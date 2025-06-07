@@ -82,6 +82,14 @@
           </div>
         `;
         containerAnalise.insertAdjacentHTML('afterbegin', novaAnalise);
+
+        // ✅ Ativa o botão "Perguntar"
+        const botaoPerguntar = document.getElementById('botao-perguntar');
+        const campoPrompt = document.getElementById('prompt');
+        if (botaoPerguntar && campoPrompt) {
+          botaoPerguntar.disabled = false;
+          campoPrompt.disabled = false;
+        }
       }
 
     } catch (error) {
@@ -140,4 +148,3 @@
     }
   }
 </script>
-
