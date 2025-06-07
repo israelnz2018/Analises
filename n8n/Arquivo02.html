@@ -26,7 +26,24 @@
 
     <!-- 🧠 Prompt -->
     <label for="prompt">Prompt</label>
-    <input type="text" id="prompt" name="prompt" disabled />
+    <input
+      type="text"
+      id="prompt"
+      name="prompt"
+      disabled
+      style="width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 6px;"
+    />
+
+    <!-- 🔹 Botão “Perguntar” (inicialmente oculto) -->
+    <button
+      id="botao-perguntar"
+      type="button"
+      onclick="perguntarIA()"
+      disabled
+      style="display: none; background-color: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 20px;"
+    >
+      Perguntar
+    </button>
 
     <!-- 🕽️ Dropdowns -->
     <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
