@@ -25,6 +25,7 @@
 
   iniciarMonitoramentoInatividade();
 
+
   async function enviarFormulario(event) {
     event.preventDefault();
 
@@ -71,6 +72,18 @@
         const carregandoAntigo = document.getElementById('carregando-analise');
         if (carregandoAntigo) carregandoAntigo.remove();
 
+        // ✅ Ativa o botão "Perguntar"
+        const botaoPerguntar = document.getElementById("botao-perguntar");
+        const campoPrompt = document.getElementById("prompt");
+
+        if (botaoPerguntar) {
+          botaoPerguntar.style.display = "inline-block";
+          botaoPerguntar.disabled = false;
+        }
+        if (campoPrompt) {
+          campoPrompt.disabled = false;
+        }
+
         const parteAnalise = json.analise
           .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
           .replace(/\n/g, '<br>');
@@ -82,14 +95,6 @@
           </div>
         `;
         containerAnalise.insertAdjacentHTML('afterbegin', novaAnalise);
-
-        // ✅ Ativa o botão "Perguntar"
-        const botaoPerguntar = document.getElementById('botao-perguntar');
-        const campoPrompt = document.getElementById('prompt');
-        if (botaoPerguntar && campoPrompt) {
-          botaoPerguntar.disabled = false;
-          campoPrompt.disabled = false;
-        }
       }
 
     } catch (error) {
