@@ -95,7 +95,15 @@
           </div>
         `;
         containerAnalise.insertAdjacentHTML('afterbegin', novaAnalise);
-      }
+        // Ativa o botão "Perguntar" após a análise
+        const botaoPerguntar = document.getElementById("botao-perguntar");
+        if (botaoPerguntar) {
+          botaoPerguntar.disabled = false;
+          botaoPerguntar.style.opacity = "1";
+          botaoPerguntar.style.cursor = "pointer";
+        }
+
+    
 
     } catch (error) {
       const erroMsg = document.createElement('div');
