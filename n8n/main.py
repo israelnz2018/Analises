@@ -6,7 +6,6 @@ import os
 import traceback
 from pathlib import Path
 
-# ← Aqui: imports sem prefixo "n8n."
 from leitura import ler_arquivo
 from suporte import interpretar_coluna
 from estatistica import ANALISES
@@ -19,17 +18,14 @@ app = FastAPI()
 def healthcheck():
     return JSONResponse({"status": "ok"})
 
-# Ajuste: pasta_raiz agora é /app/n8n (por causa do `cd /app/n8n` no start.sh)
 pasta_raiz = Path(__file__).parent
 
-# Monta todos os arquivos dentro de /app/n8n (index.html e ArquivoXX.html) em "/n8n"
 app.mount(
     "/n8n",
     StaticFiles(directory=pasta_raiz),
     name="n8n_static"
 )
 
-# Ajuste: Templates também apontam para /app/n8n
 templates = Jinja2Templates(directory=str(pasta_raiz))
 
 @app.get("/", response_class=HTMLResponse)
@@ -95,11 +91,6 @@ async def analisar(
                 coluna_y=nome_coluna_y
             )
 
-        if modo == "analise":
-            if not ferramenta and not grafico:
-                return JSONResponse(content={"erro": "❌ Você deve selecionar pelo menos uma ferramenta ou gráfico."}, status_code=400)
-
-
         return {
             "analise": resultado_texto or "",
             "explicacao_ia": explicacao_ia,
@@ -122,4 +113,5 @@ async def analisar(
             },
             status_code=500
         )
+
 
