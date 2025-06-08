@@ -1,5 +1,6 @@
 <script>
   let slimSelectInstance = null;
+
   function verificarArquivo() {
     const arquivo = document.getElementById('arquivo').files[0];
     const erro = document.getElementById('erro-arquivo');
@@ -49,7 +50,7 @@
         msg.textContent = `✅ Acesso aprovado! Bem-vindo, ${itemComNome.nome}!`;
         msg.style.color = "green";
 
-        // Habilita campos (exceto botão enviar que já está sempre ativado)
+        // Habilita campos
         ['prompt', 'arquivo', 'enviar', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.disabled = false;
@@ -63,15 +64,19 @@
         campoSenha.disabled = true;
 
         if (slimSelectInstance) slimSelectInstance.destroy();
-        slimSelectInstance = new SlimSelect({
-          select: '#colunas_x',
-          settings: { closeOnSelect: false },
-          events: {
-            afterChange: info => {
-              slimSelectInstance.ordemSelecionada = info.map(item => item.value);
+
+        // ⏱ Aguarda DOM liberar antes de inicializar SlimSelect
+        setTimeout(() => {
+          slimSelectInstance = new SlimSelect({
+            select: '#colunas_x',
+            settings: { closeOnSelect: false },
+            events: {
+              afterChange: info => {
+                slimSelectInstance.ordemSelecionada = info.map(item => item.value);
+              }
             }
-          }
-        });
+          });
+        }, 0);
 
         sessaoAtiva = true;
         resetarTimer();
@@ -95,10 +100,3 @@
     if (erro) erro.textContent = '';
   }
 </script>
-
-
-
-
-
-
-
