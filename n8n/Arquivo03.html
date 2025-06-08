@@ -47,11 +47,21 @@
     containerAnalise.prepend(carregando);
 
     try {
+      // Captura raw text para debugging
       const resposta = await fetch(
         'https://primary-nita-production.up.railway.app/webhook/Agente-gpt',
         { method: 'POST', body: formData }
       );
-      const json = await resposta.json();
+      const respostaTexto = await resposta.text();
+      console.log('⛔️ Response raw text:', respostaTexto);
+
+      // Tenta parsear JSON
+      let json;
+      try {
+        json = JSON.parse(respostaTexto);
+      } catch {
+        throw new Error('Não foi possível parsear resposta JSON: ' + respostaTexto);
+      }
 
       if (json.analise && json.analise.trim()) {
         document.getElementById('carregando-analise')?.remove();
@@ -74,7 +84,8 @@
                  </div>`
               : ''}
           </div>
-        `);
+        `
+        );
 
         const botaoPerguntar = document.getElementById('botao-perguntar');
         botaoPerguntar.style.display = 'inline-block';
@@ -131,3 +142,4 @@
     }
   }
 </script>
+
