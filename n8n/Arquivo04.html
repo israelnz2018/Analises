@@ -49,7 +49,7 @@
         msg.style.color = "green";
 
         // Habilita campos (exceto botão enviar que já está sempre ativado)
-        ['prompt', 'arquivo', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
+        ['prompt', 'arquivo', 'enviar', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.disabled = false;
         });
