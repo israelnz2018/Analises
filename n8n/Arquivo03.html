@@ -3,7 +3,6 @@
   // ⏱ Monitoramento de inatividade
   let inatividadeTimer;
   let sessaoAtiva = false;
-  let slimSelectInstance = null;
 
   function resetarTimer() {
     if (!sessaoAtiva) return;
@@ -17,19 +16,17 @@
   }
 
   function iniciarMonitoramentoInatividade() {
-    ['mousemove', 'keydown', 'scroll'].forEach(evt =>
+    ['mousemove', 'keydown', 'scroll', 'click'].forEach(evt =>
       document.addEventListener(evt, resetarTimer)
     );
-    document.addEventListener('click', e => {
-      if (e.target.id !== 'enviar') resetarTimer();
-    });
   }
-
   iniciarMonitoramentoInatividade();
 
   // 📤 Função de envio do formulário
   async function enviarFormulario(event) {
+    alert('▶️ enviarFormulario foi acionado');
     event.preventDefault();
+
     if (!validarCamposSelecionados()) return;
 
     sessaoAtiva = true; // ativa sessão após primeiro envio
@@ -38,7 +35,8 @@
     const spinner = document.getElementById('spinner');
     spinner.style.display = 'inline-block';
 
-    const formData = new FormData(document.getElementById('formulario'));
+    const form = document.getElementById('formulario');
+    const formData = new FormData(form);
     formData.delete('senha');
 
     const containerAnalise = document.getElementById('analise');
@@ -67,17 +65,16 @@
         containerAnalise.insertAdjacentHTML(
           'afterbegin',
           `
-          <div class="analise-completa" style="margin-bottom:24px; padding-bottom:12px; border-bottom:1px solid #ccc;">
+          <div class="analise-completa"
+               style="margin-bottom:24px; padding-bottom:12px; border-bottom:1px solid #ccc;">
             <div class="analise-texto">${parteAnalise}</div>
-            ${
-              json.grafico_base64
-                ? `<div class="analise-graficos">
-                     <img src="data:image/png;base64,${json.grafico_base64}"
-                          alt="Gráfico da análise"
-                          style="margin-top:12px; border-radius:6px; max-width:100%;" />
-                   </div>`
-                : ''
-            }
+            ${json.grafico_base64
+              ? `<div class="analise-graficos">
+                   <img src="data:image/png;base64,${json.grafico_base64}"
+                        alt="Gráfico da análise"
+                        style="margin-top:12px; border-radius:6px; max-width:100%;" />
+                 </div>`
+              : ''}
           </div>
         `
         );
@@ -99,7 +96,10 @@
 
   // 🧠 Função de pergunta ao Agente baseado na última análise
   async function perguntarIA() {
-    const pergunta = document.getElementById('prompt').value.trim();
+    alert('▶️ perguntarIA foi acionado');
+
+    const promptInput = document.getElementById('prompt');
+    const pergunta = promptInput.value.trim();
     if (!pergunta) return;
 
     const ultima = document.querySelector('.analise-completa .analise-texto');
@@ -109,7 +109,7 @@
     }
 
     const textoPlano = ultima.textContent.trim();
-    const promptCompleto = `Com base nesta análise:\n\n${textoPlano}\n\nResponda:\n${pergunta}`;
+    const payload = { prompt: `Com base nesta análise:\n\n${textoPlano}\n\nResponda:\n${pergunta}` };
 
     const blocoPergunta = document.createElement('div');
     blocoPergunta.className = 'pergunta-resposta';
@@ -125,7 +125,7 @@
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: promptCompleto })
+          body: JSON.stringify(payload)
         }
       );
       const data = await response.json();
@@ -135,3 +135,4 @@
     }
   }
 </script>
+
