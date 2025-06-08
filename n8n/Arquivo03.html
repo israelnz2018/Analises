@@ -27,8 +27,6 @@
     alert('▶️ enviarFormulario foi acionado');
     event.preventDefault();
 
-    if (!validarCamposSelecionados()) return;
-
     sessaoAtiva = true; // ativa sessão após primeiro envio
     resetarTimer();
 
@@ -76,13 +74,11 @@
                  </div>`
               : ''}
           </div>
-        `
-        );
+        `);
 
         const botaoPerguntar = document.getElementById('botao-perguntar');
         botaoPerguntar.style.display = 'inline-block';
         botaoPerguntar.disabled = false;
-        document.getElementById('prompt').disabled = false;
       }
     } catch (error) {
       containerAnalise.insertAdjacentHTML(
@@ -135,4 +131,3 @@
     }
   }
 </script>
-
