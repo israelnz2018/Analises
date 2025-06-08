@@ -5,7 +5,7 @@
     sessaoAtiva = false;
     clearTimeout(inatividadeTimer);
 
-    ['prompt', 'arquivo', 'enviar', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
+    ['prompt', 'arquivo', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.disabled = true;
