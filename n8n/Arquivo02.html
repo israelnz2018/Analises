@@ -33,20 +33,6 @@
       disabled
       style="width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 6px;"
     />
-  </form>
-
-  <!-- 🔹 Botão “Perguntar” (inicialmente oculto), agora FORA do formulário -->
-  <button
-    id="botao-perguntar"
-    type="button"
-    onclick="perguntarIA()"
-    disabled
-    style="display: none; background-color: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;"
-  >
-    Perguntar
-  </button>
-</div>
-
 
     <!-- 🕽️ Dropdowns -->
     <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
@@ -164,7 +150,7 @@
       </div>
     </div>
 
-        <!-- 📌 Upload -->
+    <!-- 📌 Upload -->
     <label for="arquivo">Anexar Arquivo (.xlsx do Excel)</label>
     <input type="file" id="arquivo" name="arquivo" accept=".xlsx" onchange="verificarArquivo()" />
     <div id="erro-arquivo"></div>
@@ -182,4 +168,16 @@
       <div id="grafico" style="flex: 1; display: flex; flex-direction: column;"></div>
     </div>
   </form>
+
+  <!-- 🔹 Botão “Perguntar” (inicialmente oculto), agora FORA do formulário -->
+  <button
+    id="botao-perguntar"
+    type="button"
+    onclick="perguntarIA()"
+    disabled
+    style="display: none; background-color: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;"
+  >
+    Perguntar
+  </button>
 </div>
+
