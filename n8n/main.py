@@ -47,8 +47,11 @@ async def analisar(
 
         nome_coluna_y = None
         if coluna_y and coluna_y.strip():
-            nome_coluna_y = interpretar_coluna(df, coluna_y.strip())
-            colunas_usadas.append(nome_coluna_y)
+            try:
+                nome_coluna_y = interpretar_coluna(df, coluna_y.strip())
+                colunas_usadas.append(nome_coluna_y)
+            except Exception as e:
+                print(f"Erro ao interpretar coluna_y: {e}")
 
         colunas_x_lista = []
         if colunas_x:
@@ -59,10 +62,13 @@ async def analisar(
                     colunas_x_lista.extend([x.strip() for x in item.split(",") if x.strip()])
 
             for letra in colunas_x_lista:
-                nome_coluna = interpretar_coluna(df, letra)
-                colunas_usadas.append(nome_coluna)
+                try:
+                    nome_coluna = interpretar_coluna(df, letra)
+                    colunas_usadas.append(nome_coluna)
+                except Exception as e:
+                    print(f"Erro ao interpretar colunas_x: {e}")
 
-        if not colunas_usadas:
+        if not nome_coluna_y and not colunas_x_lista:
             return JSONResponse(content={"erro": "Informe ao menos coluna_y ou colunas_x."}, status_code=422)
 
         for col in colunas_usadas:
