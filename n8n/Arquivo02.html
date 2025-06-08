@@ -170,11 +170,12 @@
     <div id="erro-arquivo"></div>
 
     <!-- 🔘 Botões -->
-  <div class="botoes">
-    <button id="enviar" type="submit">Enviar</button>
-    <button id="remover" type="button" onclick="removerArquivo()">Remover Arquivo</button>
-    <span id="spinner"></span>
-  </div>
+    <div class="botoes">
+      <button id="enviar" type="submit" disabled>Enviar</button>
+      <button id="remover" type="button" onclick="removerArquivo()" disabled>Remover Arquivo</button>
+      <span id="spinner"></span>
+    </div>
+
 
     <!-- 📊 Resultados -->
     <div class="resultado-container" style="display: flex; gap: 40px; margin-top: 40px;">
