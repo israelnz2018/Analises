@@ -68,7 +68,8 @@ async def analisar(
                 except Exception as e:
                     print(f"Erro ao interpretar colunas_x: {e}")
 
-        if not nome_coluna_y and not colunas_x_lista:
+        # ✅ Verifica se colunas foram realmente interpretadas com sucesso
+        if not colunas_usadas:
             return JSONResponse(content={"erro": "Informe ao menos coluna_y ou colunas_x."}, status_code=422)
 
         for col in colunas_usadas:
@@ -119,5 +120,6 @@ async def analisar(
             },
             status_code=500
         )
+
 
 
