@@ -44,8 +44,8 @@
         msg.textContent = `✅ Acesso aprovado! Bem-vindo, ${itemComNome.nome}!`;
         msg.style.color = "green";
 
-        // Habilita os campos e botões agora que a chave está correta
-        ['prompt', 'arquivo', 'enviar', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
+        // Habilita os campos (exceto o botão enviar que já está sempre habilitado)
+        ['prompt', 'arquivo', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.disabled = false;
         });
@@ -93,6 +93,7 @@
     if (erro) erro.textContent = '';
   }
 </script>
+
 
 
 
