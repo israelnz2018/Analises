@@ -95,8 +95,10 @@ async def analisar(
                 coluna_y=nome_coluna_y
             )
 
-        if not ferramenta and not grafico:
-            return JSONResponse(content={"erro": "Nenhuma ferramenta selecionada."}, status_code=400)
+        if modo == "analise":
+            if not ferramenta and not grafico:
+                return JSONResponse(content={"erro": "❌ Você deve selecionar pelo menos uma ferramenta ou gráfico."}, status_code=400)
+
 
         return {
             "analise": resultado_texto or "",
