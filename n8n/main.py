@@ -49,7 +49,8 @@ async def analisar(
         if coluna_y and coluna_y.strip():
             try:
                 nome_coluna_y = interpretar_coluna(df, coluna_y.strip())
-                colunas_usadas.append(nome_coluna_y)
+                if nome_coluna_y:
+                    colunas_usadas.append(nome_coluna_y)
             except Exception as e:
                 print(f"Erro ao interpretar coluna_y: {e}")
 
@@ -64,11 +65,12 @@ async def analisar(
             for letra in colunas_x_lista:
                 try:
                     nome_coluna = interpretar_coluna(df, letra)
-                    colunas_usadas.append(nome_coluna)
+                    if nome_coluna:
+                        colunas_usadas.append(nome_coluna)
                 except Exception as e:
                     print(f"Erro ao interpretar colunas_x: {e}")
 
-        # 🟡 DEBUG: Mostra o que foi interpretado
+        # ✅ Correção: valida colunas interpretadas com sucesso
         print("🟡 DEBUG colunas_usadas:", colunas_usadas)
         print("🟡 Todas as colunas do df:", list(df.columns))
 
@@ -123,7 +125,3 @@ async def analisar(
             },
             status_code=500
         )
-
-
-
-
