@@ -1,21 +1,28 @@
 #!/bin/sh
-echo "🚀 Startup: PROJECT=$PROJECT"
+echo "🟡 [start.sh] PROJECT=${PROJECT}"
 echo "📁 Diretório atual: $(pwd)"
 
-if [ "$PROJECT" = "analises" ]; then
-  echo "▶️ Modo Análises: iniciando FastAPI..."
+if [ "$PROJECT" = "html" ]; then
+  echo "📂 Conteúdo de /app/n8n:"
+  ls -la /app/n8n
+
+  echo "📄 Verificando se /app/n8n/main.py existe..."
+  if [ -f /app/n8n/main.py ]; then
+    echo "✅ /app/n8n/main.py encontrado!"
+  else
+    echo "❌ ERRO: /app/n8n/main.py NÃO encontrado!"
+    exit 1
+  fi
+
+  echo "🚀 Iniciando FastAPI (formulário) em $PORT ou fallback 8000..."
   cd /app/n8n
   uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
 
-elif [ "$PROJECT" = "html" ]; then
-  echo "▶️ Modo HTML/API: iniciando n8n Workflow Designer..."
-  n8n start --port ${PORT:-5678}
-
 else
-  echo "❌ Valor inválido para PROJECT: $PROJECT"
-  echo "   Use PROJECT=html ou PROJECT=analises"
-  exit 1
+  echo "🚀 Iniciando n8n Workflow Designer em ${PORT}..."
+  n8n start --host 0.0.0.0 --port ${PORT}
 fi
+
 
 
 
