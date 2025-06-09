@@ -19,8 +19,8 @@ if [ "$PROJECT" = "html" ]; then
   uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
 
 else
-  echo "🚀 Iniciando n8n Workflow Designer em ${PORT}..."
-  n8n start --host 0.0.0.0 --port ${PORT}
+  echo "🚀 Iniciando n8n Workflow Designer..."
+  n8n start
 fi
 
 
