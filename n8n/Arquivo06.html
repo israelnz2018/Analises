@@ -3,7 +3,7 @@
     const ferramenta = document.getElementById("ferramenta").value;
     const grafico = document.getElementById("grafico_tipo").value;
     const colunaY = document.getElementById("coluna_y").value;
-    const colunasX = slimSelectInstance ? slimSelectInstance.getSelected() : [];
+    const colunasX = slimSelectInstance ? slimSelectInstance.getSelected() : []; 
 
     if (!ferramenta && !grafico) {
       exibirModalErro("Selecione uma ferramenta estatística ou um tipo de gráfico.");
