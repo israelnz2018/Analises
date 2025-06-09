@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware 
+from fastapi.templating import Jinja2Templates
 import os
 import traceback
 from pathlib import Path
