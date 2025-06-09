@@ -5,7 +5,7 @@
   let sessaoAtiva = false;
 
   function resetarTimer() {
-    if (!sessaoAtiva) return;
+    if (!sessaoAtiva) return; 
     clearTimeout(inatividadeTimer);
     inatividadeTimer = setTimeout(() => {
       deslogar();
