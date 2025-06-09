@@ -9,7 +9,8 @@ if [ "$PROJECT" = "analises" ]; then
 
 elif [ "$PROJECT" = "html" ]; then
   echo "▶️ Modo HTML/API: iniciando n8n Workflow Designer..."
-  n8n start
+  n8n start --port ${PORT:-5678}
+
 else
   echo "❌ Valor inválido para PROJECT: $PROJECT"
   echo "   Use PROJECT=html ou PROJECT=analises"
