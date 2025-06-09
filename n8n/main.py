@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import traceback
 from pathlib import Path
@@ -14,6 +14,13 @@ from agente import interpretar_analise
 
 # Cria app
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # ou substitua por ["https://www.seusite.com"] se quiser restringir
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
 
 # Templates e path raiz
@@ -133,4 +140,5 @@ async def analisar(
             },
             status_code=500
         )
+
 
