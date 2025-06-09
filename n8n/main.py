@@ -11,13 +11,13 @@ from leitura import ler_arquivo
 from suporte import interpretar_coluna
 from estatistica import ANALISES
 from graficos import GRAFICOS
-from agente import interpretar_analise
+from agente import perguntar_ia  # ⬅️ ALTERADO AQUI
 
 # Cria app
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ou substitua por ["https://www.seusite.com"] se quiser restringir
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -108,7 +108,7 @@ async def analisar(
             if not funcao:
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
             resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
-            explicacao_ia = interpretar_analise(resultado_texto)
+            explicacao_ia = perguntar_ia("O que essa análise significa?", resultado_texto)  # ⬅️ ALTERADO AQUI
 
         # Processa gráfico
         if grafico and grafico.strip():
@@ -141,5 +141,6 @@ async def analisar(
             },
             status_code=500
         )
+
 
 
