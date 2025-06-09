@@ -10,12 +10,12 @@ if [ "$PROJECT" = "html" ]; then
 elif [ "$PROJECT" = "analises" ]; then
   echo "▶️ Modo Análises: iniciando n8n Workflow Designer..."
   n8n start
-
 else
   echo "❌ Valor inválido para PROJECT: $PROJECT"
   echo "   Use PROJECT=html ou PROJECT=analises"
   exit 1
 fi
+
 
 
 
