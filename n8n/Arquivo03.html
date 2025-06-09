@@ -49,7 +49,7 @@
     try {
       // Captura raw text para debugging
       const resposta = await fetch(
-        'https://primary-production-1d53.up.railway.app/webhook/Agente-gpt',
+        'https://educacaopelotrabalho-production.up.railway.app/analise',
         { method: 'POST', body: formData }
       );
       const respostaTexto = await resposta.text();
@@ -128,7 +128,7 @@
 
     try {
       const response = await fetch(
-        'https://primary-nita-production.up.railway.app/webhook/Agente-gpt',
+        '',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
