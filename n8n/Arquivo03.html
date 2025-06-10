@@ -102,6 +102,7 @@
   }
 
   <!-- 🧠 Função de pergunta ao Agente baseado na última análise -->
+<script>
   async function perguntarIA() {
     alert('▶️ perguntarIA foi acionado');
 
@@ -145,15 +146,22 @@
 
       let respostaFinal = "";
 
-      if (typeof data === "string") {
-        respostaFinal = data;
-      } else if (data?.analise) {
-        respostaFinal = data.analise;
-      } else {
-        console.warn("⚠️ Nenhum campo 'analise' encontrado em 'data'.", data);
-      }
+      try {
+        if (typeof data === "string") {
+          respostaFinal = data;
+        } else if (data?.analise) {
+          respostaFinal = data.analise;
+        } else {
+          console.warn("⚠️ Nenhum campo 'analise' encontrado em 'data'.", data);
+          respostaFinal = JSON.stringify(data);
+        }
 
-      respostaFinal = (respostaFinal || "").replace(/\n/g, '<br>');
+        respostaFinal = (respostaFinal || "").replace(/\*\*(.*?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+      } catch (erro) {
+        console.error("❌ Erro ao formatar resultado:", erro);
+        console.log("🧪 Resultado recebido:", data);
+        respostaFinal = data?.analise || "❌ Nenhuma resposta formatável recebida.";
+      }
 
       blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${respostaFinal}`;
     } catch (e) {
