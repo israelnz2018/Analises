@@ -101,7 +101,7 @@
     }
   }
 
-  // 🧠 Função de pergunta ao Agente baseado na última análise
+  <!-- 🧠 Função de pergunta ao Agente baseado na última análise -->
   async function perguntarIA() {
     alert('▶️ perguntarIA foi acionado');
 
@@ -153,12 +153,7 @@
         console.warn("⚠️ Nenhum campo 'analise' encontrado em 'data'.", data);
       }
 
-      if (!respostaFinal || typeof respostaFinal !== "string") {
-        console.error("❌ respostaFinal está undefined ou não é string:", respostaFinal);
-        respostaFinal = "";
-      }
-
-      respostaFinal = respostaFinal.replace(/\n/g, '<br>');
+      respostaFinal = (respostaFinal || "").replace(/\n/g, '<br>');
 
       blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${respostaFinal}`;
     } catch (e) {
@@ -167,4 +162,3 @@
     }
   }
 </script>
-
