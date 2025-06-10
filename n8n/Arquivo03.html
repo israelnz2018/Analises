@@ -24,7 +24,7 @@
 
   // 📤 Função de envio do formulário
   async function enviarFormulario(event) {
-    console.log('▶️ perguntarIA foi realmente acionado');
+    console.log('▶️ enviarFormulario foi acionado');
     event.preventDefault();
 
     sessaoAtiva = true; // ativa sessão após primeiro envio
@@ -89,6 +89,7 @@
         const botaoPerguntar = document.getElementById('botao-perguntar');
         botaoPerguntar.style.display = 'inline-block';
         botaoPerguntar.disabled = false;
+        botaoPerguntar.onclick = perguntarIA; // ✅ agora o botão dispara a função corretamente
       }
     } catch (error) {
       containerAnalise.insertAdjacentHTML(
@@ -100,72 +101,70 @@
     }
   }
 
- // 🧠 Função de pergunta ao Agente baseado na última análise
-async function perguntarIA() {
-  alert('▶️ perguntarIA foi acionado');
+  // 🧠 Função de pergunta ao Agente baseado na última análise
+  async function perguntarIA() {
+    alert('▶️ perguntarIA foi acionado');
 
-  const promptInput = document.getElementById('prompt');
-  const pergunta = promptInput.value.trim();
-  if (!pergunta) return;
+    const promptInput = document.getElementById('prompt');
+    const pergunta = promptInput.value.trim();
+    if (!pergunta) return;
 
-  const ultima = document.querySelector('.analise-completa .analise-texto');
-  if (!ultima) {
-    alert('⚠️ Nenhuma análise encontrada.');
-    return;
-  }
+    const ultima = document.querySelector('.analise-completa .analise-texto');
+    if (!ultima) {
+      alert('⚠️ Nenhuma análise encontrada.');
+      return;
+    }
 
-  const textoPlano = ultima.textContent.trim();
+    const textoPlano = ultima.textContent.trim();
 
-  const payload = {
-    analise: textoPlano,
-    prompt: pergunta
-  };
+    const payload = {
+      analise: textoPlano,
+      prompt: pergunta
+    };
 
-  const blocoPergunta = document.createElement('div');
-  blocoPergunta.className = 'pergunta-resposta';
-  blocoPergunta.style.marginBottom = '24px';
-  blocoPergunta.style.border = '1px solid #007bff';
-  blocoPergunta.style.padding = '12px';
-  blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><em>Carregando...</em>`;
-  document.getElementById('analise').prepend(blocoPergunta);
+    const blocoPergunta = document.createElement('div');
+    blocoPergunta.className = 'pergunta-resposta';
+    blocoPergunta.style.marginBottom = '24px';
+    blocoPergunta.style.border = '1px solid #007bff';
+    blocoPergunta.style.padding = '12px';
+    blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><em>Carregando...</em>`;
+    document.getElementById('analise').prepend(blocoPergunta);
 
-  try {
-    const response = await fetch(
-      'https://primary-production-1d53.up.railway.app/webhook/perguntar-ia',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+    try {
+      const response = await fetch(
+        'https://primary-production-1d53.up.railway.app/webhook/perguntar-ia',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      const data = await response.json();
+      console.log("🟡 Resposta bruta recebida do agente:", data);
+
+      let respostaFinal = "";
+
+      if (typeof data === "string") {
+        respostaFinal = data;
+      } else if (data?.analise) {
+        respostaFinal = data.analise;
+      } else {
+        console.warn("⚠️ Nenhum campo 'analise' encontrado em 'data'.", data);
       }
-    );
 
-    const data = await response.json();
+      if (!respostaFinal || typeof respostaFinal !== "string") {
+        console.error("❌ respostaFinal está undefined ou não é string:", respostaFinal);
+        respostaFinal = "";
+      }
 
-    // 🔍 Log completo da resposta
-    console.log("🟡 Resposta bruta recebida do agente:", data);
+      respostaFinal = respostaFinal.replace(/\n/g, '<br>');
 
-    let respostaFinal = "";
-
-    if (typeof data === "string") {
-      respostaFinal = data;
-    } else if (data?.analise) {
-      respostaFinal = data.analise;
-    } else {
-      console.warn("⚠️ Nenhum campo 'analise' encontrado em 'data'.", data);
+      blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${respostaFinal}`;
+    } catch (e) {
+      console.error("❌ Erro no fetch ou no processamento:", e);
+      blocoPergunta.innerHTML = `<span style="color:red;">❌ Erro: ${e.message}</span>`;
     }
-
-    if (!respostaFinal || typeof respostaFinal !== "string") {
-      console.error("❌ respostaFinal está undefined ou não é string:", respostaFinal);
-      respostaFinal = "";
-    }
-
-    respostaFinal = respostaFinal.replace(/\n/g, '<br>');
-
-    blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${respostaFinal}`;
-  } catch (e) {
-    console.error("❌ Erro no fetch ou no processamento:", e);
-    blocoPergunta.innerHTML = `<span style="color:red;">❌ Erro: ${e.message}</span>`;
   }
-}
-
 </script>
+
