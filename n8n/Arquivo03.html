@@ -105,44 +105,46 @@
   }
 
   // 🧠 Função de pergunta ao Agente baseado na última análise
-  async function perguntarIA() {
-    alert('▶️ perguntarIA foi acionado');
+async function perguntarIA() {
+  alert('▶️ perguntarIA foi acionado');
 
-    const promptInput = document.getElementById('prompt');
-    const pergunta = promptInput.value.trim();
-    if (!pergunta) return;
+  const promptInput = document.getElementById('prompt');
+  const pergunta = promptInput.value.trim();
+  if (!pergunta) return;
 
-    const ultima = document.querySelector('.analise-completa .analise-texto');
-    if (!ultima) {
-      alert('⚠️ Nenhuma análise encontrada.');
-      return;
-    }
-
-    const textoPlano = ultima.textContent.trim();
-    const payload = { prompt: `Com base nesta análise:\n\n${textoPlano}\n\nResponda:\n${pergunta}` };
-
-    const blocoPergunta = document.createElement('div');
-    blocoPergunta.className = 'pergunta-resposta';
-    blocoPergunta.style.marginBottom = '24px';
-    blocoPergunta.style.border = '1px solid #007bff';
-    blocoPergunta.style.padding = '12px';
-    blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><em>Carregando...</em>`;
-    document.getElementById('analise').prepend(blocoPergunta);
-
-    try {
-      const response = await fetch(
-        '',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }
-      );
-      const data = await response.json();
-      blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${data.analise.replace(/\n/g, '<br>')}`;
-    } catch (e) {
-      blocoPergunta.innerHTML = `<span style="color:red;">❌ Erro: ${e.message}</span>`;
-    }
+  const ultima = document.querySelector('.analise-completa .analise-texto');
+  if (!ultima) {
+    alert('⚠️ Nenhuma análise encontrada.');
+    return;
   }
-</script>
 
+  const textoPlano = ultima.textContent.trim();
+
+  const payload = {
+    analise: textoPlano,
+    prompt: pergunta
+  };
+
+  const blocoPergunta = document.createElement('div');
+  blocoPergunta.className = 'pergunta-resposta';
+  blocoPergunta.style.marginBottom = '24px';
+  blocoPergunta.style.border = '1px solid #007bff';
+  blocoPergunta.style.padding = '12px';
+  blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><em>Carregando...</em>`;
+  document.getElementById('analise').prepend(blocoPergunta);
+
+  try {
+    const response = await fetch(
+      '',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    );
+    const data = await response.json();
+    blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${data.analise.replace(/\n/g, '<br>')}`;
+  } catch (e) {
+    blocoPergunta.innerHTML = `<span style="color:red;">❌ Erro: ${e.message}</span>`;
+  }
+}
