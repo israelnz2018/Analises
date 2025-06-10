@@ -36,6 +36,9 @@
     const form = document.getElementById('formulario');
     const formData = new FormData(form);
     formData.delete('senha');
+    const prompt = document.getElementById('prompt').value.trim();
+    formData.set('prompt', prompt);
+
 
     const containerAnalise = document.getElementById('analise');
     document.getElementById('carregando-analise')?.remove();
