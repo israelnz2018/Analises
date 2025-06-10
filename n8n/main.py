@@ -11,7 +11,7 @@ from leitura import ler_arquivo
 from suporte import interpretar_coluna
 from estatistica import ANALISES
 from graficos import GRAFICOS
-from agente import perguntar_ia  # ⬅️ ALTERADO AQUI
+from agente import perguntar_ia  # ainda importado, mas não usado
 
 # Cria app
 app = FastAPI()
@@ -101,14 +101,14 @@ async def analisar(
         resultado_texto = None
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
-        explicacao_ia = None
+        explicacao_ia = None  # ✅ Agente IA desativado no botão "Enviar"
 
         if ferramenta and ferramenta.strip():
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
             resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
-            explicacao_ia = perguntar_ia("O que essa análise significa?", resultado_texto)  # ⬅️ ALTERADO AQUI
+            explicacao_ia = None  # agente removido daqui
 
         # Processa gráfico
         if grafico and grafico.strip():
@@ -141,6 +141,7 @@ async def analisar(
             },
             status_code=500
         )
+
 
 
 
