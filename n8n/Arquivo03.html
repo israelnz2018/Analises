@@ -100,60 +100,72 @@
     }
   }
 
-  <!-- 🧠 Função de pergunta ao Agente baseado na última análise -->
-  async function perguntarIA() {
-    alert('▶️ perguntarIA foi acionado');
+ // 🧠 Função de pergunta ao Agente baseado na última análise
+async function perguntarIA() {
+  alert('▶️ perguntarIA foi acionado');
 
-    const promptInput = document.getElementById('prompt');
-    const pergunta = promptInput.value.trim();
-    if (!pergunta) return;
+  const promptInput = document.getElementById('prompt');
+  const pergunta = promptInput.value.trim();
+  if (!pergunta) return;
 
-    const ultima = document.querySelector('.analise-completa .analise-texto');
-    if (!ultima) {
-      alert('⚠️ Nenhuma análise encontrada.');
-      return;
-    }
-
-    const textoPlano = ultima.textContent.trim();
-
-    const payload = {
-      analise: textoPlano,
-      prompt: pergunta
-    };
-
-    const blocoPergunta = document.createElement('div');
-    blocoPergunta.className = 'pergunta-resposta';
-    blocoPergunta.style.marginBottom = '24px';
-    blocoPergunta.style.border = '1px solid #007bff';
-    blocoPergunta.style.padding = '12px';
-    blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><em>Carregando...</em>`;
-    document.getElementById('analise').prepend(blocoPergunta);
-
-    try {
-      const response = await fetch(
-        'https://primary-production-1d53.up.railway.app/webhook/perguntar-ia',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }
-      );
-
-      const data = await response.json();
-
-      // ✅ Correção segura contra erro de .replace
-      let respostaFinal = "";
-      if (typeof data === "string") {
-        respostaFinal = data;
-      } else if (data?.analise) {
-        respostaFinal = data.analise;
-      }
-
-      respostaFinal = respostaFinal.replace(/\n/g, '<br>');
-
-      blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${respostaFinal}`;
-    } catch (e) {
-      blocoPergunta.innerHTML = `<span style="color:red;">❌ Erro: ${e.message}</span>`;
-    }
+  const ultima = document.querySelector('.analise-completa .analise-texto');
+  if (!ultima) {
+    alert('⚠️ Nenhuma análise encontrada.');
+    return;
   }
+
+  const textoPlano = ultima.textContent.trim();
+
+  const payload = {
+    analise: textoPlano,
+    prompt: pergunta
+  };
+
+  const blocoPergunta = document.createElement('div');
+  blocoPergunta.className = 'pergunta-resposta';
+  blocoPergunta.style.marginBottom = '24px';
+  blocoPergunta.style.border = '1px solid #007bff';
+  blocoPergunta.style.padding = '12px';
+  blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><em>Carregando...</em>`;
+  document.getElementById('analise').prepend(blocoPergunta);
+
+  try {
+    const response = await fetch(
+      'https://primary-production-1d53.up.railway.app/webhook/perguntar-ia',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    const data = await response.json();
+
+    // 🔍 Log completo da resposta
+    console.log("🟡 Resposta bruta recebida do agente:", data);
+
+    let respostaFinal = "";
+
+    if (typeof data === "string") {
+      respostaFinal = data;
+    } else if (data?.analise) {
+      respostaFinal = data.analise;
+    } else {
+      console.warn("⚠️ Nenhum campo 'analise' encontrado em 'data'.", data);
+    }
+
+    if (!respostaFinal || typeof respostaFinal !== "string") {
+      console.error("❌ respostaFinal está undefined ou não é string:", respostaFinal);
+      respostaFinal = "";
+    }
+
+    respostaFinal = respostaFinal.replace(/\n/g, '<br>');
+
+    blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${respostaFinal}`;
+  } catch (e) {
+    console.error("❌ Erro no fetch ou no processamento:", e);
+    blocoPergunta.innerHTML = `<span style="color:red;">❌ Erro: ${e.message}</span>`;
+  }
+}
+
 </script>
