@@ -100,7 +100,7 @@
     }
   }
 
-  // 🧠 Função de pergunta ao Agente baseado na última análise
+  <!-- 🧠 Função de pergunta ao Agente baseado na última análise -->
   async function perguntarIA() {
     alert('▶️ perguntarIA foi acionado');
 
@@ -138,13 +138,22 @@
           body: JSON.stringify(payload)
         }
       );
+
       const data = await response.json();
 
-      const explicacao = data.analise || "";
-      blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${explicacao.replace(/\n/g, '<br>')}`;
+      // ✅ Correção segura contra erro de .replace
+      let respostaFinal = "";
+      if (typeof data === "string") {
+        respostaFinal = data;
+      } else if (data?.analise) {
+        respostaFinal = data.analise;
+      }
+
+      respostaFinal = respostaFinal.replace(/\n/g, '<br>');
+
+      blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${respostaFinal}`;
     } catch (e) {
       blocoPergunta.innerHTML = `<span style="color:red;">❌ Erro: ${e.message}</span>`;
     }
   }
 </script>
-
