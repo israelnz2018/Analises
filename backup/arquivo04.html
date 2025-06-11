@@ -1,6 +1,8 @@
 <script>
+  let slimSelectInstance = null;
+
   function verificarArquivo() {
-    const arquivo = document.getElementById('arquivo').files[0];
+    const arquivo = document.getElementById('arquivo').files[0];  
     const erro = document.getElementById('erro-arquivo');
     if (!arquivo) return;
 
@@ -12,8 +14,9 @@
     } else {
       erro.textContent = '';
     }
-  }
+  } 
 
+  // 🛡️ Valida a chave de acesso
   async function validarChave() {
     const senha = document.getElementById('chave').value.trim();
     const msg = document.getElementById('mensagem-chave');
@@ -31,12 +34,15 @@
     formData.append("senha", senha);
 
     try {
-      const resposta = await fetch("https://primary-production-1d53.up.railway.app/webhook/senha", {
-        method: "POST",
-        body: formData
-      });
+      const resposta = await fetch(
+        'https://primary-production-1d53.up.railway.app/webhook/senha',
+        { method: "POST", body: formData }
+      );
 
-      const raw = await resposta.json();
+      const texto = await resposta.text();
+      console.log("🔍 Resposta bruta da API:", texto);
+
+      const raw = JSON.parse(texto);
       const data = Array.isArray(raw) ? raw : [raw];
       const itemComNome = data.find(item => item?.nome?.trim());
 
@@ -44,9 +50,14 @@
         msg.textContent = `✅ Acesso aprovado! Bem-vindo, ${itemComNome.nome}!`;
         msg.style.color = "green";
 
-        ['prompt', 'arquivo', 'enviar', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
-          document.getElementById(id).disabled = false;
+        // Habilita campos
+        ['prompt', 'arquivo','enviar', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.disabled = false;
         });
+
+        const botaoEnviar = document.getElementById('enviar');
+        if (botaoEnviar) botaoEnviar.disabled = false;
 
         document.getElementById('sair').style.display = 'inline-block';
 
@@ -56,17 +67,19 @@
         campoSenha.disabled = true;
 
         if (slimSelectInstance) slimSelectInstance.destroy();
-        slimSelectInstance = new SlimSelect({
-          select: '#colunas_x',
-          settings: {
-            closeOnSelect: false
-          },
-          events: {
-            afterChange: (info) => {
-              slimSelectInstance.ordemSelecionada = info.map(item => item.value);
+
+        // ⏱ Aguarda DOM liberar antes de inicializar SlimSelect
+        setTimeout(() => {
+          slimSelectInstance = new SlimSelect({
+            select: '#colunas_x',
+            settings: { closeOnSelect: false },
+            events: {
+              afterChange: info => {
+                slimSelectInstance.ordemSelecionada = info.map(item => item.value);
+              }
             }
-          }
-        });
+          });
+        }, 0);
 
         sessaoAtiva = true;
         resetarTimer();
@@ -77,13 +90,16 @@
     } catch (err) {
       msg.textContent = "❌ Erro na verificação.";
       msg.style.color = "red";
+      console.error("❌ Erro ao validar chave:", err);
     } finally {
       spinner.style.display = "none";
     }
   }
 
   function removerArquivo() {
-    document.getElementById('arquivo').value = '';
-    document.getElementById('erro-arquivo').textContent = '';
+    const input = document.getElementById('arquivo');
+    if (input) input.value = '';
+    const erro = document.getElementById('erro-arquivo');
+    if (erro) erro.textContent = '';
   }
 </script>
