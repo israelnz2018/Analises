@@ -27,7 +27,7 @@
     console.log('▶️ enviarFormulario foi acionado');
     event.preventDefault();
 
-    sessaoAtiva = true; // ativa sessão após primeiro envio
+    sessaoAtiva = true;
     resetarTimer();
 
     const spinner = document.getElementById('spinner');
@@ -63,6 +63,7 @@
         throw new Error('Não foi possível parsear resposta JSON: ' + respostaTexto);
       }
 
+      // 🧾 Exibe análise no lado esquerdo
       if (json.analise && json.analise.trim()) {
         document.getElementById('carregando-analise')?.remove();
 
@@ -92,7 +93,7 @@
         botaoPerguntar.onclick = perguntarIA;
       }
 
-      // 👉 Exibe o gráfico isolado no lado direito (div#grafico)
+      // 📊 Exibe gráfico isolado no lado direito
       const containerGrafico = document.getElementById('grafico');
       containerGrafico.innerHTML = ''; // limpa gráfico anterior
 
@@ -183,5 +184,6 @@
     }
   }
 </script>
+
 
 
