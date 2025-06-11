@@ -109,12 +109,13 @@ async function perguntarIA() {
   if (!pergunta) return;
 
   const ultima = document.querySelector('.analise-completa .analise-texto');
-  if (!ultima) {
+  if (!ultima || !ultima.innerText) {
     alert('⚠️ Nenhuma análise encontrada.');
     return;
   }
 
-  const textoPlano = ultima.textContent.trim();
+  const textoPlano = ultima.innerText.trim();
+  console.log("🔍 Última análise capturada:", textoPlano);
 
   const payload = {
     analise: textoPlano,
@@ -140,18 +141,34 @@ async function perguntarIA() {
     );
 
     const data = await response.json();
-    console.log("🟡 RESPOSTA COMPLETA RECEBIDA DO AGENTE:", data);
+    console.log("🟡 Resposta bruta recebida do agente:", data);
 
-    blocoPergunta.innerHTML = `
-      <strong>Pergunta:</strong> ${pergunta}<br>
-      <strong>Resposta (bruta):</strong><br>
-      <pre>${JSON.stringify(data, null, 2)}</pre>
-    `;
+    let respostaFinal = "";
+
+    try {
+      if (typeof data === "string") {
+        respostaFinal = data;
+      } else if (data?.analise) {
+        respostaFinal = data.analise;
+      } else {
+        console.warn("⚠️ Nenhum campo 'analise' encontrado em 'data'.", data);
+        respostaFinal = JSON.stringify(data);
+      }
+
+      respostaFinal = (respostaFinal || "").replace(/\*\*(.*?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+    } catch (erro) {
+      console.error("❌ Erro ao formatar resultado:", erro);
+      console.log("🧪 Resultado recebido:", data);
+      respostaFinal = data?.analise || "❌ Nenhuma resposta formatável recebida.";
+    }
+
+    blocoPergunta.innerHTML = `<strong>Pergunta:</strong> ${pergunta}<br><strong>Resposta:</strong> ${respostaFinal}`;
   } catch (e) {
     console.error("❌ Erro no fetch ou no processamento:", e);
     blocoPergunta.innerHTML = `<span style="color:red;">❌ Erro: ${e.message}</span>`;
   }
 }
+
 
 </script>
 
