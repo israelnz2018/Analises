@@ -101,7 +101,7 @@
     }
   }
 
-  <!-- 🧠 Função de pergunta ao Agente baseado na última análise -->
+ <!-- 🧠 Função de pergunta ao Agente baseado na última análise -->
   async function perguntarIA() {
     alert('▶️ perguntarIA foi acionado');
 
@@ -142,6 +142,7 @@
 
       const data = await response.json();
       console.log("🟡 Resposta bruta recebida do agente:", data);
+      console.log("🟢 Conteúdo exato de data:", JSON.stringify(data));
 
       let respostaFinal = "";
 
@@ -155,7 +156,9 @@
           respostaFinal = JSON.stringify(data);
         }
 
-        respostaFinal = (respostaFinal || "").replace(/\*\*(.*?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+        respostaFinal = (respostaFinal || "")
+          .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+          .replace(/\n/g, "<br>");
       } catch (erro) {
         console.error("❌ Erro ao formatar resultado:", erro);
         console.log("🧪 Resultado recebido:", data);
