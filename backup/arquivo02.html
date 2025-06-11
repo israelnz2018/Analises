@@ -1,8 +1,8 @@
 <div class="container">
-  <form id="formulario" onsubmit="enviarFormulario(event)">
+  <form id="formulario" onsubmit="enviarFormulario(event)" novalidate>
     <!-- 🔝 Cabeçalho -->
     <div class="topo">
-      <img src="https://i.postimg.cc/bwxxn1sN/logo.png" alt="Logo" />
+      <img src="https://i.postimg.cc/bwxxn1sN/logo.png" alt="Logo" /> 
       <h2>Learning by Working - Educação pelo Trabalho</h2>
     </div>
 
@@ -24,22 +24,14 @@
       Sair
     </button>
 
-    <!-- 🧠 Prompt com botão "Perguntar" ao lado -->
-    <div style="display: flex; gap: 10px; align-items: end; margin-bottom: 20px;">
-      <div style="flex: 1;">
-        <label for="prompt">Prompt</label>
-        <input type="text" id="prompt" name="prompt" disabled style="width: 100%;" />
-      </div>
-      <div style="margin-top: 24px;">
-        <button id="botao-perguntar" type="button" onclick="perguntarIA()"
-          style="background-color: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 4px; height: 38px; cursor: pointer;"
-          disabled>
-          Perguntar
-        </button>
-      </div>
-    </div>
-
-
+    <!-- 🧠 Prompt -->
+    <label for="prompt">Prompt</label>
+    <input
+      type="text"
+      id="prompt"
+      name="prompt"
+      style="width: 100%; padding: 12px; margin-bottom: 20px; border: 1px solid #ccc; border-radius: 6px;"
+    />
 
     <!-- 🕽️ Dropdowns -->
     <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px;">
@@ -159,7 +151,7 @@
 
     <!-- 📌 Upload -->
     <label for="arquivo">Anexar Arquivo (.xlsx do Excel)</label>
-    <input type="file" id="arquivo" name="arquivo" accept=".xlsx" disabled onchange="verificarArquivo()" />
+    <input type="file" id="arquivo" name="arquivo" accept=".xlsx" onchange="verificarArquivo()" />
     <div id="erro-arquivo"></div>
 
     <!-- 🔘 Botões -->
@@ -175,4 +167,15 @@
       <div id="grafico" style="flex: 1; display: flex; flex-direction: column;"></div>
     </div>
   </form>
+
+  <!-- 🔹 Botão “Perguntar” (inicialmente oculto), agora FORA do formulário -->
+  <button
+    id="botao-perguntar"
+    type="button"
+    onclick="perguntarIA()"
+    disabled
+    style="display: none; background-color: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;"
+  >
+    Perguntar
+  </button>
 </div>
