@@ -1,11 +1,11 @@
 <script>
   function deslogar() {
-    if (!confirm("Tem certeza que deseja sair?\nTudo será apagado.")) return;
+    if (!confirm("Tem certeza que deseja sair?\nTudo será apagado.")) return; 
 
     sessaoAtiva = false;
     clearTimeout(inatividadeTimer);
 
-    ['prompt', 'arquivo', 'enviar', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
+    ['prompt', 'arquivo', 'remover', 'ferramenta', 'grafico_tipo', 'coluna_y', 'colunas_x'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.disabled = true;
@@ -42,7 +42,7 @@
     const mensagensErro = document.querySelectorAll(".erro-aviso, .alerta, .mensagem-erro, .falha");
     mensagensErro.forEach(msg => msg.remove());
 
-    const msgErroFetch = document.getElementById("mensagem-erro-fetch");
+    const msgErroFetch = document.getElementById("mensagem-erro-fetch"); 
     if (msgErroFetch) msgErroFetch.remove();
   }
 
@@ -98,22 +98,4 @@
     const modal = document.getElementById("modal-erro");
     if (modal) modal.style.display = "none";
   }
-
-
-  function marcarUltimaAnalise() {
-    const container = document.getElementById('analise');
-
-    // Remove a marca anterior, se existir
-    const antiga = container.querySelector('.ultima-analise');
-    if (antiga) {
-      antiga.classList.remove('ultima-analise');
-    }
-
-    // Marca o primeiro filho (análise mais recente)
-    const nova = container.firstElementChild;
-    if (nova) {
-      nova.classList.add('ultima-analise');
-    }
-  }
-  
 </script>
