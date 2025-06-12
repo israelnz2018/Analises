@@ -51,6 +51,17 @@ if SERVE_UI:
     async def raiz(request: Request):
         return templates.TemplateResponse("index.html", {"request": request})
 
+    # 🔍 Novo endpoint para visualizar a planilha — funciona apenas em modo HTML
+    @app.post("/visualizar")
+    async def visualizar_planilha(file: UploadFile = File(...)):
+        try:
+            conteudo = await file.read()
+            df = pd.read_excel(BytesIO(conteudo))
+            preview = df.head(10).to_dict(orient="records")
+            return JSONResponse({"status": "ok", "preview": preview, "colunas": list(df.columns)})
+        except Exception as e:
+            return JSONResponse({"status": "erro", "mensagem": str(e)})
+
 # Endpoint de análise
 @app.post("/analise")
 async def analisar(
@@ -144,16 +155,6 @@ async def analisar(
             status_code=500
         )
 
-# 🔍 Novo endpoint para visualizar a planilha
-@app.post("/visualizar")
-async def visualizar_planilha(file: UploadFile = File(...)):
-    try:
-        conteudo = await file.read()
-        df = pd.read_excel(BytesIO(conteudo))
-        preview = df.head(10).to_dict(orient="records")
-        return JSONResponse({"status": "ok", "preview": preview, "colunas": list(df.columns)})
-    except Exception as e:
-        return JSONResponse({"status": "erro", "mensagem": str(e)})
 
 
 
