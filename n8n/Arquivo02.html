@@ -150,86 +150,32 @@
     </div>
 
     <!-- 📌 Upload -->
-<label for="arquivo">Anexar Arquivo (.xlsx do Excel)</label>
-<input type="file" id="arquivo" name="arquivo" accept=".xlsx" onchange="verificarArquivo(); visualizarPlanilha()" />
-<div id="erro-arquivo"></div>
+    <label for="arquivo">Anexar Arquivo (.xlsx do Excel)</label>
+    <input type="file" id="arquivo" name="arquivo" accept=".xlsx" onchange="verificarArquivo()" />
+    <div id="erro-arquivo"></div>
 
-<!-- 📋 Pré-visualização da Planilha -->
-<div id="preview-planilha" style="margin-top: 20px;"></div>
+    <!-- 🔘 Botões -->
+    <div class="botoes">
+      <button id="enviar" type="submit" disabled>Enviar</button>
+      <button id="remover" type="button" onclick="removerArquivo()" disabled>Remover Arquivo</button>
+      <span id="spinner"></span>
+    </div>
 
-<!-- 🔘 Botões -->
-<div class="botoes">
-  <button id="enviar" type="submit" disabled>Enviar</button>
-  <button id="remover" type="button" onclick="removerArquivo()" disabled>Remover Arquivo</button>
-  <span id="spinner"></span>
+    <!-- 📊 Resultados -->
+    <div class="resultado-container" style="display: flex; gap: 40px; margin-top: 40px;">
+      <div id="analise" style="flex: 1; display: flex; flex-direction: column;"></div>
+      <div id="grafico" style="flex: 1; display: flex; flex-direction: column;"></div>
+    </div>
+  </form>
+
+  <!-- 🔹 Botão “Perguntar” (inicialmente oculto), agora FORA do formulário -->
+  <button
+    id="botao-perguntar"
+    type="button"
+    onclick="perguntarIA()"
+    disabled
+    style="display: none; background-color: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;"
+  >
+    Perguntar
+  </button>
 </div>
-
-<!-- 📊 Resultados -->
-<div class="resultado-container" style="display: flex; gap: 40px; margin-top: 40px;">
-  <div id="analise" style="flex: 1; display: flex; flex-direction: column;"></div>
-  <div id="grafico" style="flex: 1; display: flex; flex-direction: column;"></div>
-</div>
-</form>
-
-<!-- 🔹 Botão “Perguntar” (inicialmente oculto), agora FORA do formulário -->
-<button
-  id="botao-perguntar"
-  type="button"
-  onclick="perguntarIA()"
-  disabled
-  style="display: none; background-color: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;"
->
-  Perguntar
-</button>
-</div>
-
-<!-- 🔁 Função JS para visualizar planilha -->
-<script>
-  async function visualizarPlanilha() {
-    const input = document.getElementById('arquivo');
-    const previewDiv = document.getElementById('preview-planilha');
-    previewDiv.innerHTML = ''; // limpa antes
-
-    if (!input.files || input.files.length === 0) return;
-
-    const formData = new FormData();
-    formData.append("file", input.files[0]);
-
-    try {
-      const response = await fetch("/visualizar", {
-        method: "POST",
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (data.status === "ok" && data.preview.length > 0) {
-        const colunas = data.colunas;
-        const linhas = data.preview;
-
-        let html = "<h4>Prévia da Planilha</h4><table border='1' cellpadding='8' cellspacing='0'><thead><tr>";
-        colunas.forEach(col => {
-          html += `<th>${col}</th>`;
-        });
-        html += "</tr></thead><tbody>";
-
-        linhas.forEach(linha => {
-          html += "<tr>";
-          colunas.forEach(col => {
-            html += `<td>${linha[col] ?? ""}</td>`;
-          });
-          html += "</tr>";
-        });
-
-        html += "</tbody></table>";
-        previewDiv.innerHTML = html;
-      } else {
-        previewDiv.innerHTML = "<p style='color: red;'>Erro ao ler a planilha.</p>";
-      }
-
-    } catch (err) {
-      console.error("Erro ao visualizar planilha:", err);
-      previewDiv.innerHTML = "<p style='color: red;'>Erro ao enviar arquivo.</p>";
-    }
-  }
-</script>
