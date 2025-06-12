@@ -51,7 +51,6 @@ if SERVE_UI:
     async def raiz(request: Request):
         return templates.TemplateResponse("index.html", {"request": request})
 
-    # 🔍 Novo endpoint para visualizar a planilha — funciona apenas em modo HTML
     @app.post("/visualizar")
     async def visualizar_planilha(file: UploadFile = File(...)):
         try:
@@ -154,6 +153,7 @@ async def analisar(
             },
             status_code=500
         )
+
 
 
 
