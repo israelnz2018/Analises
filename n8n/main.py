@@ -1,11 +1,9 @@
 from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware 
-from fastapi.templating import Jinja2Templates
-import os
+from fastapi.middleware.cors import CORSMiddleware
 import traceback
 from pathlib import Path
+import os
 
 from leitura import ler_arquivo
 from suporte import interpretar_coluna
@@ -24,30 +22,10 @@ app.add_middleware(
 )
 print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
 
-# Templates e path raiz
-pasta_raiz = Path(__file__).parent
-templates = Jinja2Templates(directory=str(pasta_raiz))
-
-# Define variável de ambiente para controlar UI
-PROJECT_MODE = os.getenv("PROJECT", "analises").lower()
-SERVE_UI = PROJECT_MODE == "html"
-
 # Healthcheck
 @app.get("/healthz")
 def healthcheck():
     return JSONResponse({"status": "ok"})
-
-# Monta UI apenas se estiver no modo html
-if SERVE_UI:
-    app.mount(
-        "/n8n",
-        StaticFiles(directory=pasta_raiz),
-        name="n8n_static"
-    )
-
-    @app.get("/", response_class=HTMLResponse)
-    async def raiz(request: Request):
-        return templates.TemplateResponse("index.html", {"request": request})
 
 # Endpoint de análise
 @app.post("/analise")
@@ -101,14 +79,13 @@ async def analisar(
         resultado_texto = None
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
-        explicacao_ia = None  # ✅ Agente IA desativado no botão "Enviar"
+        explicacao_ia = None
 
         if ferramenta and ferramenta.strip():
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
             resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
-            explicacao_ia = None  # agente removido daqui
 
         # Processa gráfico
         if grafico and grafico.strip():
@@ -141,3 +118,4 @@ async def analisar(
             },
             status_code=500
         )
+
