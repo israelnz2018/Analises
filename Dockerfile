@@ -1,20 +1,21 @@
 FROM python:3.11-slim
 
-WORKDIR /app
+WORKDIR /app/n8n
 
-COPY n8n/requirements.txt /app/requirements.txt
+COPY n8n/requirements.txt requirements.txt
 RUN pip install --upgrade pip \
- && pip install -r /app/requirements.txt
+ && pip install -r requirements.txt
 
 COPY n8n/ /app/n8n/
-RUN chmod +x /app/n8n/start.sh
+RUN chmod +x start.sh
 
 ARG PROJECT=html
 ENV PROJECT=${PROJECT}
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/n8n/start.sh"]
+ENTRYPOINT ["./start.sh"]
+
 
 
 
