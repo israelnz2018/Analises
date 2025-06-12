@@ -6,6 +6,8 @@ from fastapi.templating import Jinja2Templates
 import os
 import traceback
 from pathlib import Path
+import pandas as pd
+from io import BytesIO
 
 from leitura import ler_arquivo
 from suporte import interpretar_coluna
@@ -142,19 +144,17 @@ async def analisar(
             status_code=500
         )
 
+# 🔍 Novo endpoint para visualizar a planilha
 @app.post("/visualizar")
 async def visualizar_planilha(file: UploadFile = File(...)):
     try:
-        import pandas as pd
-        from io import BytesIO
-
         conteudo = await file.read()
         df = pd.read_excel(BytesIO(conteudo))
-        preview = df.head(10).to_dict(orient="records")  # mostra até 10 linhas
-
+        preview = df.head(10).to_dict(orient="records")
         return JSONResponse({"status": "ok", "preview": preview, "colunas": list(df.columns)})
     except Exception as e:
         return JSONResponse({"status": "erro", "mensagem": str(e)})
+
 
 
 
