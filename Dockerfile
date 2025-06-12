@@ -19,8 +19,8 @@ RUN apt-get update \
  && npm install -g n8n \
  && rm -rf /var/lib/apt/lists/*
 
-# 4) Define o projeto como FastAPI
-ARG PROJECT=fastapi
+# 4) Define o projeto como Analises
+ARG PROJECT=analises
 ENV PROJECT=${PROJECT}
 
 # 5) Expõe as portas padrão
@@ -28,6 +28,7 @@ EXPOSE 8000 5678
 
 # 6) Inicia o script de entrada
 ENTRYPOINT ["/app/start.sh"]
+
 
 
 
