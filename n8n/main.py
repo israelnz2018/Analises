@@ -5,7 +5,7 @@ import traceback
 from pathlib import Path
 import os
 
-from leitura import ler_arquivo
+from leitura import ler_arquivo 
 from suporte import interpretar_coluna
 from estatistica import ANALISES
 from graficos import GRAFICOS
