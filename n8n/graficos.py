@@ -418,7 +418,7 @@ def grafico_barras_agrupado(df, colunas_x, coluna_y=None):
 
 GRAFICOS = {
     "scatter": grafico_dispersao,
-    "boxplot_simples": grafico_boxplot_simples,
+    "Grafico BoxPlot": grafico_boxplot_simples,
     "grafico_pareto": grafico_pareto,
     "boxplot_multiplo": grafico_boxplot_multiplo,
     "histograma_simples": grafico_histograma_simples,
