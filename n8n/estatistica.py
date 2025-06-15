@@ -1147,7 +1147,7 @@ def teste_anova(df, colunas_usadas):
 
 # Dicionário de análises estatísticas
 ANALISES = {
-    "regressao_simples": analise_regressao_linear_simples,
+    "Regressão linear simples": analise_regressao_linear_simples,
     "regressao_multipla": analise_regressao_linear_multipla,
     "analise_descritiva": analise_descritiva,
     "teste_normalidade": teste_normalidade,
