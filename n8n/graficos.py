@@ -417,18 +417,18 @@ def grafico_barras_agrupado(df, colunas_x, coluna_y=None):
 
 
 GRAFICOS = {
-    "scatter": grafico_dispersao,
-    "Grafico BoxPlot": grafico_boxplot_simples,
-    "grafico_pareto": grafico_pareto,
+    "Gráfico de disperao": grafico_dispersao,
+    "BoxPlot simples": grafico_boxplot_simples,
+    "Pareto simples": grafico_pareto,
     "boxplot_multiplo": grafico_boxplot_multiplo,
-    "histograma_simples": grafico_histograma_simples,
+    "Histograma simples": grafico_histograma_simples,
     "histograma_multiplo": grafico_histograma_multiplo,
-    "grafico_barras_simples": grafico_barras_simples,
-    "Grafico_barras_agrupado": grafico_barras_agrupado,
-    "grafico_bolhas": grafico_bolhas,
-    "grafico_pizza": grafico_pizza,
+    "Gráfifo de barras": grafico_barras_simples,
+    "Gráfifo de barras com subgrupo": grafico_barras_agrupado,
+    "Gráficos de bolhas": grafico_bolhas,
+    "Gráfico de pizza": grafico_pizza,
     "grafico_ic_media": grafico_ic_media,
-    "grafico_linha_temporal": grafico_linha_temporal
+    "Gráfico de tendecias": grafico_linha_temporal
 
 
 }
