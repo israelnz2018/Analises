@@ -1148,18 +1148,18 @@ def teste_anova(df, colunas_usadas):
 # Dicionário de análises estatísticas
 ANALISES = {
     "Regressão linear simples": analise_regressao_linear_simples,
-    "regressao_multipla": analise_regressao_linear_multipla,
+    "Regressão linear múltipla": analise_regressao_linear_multipla,
     "analise_descritiva": analise_descritiva,
-    "teste_normalidade": teste_normalidade,
-    "regressao_logistica_binaria": analise_regressao_logistica_binaria,
-    "regressao_logistica_nominal": analise_regressao_logistica_nominal,
-    "regressao_logistica_ordinal": analise_regressao_logistica_ordinal,
-    "teste_2sample_t": teste_2sample_t,
-    "teste_paired_t": analise_teste_paired_t,
-    "teste_variancias": teste_variancias,
-    "teste_anova": teste_anova,
-    "analise_chi_quadrado": analise_chi_quadrado,
-    "capabilidade_normal": analise_capabilidade_normal,
-    "capabilidade_nao_normal": analise_capabilidade_nao_normal,
-    "transformacao_johnson": aplicar_transformacao_johnson
+    "Teste de normalidade": teste_normalidade,
+    "Regressão logística binária": analise_regressao_logistica_binaria,
+    "Regressão logística nominal": analise_regressao_logistica_nominal,
+    "Regressão logística ordinal": analise_regressao_logistica_ordinal,
+    "2 Sample T": teste_2sample_t,
+    "Paired Test": analise_teste_paired_t,
+    "F/Levene Test": teste_variancias,
+    "One way ANOVA": teste_anova,
+    "Qui- quadrado": analise_chi_quadrado,
+    "Capabilidade para dados normais": analise_capabilidade_normal,
+    "Capabilidade para outras distribuições": analise_capabilidade_nao_normal,
+    "Capabilidade com dados transformados": aplicar_transformacao_johnson
 }
