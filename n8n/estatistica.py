@@ -146,6 +146,56 @@ Resultados:
 
     return resumo, None
 
+def analise_matrix_correlacao(df, colunas_usadas):
+    if len(colunas_usadas) < 2:
+        return "❌ É necessário ao menos duas colunas para gerar a matriz de correlação.", None
+
+    # Valida colunas
+    for col in colunas_usadas:
+        if col not in df.columns:
+            return f"❌ Coluna '{col}' não encontrada no dataframe.", None
+
+    # Prepara dados
+    dados = df[colunas_usadas].dropna()
+    if dados.empty:
+        return "❌ Dados insuficientes após remoção de valores ausentes.", None
+
+    # Calcula matriz de correlação
+    matriz_cor = dados.corr(method='pearson')
+
+    # Prepara resumo textual
+    linhas_resumo = []
+    for i in range(len(colunas_usadas)):
+        for j in range(i + 1, len(colunas_usadas)):
+            col1 = colunas_usadas[i]
+            col2 = colunas_usadas[j]
+            r = matriz_cor.loc[col1, col2]
+
+            if abs(r) < 0.3:
+                forca = "fraca"
+            elif abs(r) < 0.7:
+                forca = "moderada"
+            else:
+                forca = "forte"
+
+            linhas_resumo.append(f"- {col1} vs {col2}: correlação {forca} (r={r:.2f})")
+
+    resumo = "📊 **Matriz de Correlação (Pearson)**\n" + "\n".join(linhas_resumo)
+
+    # Gerar gráfico
+    aplicar_estilo_minitab()
+    sns.pairplot(dados, kind='reg', plot_kws={'line_kws': {'color': 'red'}, 'scatter_kws': {'s': 20}})
+    
+    from io import BytesIO
+    import base64
+    buffer = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buffer, format='png')
+    plt.close()
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+    return resumo, img_base64
 
 def analise_capabilidade_normal(df, colunas_usadas):
     from scipy.stats import norm, shapiro, anderson, kstest
@@ -1250,6 +1300,7 @@ ANALISES = {
     "Gráfico Sumario": grafico_sumario,
     "Análise de outliers": analise_de_outliers,
     "Correlação de person": analise_correlacao_person,
+    "Matrix de correlacao": analise_matrix_correlacao,
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Teste de normalidade": teste_normalidade,
