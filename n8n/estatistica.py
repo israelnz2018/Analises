@@ -1300,7 +1300,7 @@ ANALISES = {
     "Gráfico Sumario": grafico_sumario,
     "Análise de outliers": analise_de_outliers,
     "Correlação de person": analise_correlacao_person,
-    "Matrix de correlacao": analise_matrix_correlacao,
+    "Matrix de dispersão": analise_matrix_correlacao,
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Teste de normalidade": teste_normalidade,
