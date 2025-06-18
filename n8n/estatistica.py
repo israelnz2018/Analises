@@ -592,11 +592,11 @@ Y = {equacao}
 
     return texto.strip(), imagem
 
-def analise_descritiva(df, colunas_usadas):
-    coluna_y = colunas_usadas[0]  # ✅ pegando diretamente a coluna
+def grafico_sumario(df, colunas_usadas):
+    coluna_y = colunas_usadas[0]
     if coluna_y not in df.columns:
         return (
-            "❌ A coluna selecionada para análise descritiva não foi encontrada.",
+            "❌ A coluna selecionada para o Gráfico Sumario não foi encontrada.",
             None
         )
 
@@ -620,7 +620,7 @@ def analise_descritiva(df, colunas_usadas):
     curtose = serie.kurtosis()
     n = serie.count()
 
-    resumo = f"""📊 **Análise Descritiva da coluna '{coluna_y}'**  
+    resumo = f"""📊 **Gráfico Sumario da coluna '{coluna_y}'**  
 - Média: {media:.2f}  
 - Mediana: {mediana:.2f}  
 - Desvio Padrão: {desvio:.2f}  
@@ -634,10 +634,11 @@ def analise_descritiva(df, colunas_usadas):
 - N: {n}"""
 
     aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(8, 1.5))
-    sns.boxplot(x=serie, orient='h', ax=ax)
-    ax.set_title(f"Boxplot - {coluna_y}")
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.histplot(serie, bins=10, kde=True, ax=ax, color='gray')
+    ax.set_title(f"Gráfico Sumario - {coluna_y}")
     ax.set_xlabel(coluna_y)
+    ax.set_ylabel("Frequência")
 
     buffer = BytesIO()
     plt.tight_layout()
@@ -647,6 +648,7 @@ def analise_descritiva(df, colunas_usadas):
     imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
     return resumo, imagem_base64
+
 
 def teste_normalidade(df, colunas_usadas):
     if not colunas_usadas:
@@ -1149,7 +1151,7 @@ def teste_anova(df, colunas_usadas):
 ANALISES = {
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
-    "analise_descritiva": analise_descritiva,
+    "Gráfico Sumario": grafico_sumario,
     "Teste de normalidade": teste_normalidade,
     "Regressão logística binária": analise_regressao_logistica_binaria,
     "Regressão logística nominal": analise_regressao_logistica_nominal,
