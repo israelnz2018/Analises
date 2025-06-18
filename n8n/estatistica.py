@@ -38,6 +38,50 @@ from estilo import aplicar_estilo_minitab
 # ✅ Todas as análises começam abaixo, dentro das funções (nunca aqui fora)
 
 
+def analise_de_outliers(df, colunas_usadas):
+    resultado_texto = "📊 **Análise de Outliers**\n"
+    aplicar_estilo_minitab()
+    fig, axs = plt.subplots(len(colunas_usadas), 1, figsize=(6, 4 * len(colunas_usadas)))
+    if len(colunas_usadas) == 1:
+        axs = [axs]
+
+    encontrou_outliers = False
+
+    for ax, coluna in zip(axs, colunas_usadas):
+        if coluna not in df.columns:
+            resultado_texto += f"- ❌ A coluna '{coluna}' não foi encontrada.\n"
+            continue
+
+        serie = df[coluna].dropna()
+        if serie.empty:
+            resultado_texto += f"- ❌ A coluna '{coluna}' não contém dados numéricos válidos.\n"
+            continue
+
+        q1 = serie.quantile(0.25)
+        q3 = serie.quantile(0.75)
+        iqr = q3 - q1
+        limite_inferior = q1 - 1.5 * iqr
+        limite_superior = q3 + 1.5 * iqr
+        outliers = serie[(serie < limite_inferior) | (serie > limite_superior)]
+
+        sns.boxplot(x=serie, orient="h", ax=ax, flierprops=dict(marker='*', markersize=8, markerfacecolor='red'))
+        ax.set_title(f"Boxplot - {coluna}")
+        ax.set_xlabel(coluna)
+
+        if not outliers.empty:
+            encontrou_outliers = True
+            resultado_texto += f"- ⚠ A coluna '{coluna}' possui {len(outliers)} outlier(s): {list(outliers.values)}\n"
+        else:
+            resultado_texto += f"- ✅ A coluna '{coluna}' não possui outliers detectados.\n"
+
+    buffer = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buffer, format='png')
+    plt.close(fig)
+    buffer.seek(0)
+    imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+    return resultado_texto, imagem_base64
 
 def salvar_grafico():
     caminho = "grafico.png"
@@ -1149,9 +1193,10 @@ def teste_anova(df, colunas_usadas):
 
 # Dicionário de análises estatísticas
 ANALISES = {
+    "Gráfico Sumario": grafico_sumario,
+    "Análise de outliers": analise_de_outliers,
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
-    "Gráfico Sumario": grafico_sumario,
     "Teste de normalidade": teste_normalidade,
     "Regressão logística binária": analise_regressao_logistica_binaria,
     "Regressão logística nominal": analise_regressao_logistica_nominal,
