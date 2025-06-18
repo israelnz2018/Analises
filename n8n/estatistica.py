@@ -196,6 +196,78 @@ def analise_matrix_correlacao(df, colunas_usadas):
     img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
     return resumo, img_base64
+def analise_estabilidade(df, colunas_usadas):
+    if not colunas_usadas or colunas_usadas[0] not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no dataframe.", None
+
+    nome_coluna_y = colunas_usadas[0]
+    nome_coluna_subgrupo = colunas_usadas[1] if len(colunas_usadas) > 1 else None
+
+    dados = df[[nome_coluna_y]].copy()
+    if nome_coluna_subgrupo and nome_coluna_subgrupo in df.columns:
+        dados['Subgrupo'] = df[nome_coluna_subgrupo]
+    else:
+        dados['Subgrupo'] = range(1, len(dados) + 1)
+
+    if dados.empty or dados[nome_coluna_y].dropna().empty:
+        return "❌ Dados insuficientes para análise.", None
+
+    aplicar_estilo_minitab()
+    texto_resumo = f"📊 **Análise de Estabilidade da coluna '{nome_coluna_y}'**\n"
+
+    # Decide se faz I-MR ou XBar-R
+    if nome_coluna_subgrupo and nome_coluna_subgrupo in df.columns:
+        # Carta XBar-R
+        fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+
+        sns.lineplot(x="Subgrupo", y=nome_coluna_y, data=dados, ax=axs[0], marker="o")
+        axs[0].set_title("Carta X-Barra")
+        axs[0].set_ylabel("Média")
+
+        grupo_stats = dados.groupby('Subgrupo')[nome_coluna_y].agg(['mean', 'std'])
+        r_values = grupo_stats['std'] * (2 ** 0.5)  # aproximação do range
+
+        axs[1].plot(grupo_stats.index, r_values, marker="o")
+        axs[1].set_title("Carta R")
+        axs[1].set_ylabel("Amplitude (aprox)")
+
+        texto_resumo += "- Carta X-BarraR usada (subgrupos detectados).\n"
+    else:
+        # Carta I-MR
+        fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+
+        sns.lineplot(x="Subgrupo", y=nome_coluna_y, data=dados, ax=axs[0], marker="o")
+        axs[0].set_title("Carta Individual")
+        axs[0].set_ylabel("Valor")
+
+        mr = dados[nome_coluna_y].diff().abs()
+        axs[1].plot(dados['Subgrupo'][1:], mr[1:], marker="o")
+        axs[1].set_title("Carta MR")
+        axs[1].set_ylabel("Movimento Range")
+
+        texto_resumo += "- Carta I-MR usada (sem subgrupos).\n"
+
+    # Simples regra: verificar outliers nos gráficos (pontos fora de 3 sigma)
+    media = dados[nome_coluna_y].mean()
+    sigma = dados[nome_coluna_y].std()
+    outliers = dados[(dados[nome_coluna_y] > media + 3*sigma) | (dados[nome_coluna_y] < media - 3*sigma)]
+
+    if not outliers.empty:
+        texto_resumo += f"- ⚠ Detectados {len(outliers)} pontos fora dos limites (3 sigma). Processo potencialmente instável.\n"
+    else:
+        texto_resumo += "- ✅ Nenhum ponto fora dos limites (3 sigma). Processo aparentemente estável.\n"
+
+    # Exportar gráfico
+    from io import BytesIO
+    import base64
+    buffer = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buffer, format='png')
+    plt.close(fig)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+    return texto_resumo, img_base64
 
 def analise_capabilidade_normal(df, colunas_usadas):
     from scipy.stats import norm, shapiro, anderson, kstest
@@ -1301,6 +1373,7 @@ ANALISES = {
     "Análise de outliers": analise_de_outliers,
     "Correlação de person": analise_correlacao_person,
     "Matrix de dispersão": analise_matrix_correlacao,
+    "Análise de estabilidade": analise_estabilidade,
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Teste de normalidade": teste_normalidade,
