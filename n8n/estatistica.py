@@ -196,6 +196,7 @@ def analise_matrix_correlacao(df, colunas_usadas):
     img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
     return resumo, img_base64
+    
 def analise_estabilidade(df, colunas_usadas):
     if not colunas_usadas or colunas_usadas[0] not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no dataframe.", None
