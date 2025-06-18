@@ -93,6 +93,60 @@ def salvar_grafico():
     os.remove(caminho)
     return img_base64
 
+def analise_correlacao_person(df, colunas_usadas):
+    if len(colunas_usadas) < 2:
+        return "❌ É necessário ao menos uma variável Y e uma variável X.", None
+
+    nome_coluna_y = colunas_usadas[0]
+    nomes_colunas_x = colunas_usadas[1:]
+
+    if nome_coluna_y not in df.columns:
+        return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada.", None
+
+    for col in nomes_colunas_x:
+        if col not in df.columns:
+            return f"❌ A coluna X '{col}' não foi encontrada.", None
+
+    serie_y = df[nome_coluna_y].dropna()
+    if serie_y.empty:
+        return f"❌ A coluna Y '{nome_coluna_y}' não contém dados válidos.", None
+
+    linhas = []
+    for nome_x in nomes_colunas_x:
+        serie_x = df[nome_x].dropna()
+        if serie_x.empty:
+            linhas.append(f"- {nome_x}: ❌ Dados X inválidos.")
+            continue
+
+        # Ajustar para tamanho igual
+        data = pd.concat([serie_y, serie_x], axis=1).dropna()
+        if data.empty:
+            linhas.append(f"- {nome_x}: ❌ Sem dados pareados suficientes.")
+            continue
+
+        r, p = stats.pearsonr(data.iloc[:, 0], data.iloc[:, 1])
+
+        if abs(r) < 0.3:
+            forca = "fraca"
+        elif abs(r) < 0.7:
+            forca = "moderada"
+        else:
+            forca = "forte"
+
+        dependencia = "existe dependência estatística" if p < 0.05 else "não há dependência estatística"
+
+        linhas.append(
+            f"- {nome_x}: Coeficiente de Pearson = {r:.2f}, p-valor = {p:.4f} → Correlação {forca}, {dependencia}."
+        )
+
+    resumo = f"""📊 **Análise de Correlação de Pearson**
+Coluna Y: **{nome_coluna_y}**
+Resultados:
+""" + "\n".join(linhas)
+
+    return resumo, None
+
+
 def analise_capabilidade_normal(df, colunas_usadas):
     from scipy.stats import norm, shapiro, anderson, kstest
     from io import BytesIO
@@ -1195,6 +1249,7 @@ def teste_anova(df, colunas_usadas):
 ANALISES = {
     "Gráfico Sumario": grafico_sumario,
     "Análise de outliers": analise_de_outliers,
+    "Correlação de person": analise_correlacao_person,
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Teste de normalidade": teste_normalidade,
