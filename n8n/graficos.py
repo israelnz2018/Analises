@@ -26,45 +26,38 @@ def gerar_histograma(df: pd.DataFrame, colunas: list, coluna_y=None):
 
     coluna_x = colunas[0].strip()
     coluna_subgrupo = colunas[1].strip() if len(colunas) > 1 else None
-    coluna_y = coluna_y.strip() if coluna_y else None
 
     if coluna_x not in df.columns:
         raise ValueError(f"A coluna '{coluna_x}' não foi encontrada no arquivo.")
 
     aplicar_estilo_minitab()
-
     plt.figure(figsize=(10, 6))
 
     if coluna_subgrupo and coluna_subgrupo in df.columns:
-        # Histograma com subgrupos (cores diferentes)
         grupos = df.groupby(coluna_subgrupo)
         cores = sns.color_palette("tab10", n_colors=len(grupos))
 
         for i, (nome, grupo) in enumerate(grupos):
-            if coluna_y and coluna_y in grupo.columns:
-                plt.bar(grupo[coluna_x].astype(str), grupo[coluna_y], alpha=0.5, label=str(nome), color=cores[i])
-            else:
-                sns.histplot(
-                    grupo[coluna_x],
-                    bins=10,
-                    kde=True,
-                    stat="density",
-                    alpha=0.4,
-                    label=str(nome),
-                    color=cores[i]
-                )
-    else:
-        if coluna_y and coluna_y in df.columns:
-            plt.bar(df[coluna_x].astype(str), df[coluna_y], alpha=0.5, color="steelblue")
-        else:
             sns.histplot(
-                df[coluna_x],
+                grupo[coluna_x],
                 bins=10,
                 kde=True,
                 stat="density",
                 alpha=0.4,
-                color="steelblue"
+                label=str(nome),
+                color=cores[i],
+                edgecolor="black"
             )
+    else:
+        sns.histplot(
+            df[coluna_x],
+            bins=10,
+            kde=True,
+            stat="density",
+            alpha=0.4,
+            color="steelblue",
+            edgecolor="black"
+        )
 
     plt.xlabel(coluna_x)
     plt.ylabel("Densidade")
