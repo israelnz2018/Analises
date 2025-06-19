@@ -16,6 +16,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
 
 @app.get("/healthz")
@@ -49,12 +50,14 @@ async def analisar(
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
 
+        # Executa análise
         if ferramenta and ferramenta.strip():
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
             resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
 
+        # Executa gráfico
         if grafico and grafico.strip():
             funcao = GRAFICOS.get(grafico.strip())
             if not funcao:
