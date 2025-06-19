@@ -276,7 +276,7 @@ import numpy as np
 from io import BytesIO
 import base64
 
-def analise_distribuicao_estatistica(df, coluna_y):
+def analise_distribuicao_estatistica(df, colunas_usadas):
     # Ajusta caso venha lista
     if isinstance(coluna_y, list):
         if len(coluna_y) > 0:
