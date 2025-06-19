@@ -277,20 +277,23 @@ from io import BytesIO
 import base64
 
 def analise_distribuicao_estatistica(df, colunas_usadas):
-    # Ajusta caso venha lista
-    if isinstance(coluna_y, list):
-        if len(coluna_y) > 0:
-            coluna_y = coluna_y[0]
+    # Garante que coluna_y seja o nome da coluna
+    if isinstance(colunas_usadas, list):
+        if len(colunas_usadas) > 0:
+            coluna_y = colunas_usadas[0]
         else:
             return {
-                "analise": "Erro: Coluna Y não fornecida.",
+                "analise": "Erro: Nenhuma coluna Y fornecida.",
                 "grafico_base64": None,
                 "colunas_utilizadas": []
             }
+    else:
+        coluna_y = colunas_usadas
 
+    # Validação
     if not coluna_y or coluna_y not in df.columns:
         return {
-            "analise": "Erro: Coluna Y obrigatória não fornecida ou não encontrada.",
+            "analise": "Erro: Coluna Y não encontrada no arquivo.",
             "grafico_base64": None,
             "colunas_utilizadas": []
         }
@@ -317,7 +320,7 @@ def analise_distribuicao_estatistica(df, colunas_usadas):
         try:
             params = dist.fit(dados)
             if nome == "Normal":
-                ad_stat, crit_vals, sig_levels = stats.anderson(dados, dist='norm')
+                ad_stat, crit_vals, _ = stats.anderson(dados, dist='norm')
                 p_value = 1 - ad_stat / max(crit_vals)
                 p_value = max(min(p_value, 1.0), 0.0)
             else:
@@ -370,6 +373,7 @@ def analise_distribuicao_estatistica(df, colunas_usadas):
         "grafico_base64": grafico_base64,
         "colunas_utilizadas": [coluna_y]
     }
+
 def analise_capabilidade_normal(df, colunas_usadas):
     from scipy.stats import norm, shapiro, anderson, kstest
     from io import BytesIO
