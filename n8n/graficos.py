@@ -74,8 +74,6 @@ def gerar_histograma(df: pd.DataFrame, colunas: list, coluna_y=None):
     return imagem_base64
 
 
-
-    
 def gerar_pareto(df, colunas_usadas):
     if len(colunas_usadas) < 1:
         return "Erro: Coluna X (atributivo) obrigatória não fornecida.", None
@@ -87,17 +85,18 @@ def gerar_pareto(df, colunas_usadas):
     resultado_texto = []
     imagens = []
 
-    # Apenas X fornecido -> Pareto simples
     if col_x and not col_y and not col_sub:
         contagem = df[col_x].value_counts().sort_values(ascending=False)
+        if contagem.sum() == 0:
+            return "Sem dados para gerar Pareto.", None
         resultado_texto.append(contagem.to_frame().to_html())
 
         plt.figure(figsize=(8,5))
         ax = contagem.plot(kind="bar")
         cum = contagem.cumsum() / contagem.sum() * 100
-        cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
+        ax2 = cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
         ax.set_ylabel("Frequência")
-        ax.right_ax.set_ylabel("Acumulado (%)")
+        ax2.set_ylabel("Acumulado (%)")
         ax.set_title(f"Pareto - {col_x}")
         plt.tight_layout()
         buf = BytesIO()
@@ -106,18 +105,19 @@ def gerar_pareto(df, colunas_usadas):
         buf.seek(0)
         imagens.append(base64.b64encode(buf.read()).decode("utf-8"))
 
-    # X + Y fornecido -> Pareto tabela
     elif col_x and col_y and not col_sub:
         dados = df[[col_x, col_y]].dropna()
         soma = dados.groupby(col_x)[col_y].sum().sort_values(ascending=False)
+        if soma.sum() == 0:
+            return "Sem dados para gerar Pareto.", None
         resultado_texto.append(soma.to_frame().to_html())
 
         plt.figure(figsize=(8,5))
         ax = soma.plot(kind="bar")
         cum = soma.cumsum() / soma.sum() * 100
-        cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
+        ax2 = cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
         ax.set_ylabel("Soma de Y")
-        ax.right_ax.set_ylabel("Acumulado (%)")
+        ax2.set_ylabel("Acumulado (%)")
         ax.set_title(f"Pareto - {col_x} (Y={col_y})")
         plt.tight_layout()
         buf = BytesIO()
@@ -126,19 +126,20 @@ def gerar_pareto(df, colunas_usadas):
         buf.seek(0)
         imagens.append(base64.b64encode(buf.read()).decode("utf-8"))
 
-    # X + Y + Subgrupo -> Pareto por subgrupo
     elif col_x and col_y and col_sub:
         dados = df[[col_x, col_sub, col_y]].dropna()
         for subgrupo, sub_df in dados.groupby(col_sub):
             soma = sub_df.groupby(col_x)[col_y].sum().sort_values(ascending=False)
+            if soma.sum() == 0:
+                continue
             resultado_texto.append(f"<strong>Subgrupo {subgrupo}</strong><br>" + soma.to_frame().to_html())
 
             plt.figure(figsize=(8,5))
             ax = soma.plot(kind="bar")
             cum = soma.cumsum() / soma.sum() * 100
-            cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
+            ax2 = cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
             ax.set_ylabel("Soma de Y")
-            ax.right_ax.set_ylabel("Acumulado (%)")
+            ax2.set_ylabel("Acumulado (%)")
             ax.set_title(f"Pareto - {col_x} (Y={col_y}, Subgrupo={subgrupo})")
             plt.tight_layout()
             buf = BytesIO()
@@ -147,19 +148,20 @@ def gerar_pareto(df, colunas_usadas):
             buf.seek(0)
             imagens.append(base64.b64encode(buf.read()).decode("utf-8"))
 
-    # X + Subgrupo (sem Y) -> Pareto por subgrupo com contagem
     elif col_x and not col_y and col_sub:
         dados = df[[col_x, col_sub]].dropna()
         for subgrupo, sub_df in dados.groupby(col_sub):
             contagem = sub_df[col_x].value_counts().sort_values(ascending=False)
+            if contagem.sum() == 0:
+                continue
             resultado_texto.append(f"<strong>Subgrupo {subgrupo}</strong><br>" + contagem.to_frame().to_html())
 
             plt.figure(figsize=(8,5))
             ax = contagem.plot(kind="bar")
             cum = contagem.cumsum() / contagem.sum() * 100
-            cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
+            ax2 = cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
             ax.set_ylabel("Frequência")
-            ax.right_ax.set_ylabel("Acumulado (%)")
+            ax2.set_ylabel("Acumulado (%)")
             ax.set_title(f"Pareto - {col_x} (Subgrupo={subgrupo})")
             plt.tight_layout()
             buf = BytesIO()
