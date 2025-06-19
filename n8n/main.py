@@ -58,35 +58,36 @@ async def analisar(
             resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
 
         # Executa gráfico
-if grafico and grafico.strip():
-    print(f"🎨 Gráfico solicitado: {grafico.strip()}")
-    print(f"📊 Colunas usadas: {colunas_usadas}")
-    funcao = GRAFICOS.get(grafico.strip())
-    if not funcao:
-        print(f"❌ Gráfico {grafico.strip()} não encontrado no GRAFICOS.")
-        return JSONResponse(content={"erro": f"Gráfico {grafico.strip()} não encontrado."}, status_code=400)
-    imagem_grafico_isolado_base64 = funcao(
-        df,
-        colunas_usadas,
-        coluna_y=coluna_y.strip() if coluna_y else None
-    )
+        if grafico and grafico.strip():
+            print(f"🎨 Gráfico solicitado: {grafico.strip()}")
+            print(f"📊 Colunas usadas: {colunas_usadas}")
+            funcao = GRAFICOS.get(grafico.strip())
+            if not funcao:
+                print(f"❌ Gráfico {grafico.strip()} não encontrado no GRAFICOS.")
+                return JSONResponse(content={"erro": f"Gráfico {grafico.strip()} não encontrado."}, status_code=400)
+            imagem_grafico_isolado_base64 = funcao(
+                df,
+                colunas_usadas,
+                coluna_y=coluna_y.strip() if coluna_y else None
+            )
 
-return {
-    "analise": resultado_texto or "",
-    "grafico_base64": imagem_analise_base64 or [],
-    "grafico_isolado_base64": imagem_grafico_isolado_base64,
-    "colunas_utilizadas": colunas_usadas
-}
+        return {
+            "analise": resultado_texto or "",
+            "grafico_base64": imagem_analise_base64 or [],
+            "grafico_isolado_base64": imagem_grafico_isolado_base64,
+            "colunas_utilizadas": colunas_usadas
+        }
 
-except ValueError as e:
-    return JSONResponse(content={"erro": str(e)}, status_code=400)
-except Exception as e:
-    tb = traceback.format_exc()
-    return JSONResponse(
-        content={
-            "erro": "Erro interno ao processar a análise.",
-            "detalhe": str(e),
-            "traceback": tb
-        },
-        status_code=500
-    )
+    except ValueError as e:
+        return JSONResponse(content={"erro": str(e)}, status_code=400)
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse(
+            content={
+                "erro": "Erro interno ao processar a análise.",
+                "detalhe": str(e),
+                "traceback": tb
+            },
+            status_code=500
+        )
