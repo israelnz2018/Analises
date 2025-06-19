@@ -354,31 +354,6 @@ def grafico_boxplot_simples(df, colunas, coluna_y=None):
     plt.title("Boxplot Simples com Média (losango)")
     return salvar_grafico()
 
-def grafico_pareto(df, colunas):
-    if len(colunas) != 1:
-        raise ValueError("O gráfico de Pareto requer exatamente uma coluna categórica.")
-
-    coluna = colunas[0]
-    contagem = df[coluna].value_counts().sort_values(ascending=False)
-    porcentagem = contagem / contagem.sum() * 100
-    acumulado = porcentagem.cumsum()
-
-    plt.figure(figsize=(10, 6))
-    aplicar_estilo_minitab()
-
-    ax = sns.barplot(x=contagem.index, y=contagem.values, color="#89CFF0")
-    ax.set_ylabel("Frequência")
-    ax.set_xlabel(coluna)
-    ax.set_title("Gráfico de Pareto")
-
-    ax2 = ax.twinx()
-    ax2.plot(contagem.index, acumulado.values, color="red", marker="o", linewidth=2)
-    ax2.set_ylabel("Acumulado (%)")
-    ax2.set_ylim(0, 110)
-
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
-
-    return salvar_grafico()
 
 def grafico_boxplot_multiplo(df, colunas, coluna_y=None):
     if not coluna_y or not coluna_y.strip():
@@ -421,26 +396,6 @@ def grafico_boxplot_multiplo(df, colunas, coluna_y=None):
 
     return salvar_grafico()
 
-def grafico_histograma_simples(df, colunas, coluna_y=None):
-    if not colunas or len(colunas) == 0:
-        raise ValueError("Você deve selecionar uma coluna Y com dados numéricos para o histograma simples.")
-
-    coluna_y = colunas[0]
-
-    y = df[coluna_y].astype(str).str.replace(",", ".").str.replace(r"[^\d\.\-]", "", regex=True)
-    y = pd.to_numeric(y, errors="coerce").dropna()
-
-    if len(y) < 2:
-        raise ValueError("Coluna Y deve conter ao menos dois valores numéricos.")
-
-    plt.figure(figsize=(8, 6))
-    aplicar_estilo_minitab()
-    sns.histplot(y, kde=True, color="#89CFF0", edgecolor="black")
-    plt.xlabel(coluna_y)
-    plt.ylabel("Frequência")
-    plt.title("Histograma Simples com Curva de Densidade")
-
-    return salvar_grafico()
 
 
 
@@ -518,18 +473,19 @@ def grafico_barras_agrupado(df, colunas_x, coluna_y=None):
 GRAFICOS = {
     "Histograma": gerar_histograma,
     "Pareto": gerar_pareto,
+    "Gráfico de tendecias": grafico_linha_temporal,
+    "grafico_ic_media": grafico_ic_media,
+    "Gráfico de pizza": grafico_pizza,
+    "Gráficos de bolhas": grafico_bolhas,
     "Gráfico de disperao": grafico_dispersao,
     "BoxPlot simples": grafico_boxplot_simples,
-    "Pareto simples": grafico_pareto,
     "boxplot_multiplo": grafico_boxplot_multiplo,
-    "Histograma simples": grafico_histograma_simples,
-    "histograma_multiplo": grafico_histograma_multiplo,
     "Gráfifo de barras": grafico_barras_simples,
     "Gráfifo de barras com subgrupo": grafico_barras_agrupado,
-    "Gráficos de bolhas": grafico_bolhas,
-    "Gráfico de pizza": grafico_pizza,
-    "grafico_ic_media": grafico_ic_media,
-    "Gráfico de tendecias": grafico_linha_temporal
+
+    
+  
+    
 
 
 }
