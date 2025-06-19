@@ -368,11 +368,14 @@ def analise_distribuicao_estatistica(df, colunas_usadas):
     ]
     conclusao = "Distribuições mais adequadas são aquelas com p-value maior que 0.05."
 
-    return {
-        "analise": tabela + "<br><br>" + "<br>".join(recomendacoes) + "<br><br>" + conclusao,
-        "grafico_base64": grafico_base64,
-        "colunas_utilizadas": [coluna_y]
-    }
+    resultado_texto = (
+    tabela + "<br><br>" +
+    "<br>".join(recomendacoes) + "<br><br>" +
+    conclusao
+)
+
+return resultado_texto, grafico_base64
+
 
 def analise_capabilidade_normal(df, colunas_usadas):
     from scipy.stats import norm, shapiro, anderson, kstest
