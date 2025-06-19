@@ -20,7 +20,104 @@ def salvar_grafico():
     os.remove(caminho)
     return img_base64
 
+def gerar_histograma(df: pd.DataFrame, colunas: list, coluna_y=None):
+    if not colunas or len(colunas) < 1:
+        raise ValueError("⚠ O histograma precisa ter ao menos uma coluna X informada.")
 
+    col_x = colunas[0]
+    col_y = coluna_y if coluna_y else None
+    col_subgrupo = colunas[1] if len(colunas) > 1 else None
+
+    plt.figure(figsize=(8, 6))
+    plt.style.use('default')
+    plt.grid(True, linestyle=':', color='gray', alpha=0.7)
+
+    if col_subgrupo and col_subgrupo in df.columns:
+        grupos = df.groupby(col_subgrupo)
+        for nome, grupo in grupos:
+            if col_y and col_y in grupo.columns:
+                plt.bar(grupo[col_x].astype(str), grupo[col_y], alpha=0.5, label=str(nome))
+            else:
+                sns.histplot(grupo[col_x], bins=10, kde=True, stat='density', alpha=0.5, label=str(nome))
+    else:
+        if col_y and col_y in df.columns:
+            plt.bar(df[col_x].astype(str), df[col_y], alpha=0.5)
+        else:
+            sns.histplot(df[col_x], bins=10, kde=True, stat='density', alpha=0.5)
+
+    plt.xlabel(col_x)
+    plt.ylabel('Frequência (densidade)')
+    plt.title('Histograma com Curva de Densidade')
+    plt.legend()
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    plt.close()
+
+    return imagem_base64
+
+def grafico_histograma_multiplo(df, colunas, coluna_y=None):
+    if not coluna_y or not coluna_y.strip():
+        raise ValueError("Você deve selecionar uma coluna Y com dados numéricos.")
+    if not colunas or len(colunas) == 0:
+        raise ValueError("Você deve selecionar uma coluna X com os grupos.")
+
+    coluna_y = coluna_y.strip()
+    coluna_x = colunas[0].strip()
+
+    # 🚨 Correção importante: garantir que coluna_y != coluna_x
+    if coluna_y == coluna_x:
+        raise ValueError("A coluna Y e a coluna X devem ser diferentes.")
+
+    if coluna_y not in df.columns:
+        raise ValueError(f"A coluna Y '{coluna_y}' não foi encontrada no arquivo.")
+    if coluna_x not in df.columns:
+        raise ValueError(f"A coluna X '{coluna_x}' não foi encontrada no arquivo.")
+
+    y = df[coluna_y].astype(str).str.replace(",", ".").str.replace(r"[^\d\.\-]", "", regex=True)
+    y = pd.to_numeric(y, errors="coerce")
+    grupo = df[coluna_x].astype(str)
+
+    df_plot = pd.DataFrame({coluna_y: y, coluna_x: grupo}).dropna()
+
+    if df_plot.empty:
+        raise ValueError("Os dados das colunas selecionadas não têm valores válidos.")
+
+    plt.figure(figsize=(10, 6))
+    aplicar_estilo_minitab()
+
+    cores = sns.color_palette("tab10", n_colors=df_plot[coluna_x].nunique())
+
+    for i, (nome_grupo, dados_grupo) in enumerate(df_plot.groupby(coluna_x)):
+        dados_y = pd.to_numeric(dados_grupo[coluna_y], errors="coerce").dropna()
+
+        sns.histplot(
+            x=dados_y,
+            kde=True,
+            stat="density",
+            element="step",
+            fill=True,
+            label=str(nome_grupo),
+            color=cores[i],
+            alpha=0.4,
+            edgecolor="black"
+        )
+        sns.kdeplot(
+            x=dados_y,
+            color=cores[i],
+            linewidth=2,
+            alpha=0.9
+        )
+
+    plt.title(f"Histograma Múltiplo de '{coluna_y}' por '{coluna_x}'")
+    plt.xlabel(coluna_y)
+    plt.ylabel("Densidade")
+    plt.legend(title=coluna_x)
+    return salvar_grafico()
+    
 def analise_pareto(df, colunas_usadas):
     if len(colunas_usadas) < 1:
         return "Erro: Coluna X (atributivo) obrigatória não fornecida.", None
@@ -385,64 +482,7 @@ def grafico_histograma_simples(df, colunas, coluna_y=None):
 
     return salvar_grafico()
 
-def grafico_histograma_multiplo(df, colunas, coluna_y=None):
-    if not coluna_y or not coluna_y.strip():
-        raise ValueError("Você deve selecionar uma coluna Y com dados numéricos.")
-    if not colunas or len(colunas) == 0:
-        raise ValueError("Você deve selecionar uma coluna X com os grupos.")
 
-    coluna_y = coluna_y.strip()
-    coluna_x = colunas[0].strip()
-
-    # 🚨 Correção importante: garantir que coluna_y != coluna_x
-    if coluna_y == coluna_x:
-        raise ValueError("A coluna Y e a coluna X devem ser diferentes.")
-
-    if coluna_y not in df.columns:
-        raise ValueError(f"A coluna Y '{coluna_y}' não foi encontrada no arquivo.")
-    if coluna_x not in df.columns:
-        raise ValueError(f"A coluna X '{coluna_x}' não foi encontrada no arquivo.")
-
-    y = df[coluna_y].astype(str).str.replace(",", ".").str.replace(r"[^\d\.\-]", "", regex=True)
-    y = pd.to_numeric(y, errors="coerce")
-    grupo = df[coluna_x].astype(str)
-
-    df_plot = pd.DataFrame({coluna_y: y, coluna_x: grupo}).dropna()
-
-    if df_plot.empty:
-        raise ValueError("Os dados das colunas selecionadas não têm valores válidos.")
-
-    plt.figure(figsize=(10, 6))
-    aplicar_estilo_minitab()
-
-    cores = sns.color_palette("tab10", n_colors=df_plot[coluna_x].nunique())
-
-    for i, (nome_grupo, dados_grupo) in enumerate(df_plot.groupby(coluna_x)):
-        dados_y = pd.to_numeric(dados_grupo[coluna_y], errors="coerce").dropna()
-
-        sns.histplot(
-            x=dados_y,
-            kde=True,
-            stat="density",
-            element="step",
-            fill=True,
-            label=str(nome_grupo),
-            color=cores[i],
-            alpha=0.4,
-            edgecolor="black"
-        )
-        sns.kdeplot(
-            x=dados_y,
-            color=cores[i],
-            linewidth=2,
-            alpha=0.9
-        )
-
-    plt.title(f"Histograma Múltiplo de '{coluna_y}' por '{coluna_x}'")
-    plt.xlabel(coluna_y)
-    plt.ylabel("Densidade")
-    plt.legend(title=coluna_x)
-    return salvar_grafico()
 
 def grafico_barras_simples(df, colunas_usadas):
     if len(colunas_usadas) != 1:
@@ -516,6 +556,7 @@ def grafico_barras_agrupado(df, colunas_x, coluna_y=None):
 
 
 GRAFICOS = {
+    "Histograma": gerar_histograma,
     "Pareto": analise_pareto,
     "Gráfico de disperao": grafico_dispersao,
     "BoxPlot simples": grafico_boxplot_simples,
