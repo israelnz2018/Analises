@@ -68,16 +68,16 @@ async def analisar(
                 except Exception as e:
                     print(f"Erro ao interpretar colunas_x: {e}")
 
+        if nome_analise != "Análise de limpeza dos dados":
+            if not coluna_y and not colunas_x:
+                return {"erro": "Informe ao menos coluna_y ou colunas_x."}
+                
         # Validação
         if not colunas_usadas:
             return JSONResponse(content={"erro": "Informe ao menos coluna_y ou colunas_x."}, status_code=422)
         for col in colunas_usadas:
             if col not in df.columns:
                 return JSONResponse(content={"erro": f"Coluna '{col}' não encontrada no arquivo."}, status_code=400)
-
-        if nome_analise != "Análise de limpeza dos dados":
-            if not coluna_y and not colunas_x:
-                return {"erro": "Informe ao menos coluna_y ou colunas_x."}
 
 
         # Processa análise
