@@ -270,7 +270,20 @@ def analise_estabilidade(df, colunas_usadas):
 
     return texto_resumo, img_base64
 
+import matplotlib.pyplot as plt
+import scipy.stats as stats
+import numpy as np
+from io import BytesIO
+import base64
+
 def analise_distribuicao_estatistica(df, coluna_y):
+    if not coluna_y or coluna_y not in df.columns:
+        return {
+            "analise": "Erro: Coluna Y obrigatória não fornecida ou não encontrada.",
+            "grafico_base64": None,
+            "colunas_utilizadas": []
+        }
+
     dados = df[coluna_y].dropna().values
     distribs = [
         ("Normal", stats.norm),
@@ -285,21 +298,20 @@ def analise_distribuicao_estatistica(df, coluna_y):
 
     resultados = []
     melhor_p = -1
-    melhor_nome = ""
-    melhor_dist = None
-    melhor_params = None
+    melhor_nome = "Normal"
+    melhor_dist = stats.norm
+    melhor_params = stats.norm.fit(dados)
 
     for nome, dist in distribs:
         try:
             params = dist.fit(dados)
             if nome == "Normal":
                 ad_stat, crit_vals, sig_levels = stats.anderson(dados, dist='norm')
-                p_value = 1 - ad_stat / max(crit_vals)  # Simplificação para estimar p-value
+                p_value = 1 - ad_stat / max(crit_vals)
                 p_value = max(min(p_value, 1.0), 0.0)
             else:
                 ad_stat = np.nan
-                p_value = np.nan  # Não disponível, como no Minitab
-
+                p_value = np.nan
             resultados.append((nome, ad_stat, p_value))
 
             if not np.isnan(p_value) and p_value > melhor_p:
@@ -307,7 +319,7 @@ def analise_distribuicao_estatistica(df, coluna_y):
                 melhor_nome = nome
                 melhor_dist = dist
                 melhor_params = params
-        except Exception as e:
+        except Exception:
             resultados.append((nome, np.nan, np.nan))
 
     linhas = ["<strong>Distribuição</strong> | <strong>AD</strong> | <strong>p-value</strong>"]
@@ -317,7 +329,7 @@ def analise_distribuicao_estatistica(df, coluna_y):
         linhas.append(f"{nome} | {ad_txt} | {p_txt}")
     tabela = "<br>".join(linhas)
 
-    # Gera probability plot para a melhor distribuição (ou normal se nenhuma)
+    # Gera probability plot com fallback seguro
     plt.figure(figsize=(6,4))
     try:
         if melhor_dist and melhor_params is not None:
@@ -326,8 +338,9 @@ def analise_distribuicao_estatistica(df, coluna_y):
         else:
             stats.probplot(dados, dist="norm", plot=plt)
             plt.title('Probability Plot - Normal')
-    except Exception as e:
+    except Exception:
         plt.text(0.5, 0.5, 'Erro ao gerar plot', ha='center')
+        plt.axis('off')
 
     buf = BytesIO()
     plt.tight_layout()
@@ -337,18 +350,16 @@ def analise_distribuicao_estatistica(df, coluna_y):
     grafico_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     recomendacoes = [
-        f"A distribuição {nome} apresentou p-value {p_txt}."
-        for nome, ad, p in resultados if not np.isnan(p)
+        f"A distribuição {nome} apresentou p-value {f'{p:.3f}' if not np.isnan(p) else '*'}"
+        for nome, ad, p in resultados
     ]
-    conclusao = "Distribuições mais adequadas são aquelas com p-value maior que 0.05."  
+    conclusao = "Distribuições mais adequadas são aquelas com p-value maior que 0.05."
 
     return {
         "analise": tabela + "<br><br>" + "<br>".join(recomendacoes) + "<br><br>" + conclusao,
         "grafico_base64": grafico_base64,
         "colunas_utilizadas": [coluna_y]
     }
-
-    
 def analise_capabilidade_normal(df, colunas_usadas):
     from scipy.stats import norm, shapiro, anderson, kstest
     from io import BytesIO
