@@ -277,6 +277,17 @@ from io import BytesIO
 import base64
 
 def analise_distribuicao_estatistica(df, coluna_y):
+    # Ajusta caso venha lista
+    if isinstance(coluna_y, list):
+        if len(coluna_y) > 0:
+            coluna_y = coluna_y[0]
+        else:
+            return {
+                "analise": "Erro: Coluna Y não fornecida.",
+                "grafico_base64": None,
+                "colunas_utilizadas": []
+            }
+
     if not coluna_y or coluna_y not in df.columns:
         return {
             "analise": "Erro: Coluna Y obrigatória não fornecida ou não encontrada.",
@@ -329,7 +340,6 @@ def analise_distribuicao_estatistica(df, coluna_y):
         linhas.append(f"{nome} | {ad_txt} | {p_txt}")
     tabela = "<br>".join(linhas)
 
-    # Gera probability plot com fallback seguro
     plt.figure(figsize=(6,4))
     try:
         if melhor_dist and melhor_params is not None:
