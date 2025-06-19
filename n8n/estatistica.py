@@ -368,52 +368,32 @@ def analise_distribuicao_estatistica(df, colunas_usadas):
 
     return resultado_texto, grafico_base64
 
-def analise_limpeza_dados(df, colunas_usadas=None):
-    linhas = []
-    total_linhas = df.shape[0]
-    total_colunas = df.shape[1]
+def analise_limpeza_dados(df, colunas_usadas):
+    linhas_total = len(df)
+    colunas_total = df.shape[1]
+    linhas_duplicadas = df.duplicated().sum()
 
-    # Duplicados
-    duplicados = df[df.duplicated()]
-    linhas.append(f"Total de linhas: {total_linhas}")
-    linhas.append(f"Total de colunas: {total_colunas}")
-    linhas.append(f"Linhas duplicadas detectadas: {len(duplicados)}")
-    if len(duplicados) > 0:
-        for idx in duplicados.index:
-            linhas.append(f"Linha {idx+2}: duplicada")  # +2 para considerar header + 1-index
+    resultado = [
+        f"<strong>Total de linhas esperadas:</strong> {linhas_total}",
+        f"<strong>Total de colunas:</strong> {colunas_total}",
+        f"<strong>Linhas duplicadas detectadas:</strong> {linhas_duplicadas}<br>"
+    ]
 
-    # Gaps por coluna
-    gaps = df.isnull()
-    total_gaps = gaps.sum().sum()
-    linhas.append(f"Total de gaps (células vazias): {total_gaps}")
-    for col in df.columns:
-        col_gaps = gaps[col].sum()
-        if col_gaps > 0:
-            linhas.append(f"Coluna '{col}': {col_gaps} gaps")
-            for idx in df[df[col].isnull()].index:
-                linhas.append(f"  Gap em linha {idx+2}")
+    for coluna in df.columns:
+        n_valores = df[coluna].notnull().sum()
+        n_gaps = linhas_total - n_valores
 
-    # Tipos incoerentes (colunas numéricas com strings)
-    for col in df.columns:
-        if pd.api.types.is_numeric_dtype(df[col]):
-            # Checa por strings disfarçadas
-            problemas = df[col].apply(lambda x: isinstance(x, str))
-            if problemas.any():
-                linhas.append(f"Coluna '{col}': valores tipo string onde esperado numérico")
-                for idx in df[problemas].index:
-                    linhas.append(f"  Incoerência em linha {idx+2}: '{df.loc[idx, col]}'")
-            # Opcional: negativos suspeitos
-            negativos = df[col] < 0
-            if negativos.any():
-                linhas.append(f"Coluna '{col}': valores negativos identificados")
-                for idx in df[negativos].index:
-                    linhas.append(f"  Valor negativo em linha {idx+2}: {df.loc[idx, col]}")
+        if n_gaps > 0:
+            # Descobre onde começa o primeiro NaN
+            idx_gaps = df[df[coluna].isnull()].index
+            primeira_linha_gap = idx_gaps[0] + 2 if len(idx_gaps) > 0 else "?"
+            resultado.append(
+                f"Coluna <strong>{coluna}</strong>: {n_gaps} linhas faltando (primeiro gap na linha {primeira_linha_gap})"
+            )
 
-    if len(linhas) == 3:  # Apenas cabeçalho sem problemas encontrados
-        linhas.append("Nenhum problema identificado.")
+    texto_final = "<br>".join(resultado)
+    return texto_final, None
 
-    resultado_texto = "<br>".join(linhas)
-    return resultado_texto, None
 
 
 def analise_capabilidade_normal(df, colunas_usadas):
