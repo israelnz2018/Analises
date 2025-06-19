@@ -282,21 +282,13 @@ def analise_distribuicao_estatistica(df, colunas_usadas):
         if len(colunas_usadas) > 0:
             coluna_y = colunas_usadas[0]
         else:
-            return {
-                "analise": "Erro: Nenhuma coluna Y fornecida.",
-                "grafico_base64": None,
-                "colunas_utilizadas": []
-            }
+            return "Erro: Nenhuma coluna Y fornecida.", None
     else:
         coluna_y = colunas_usadas
 
     # Validação
     if not coluna_y or coluna_y not in df.columns:
-        return {
-            "analise": "Erro: Coluna Y não encontrada no arquivo.",
-            "grafico_base64": None,
-            "colunas_utilizadas": []
-        }
+        return "Erro: Coluna Y não encontrada no arquivo.", None
 
     dados = df[coluna_y].dropna().values
     distribs = [
@@ -369,12 +361,13 @@ def analise_distribuicao_estatistica(df, colunas_usadas):
     conclusao = "Distribuições mais adequadas são aquelas com p-value maior que 0.05."
 
     resultado_texto = (
-    tabela + "<br><br>" +
-    "<br>".join(recomendacoes) + "<br><br>" +
-    conclusao
-)
+        tabela + "<br><br>" +
+        "<br>".join(recomendacoes) + "<br><br>" +
+        conclusao
+    )
 
-return resultado_texto, grafico_base64
+    return resultado_texto, grafico_base64
+
 
 
 def analise_capabilidade_normal(df, colunas_usadas):
