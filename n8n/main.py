@@ -57,7 +57,7 @@ async def analisar(
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
             resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
 
-        # Executa gráfico
+        # Executa gráfico (tudo do graficos.py vai para o lado direito)
         if grafico and grafico.strip():
             print(f"🎨 Gráfico solicitado: {grafico.strip()}")
             print(f"📊 Colunas usadas: {colunas_usadas}")
@@ -91,3 +91,4 @@ async def analisar(
             },
             status_code=500
         )
+
