@@ -368,6 +368,52 @@ def analise_distribuicao_estatistica(df, colunas_usadas):
 
     return resultado_texto, grafico_base64
 
+def analise_limpeza_dados(df, colunas_usadas=None):
+    linhas = []
+    total_linhas = df.shape[0]
+    total_colunas = df.shape[1]
+
+    # Duplicados
+    duplicados = df[df.duplicated()]
+    linhas.append(f"Total de linhas: {total_linhas}")
+    linhas.append(f"Total de colunas: {total_colunas}")
+    linhas.append(f"Linhas duplicadas detectadas: {len(duplicados)}")
+    if len(duplicados) > 0:
+        for idx in duplicados.index:
+            linhas.append(f"Linha {idx+2}: duplicada")  # +2 para considerar header + 1-index
+
+    # Gaps por coluna
+    gaps = df.isnull()
+    total_gaps = gaps.sum().sum()
+    linhas.append(f"Total de gaps (células vazias): {total_gaps}")
+    for col in df.columns:
+        col_gaps = gaps[col].sum()
+        if col_gaps > 0:
+            linhas.append(f"Coluna '{col}': {col_gaps} gaps")
+            for idx in df[df[col].isnull()].index:
+                linhas.append(f"  Gap em linha {idx+2}")
+
+    # Tipos incoerentes (colunas numéricas com strings)
+    for col in df.columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            # Checa por strings disfarçadas
+            problemas = df[col].apply(lambda x: isinstance(x, str))
+            if problemas.any():
+                linhas.append(f"Coluna '{col}': valores tipo string onde esperado numérico")
+                for idx in df[problemas].index:
+                    linhas.append(f"  Incoerência em linha {idx+2}: '{df.loc[idx, col]}'")
+            # Opcional: negativos suspeitos
+            negativos = df[col] < 0
+            if negativos.any():
+                linhas.append(f"Coluna '{col}': valores negativos identificados")
+                for idx in df[negativos].index:
+                    linhas.append(f"  Valor negativo em linha {idx+2}: {df.loc[idx, col]}")
+
+    if len(linhas) == 3:  # Apenas cabeçalho sem problemas encontrados
+        linhas.append("Nenhum problema identificado.")
+
+    resultado_texto = "<br>".join(linhas)
+    return resultado_texto, None
 
 
 def analise_capabilidade_normal(df, colunas_usadas):
@@ -1476,6 +1522,7 @@ ANALISES = {
     "Matrix de dispersão": analise_matrix_correlacao,
     "Análise de estabilidade": analise_estabilidade,
     "Análise de distribuição estatística": analise_distribuicao_estatistica,
+    "Análise de limpeza dos dados": analise_limpeza_dados,
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Teste de normalidade": teste_normalidade,
