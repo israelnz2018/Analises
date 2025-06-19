@@ -75,6 +75,11 @@ async def analisar(
             if col not in df.columns:
                 return JSONResponse(content={"erro": f"Coluna '{col}' não encontrada no arquivo."}, status_code=400)
 
+        if nome_analise != "Análise de limpeza dos dados":
+            if not coluna_y and not colunas_x:
+                return {"erro": "Informe ao menos coluna_y ou colunas_x."}
+
+
         # Processa análise
         resultado_texto = None
         imagem_analise_base64 = None
