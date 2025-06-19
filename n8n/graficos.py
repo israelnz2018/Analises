@@ -20,6 +20,105 @@ def salvar_grafico():
     os.remove(caminho)
     return img_base64
 
+
+def analise_pareto(df, colunas_usadas):
+    if len(colunas_usadas) < 1:
+        return "Erro: Coluna X (atributivo) obrigatória não fornecida.", None
+
+    col_x = colunas_usadas[0]
+    col_sub = colunas_usadas[1] if len(colunas_usadas) > 1 else None
+    col_y = colunas_usadas[2] if len(colunas_usadas) > 2 else None
+
+    resultado_texto = []
+    imagens = []
+
+    # Apenas X fornecido -> Pareto simples
+    if col_x and not col_y and not col_sub:
+        contagem = df[col_x].value_counts().sort_values(ascending=False)
+        resultado_texto.append(contagem.to_frame().to_html())
+
+        plt.figure(figsize=(8,5))
+        ax = contagem.plot(kind="bar")
+        cum = contagem.cumsum() / contagem.sum() * 100
+        cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
+        ax.set_ylabel("Frequência")
+        ax.right_ax.set_ylabel("Acumulado (%)")
+        ax.set_title(f"Pareto - {col_x}")
+        plt.tight_layout()
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close()
+        buf.seek(0)
+        imagens.append(base64.b64encode(buf.read()).decode("utf-8"))
+
+    # X + Y fornecido -> Pareto tabela
+    elif col_x and col_y and not col_sub:
+        dados = df[[col_x, col_y]].dropna()
+        soma = dados.groupby(col_x)[col_y].sum().sort_values(ascending=False)
+        resultado_texto.append(soma.to_frame().to_html())
+
+        plt.figure(figsize=(8,5))
+        ax = soma.plot(kind="bar")
+        cum = soma.cumsum() / soma.sum() * 100
+        cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
+        ax.set_ylabel("Soma de Y")
+        ax.right_ax.set_ylabel("Acumulado (%)")
+        ax.set_title(f"Pareto - {col_x} (Y={col_y})")
+        plt.tight_layout()
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close()
+        buf.seek(0)
+        imagens.append(base64.b64encode(buf.read()).decode("utf-8"))
+
+    # X + Y + Subgrupo -> Pareto por subgrupo
+    elif col_x and col_y and col_sub:
+        dados = df[[col_x, col_sub, col_y]].dropna()
+        for subgrupo, sub_df in dados.groupby(col_sub):
+            soma = sub_df.groupby(col_x)[col_y].sum().sort_values(ascending=False)
+            resultado_texto.append(f"<strong>Subgrupo {subgrupo}</strong><br>" + soma.to_frame().to_html())
+
+            plt.figure(figsize=(8,5))
+            ax = soma.plot(kind="bar")
+            cum = soma.cumsum() / soma.sum() * 100
+            cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
+            ax.set_ylabel("Soma de Y")
+            ax.right_ax.set_ylabel("Acumulado (%)")
+            ax.set_title(f"Pareto - {col_x} (Y={col_y}, Subgrupo={subgrupo})")
+            plt.tight_layout()
+            buf = BytesIO()
+            plt.savefig(buf, format="png")
+            plt.close()
+            buf.seek(0)
+            imagens.append(base64.b64encode(buf.read()).decode("utf-8"))
+
+    # X + Subgrupo (sem Y) -> Pareto por subgrupo com contagem
+    elif col_x and not col_y and col_sub:
+        dados = df[[col_x, col_sub]].dropna()
+        for subgrupo, sub_df in dados.groupby(col_sub):
+            contagem = sub_df[col_x].value_counts().sort_values(ascending=False)
+            resultado_texto.append(f"<strong>Subgrupo {subgrupo}</strong><br>" + contagem.to_frame().to_html())
+
+            plt.figure(figsize=(8,5))
+            ax = contagem.plot(kind="bar")
+            cum = contagem.cumsum() / contagem.sum() * 100
+            cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
+            ax.set_ylabel("Frequência")
+            ax.right_ax.set_ylabel("Acumulado (%)")
+            ax.set_title(f"Pareto - {col_x} (Subgrupo={subgrupo})")
+            plt.tight_layout()
+            buf = BytesIO()
+            plt.savefig(buf, format="png")
+            plt.close()
+            buf.seek(0)
+            imagens.append(base64.b64encode(buf.read()).decode("utf-8"))
+
+    else:
+        return "Configuração de colunas não reconhecida.", None
+
+    return "<br><br>".join(resultado_texto), imagens
+
+
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
     if len(colunas_usadas) != 2:
         raise ValueError("O gráfico de série temporal requer duas colunas: X (datas/períodos) e Y (valores numéricos).")
@@ -417,6 +516,7 @@ def grafico_barras_agrupado(df, colunas_x, coluna_y=None):
 
 
 GRAFICOS = {
+    "Pareto": analise_pareto,
     "Gráfico de disperao": grafico_dispersao,
     "BoxPlot simples": grafico_boxplot_simples,
     "Pareto simples": grafico_pareto,
