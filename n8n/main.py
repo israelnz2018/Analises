@@ -27,7 +27,6 @@ print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
 def healthcheck():
     return JSONResponse({"status": "ok"})
 
-# Endpoint de análise
 @app.post("/analise")
 async def analisar(
     request: Request,
@@ -68,7 +67,7 @@ async def analisar(
                 except Exception as e:
                     print(f"Erro ao interpretar colunas_x: {e}")
 
-        # Validação de colunas exigidas (apenas para análises que precisam)
+        # Validação — só exige colunas em análises que precisam
         if ferramenta != "Análise de limpeza dos dados":
             if not coluna_y and not colunas_x:
                 return JSONResponse(content={"erro": "Informe ao menos coluna_y ou colunas_x."}, status_code=422)
@@ -77,6 +76,50 @@ async def analisar(
             for col in colunas_usadas:
                 if col not in df.columns:
                     return JSONResponse(content={"erro": f"Coluna '{col}' não encontrada no arquivo."}, status_code=400)
+
+        # Processamento da análise
+        resultado_texto = None
+        imagem_analise_base64 = None
+        imagem_grafico_isolado_base64 = None
+        explicacao_ia = None
+
+        if ferramenta and ferramenta.strip():
+            funcao = ANALISES.get(ferramenta.strip())
+            if not funcao:
+                return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
+            resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
+
+        if grafico and grafico.strip():
+            funcao = GRAFICOS.get(grafico.strip())
+            if not funcao:
+                return JSONResponse(content={"erro": "Gráfico desconhecido."}, status_code=400)
+            imagem_grafico_isolado_base64 = funcao(
+                df,
+                colunas_usadas,
+                coluna_y=nome_coluna_y
+            )
+
+        return {
+            "analise": resultado_texto or "",
+            "explicacao_ia": explicacao_ia,
+            "grafico_base64": imagem_analise_base64 or [],
+            "grafico_isolado_base64": imagem_grafico_isolado_base64,
+            "colunas_utilizadas": colunas_usadas
+        }
+
+    except ValueError as e:
+        return JSONResponse(content={"erro": str(e)}, status_code=400)
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse(
+            content={
+                "erro": "Erro interno ao processar a análise.",
+                "detalhe": str(e),
+                "traceback": tb
+            },
+            status_code=500
+        )
+
 
         # Processa análise
         resultado_texto = None
