@@ -24,40 +24,62 @@ def gerar_histograma(df: pd.DataFrame, colunas: list, coluna_y=None):
     if not colunas or len(colunas) < 1:
         raise ValueError("⚠ O histograma precisa ter ao menos uma coluna X informada.")
 
-    col_x = colunas[0]
-    col_y = coluna_y if coluna_y else None
-    col_subgrupo = colunas[1] if len(colunas) > 1 else None
+    coluna_x = colunas[0].strip()
+    coluna_subgrupo = colunas[1].strip() if len(colunas) > 1 else None
+    coluna_y = coluna_y.strip() if coluna_y else None
 
-    plt.figure(figsize=(8, 6))
-    plt.style.use('default')
-    plt.grid(True, linestyle=':', color='gray', alpha=0.7)
+    if coluna_x not in df.columns:
+        raise ValueError(f"A coluna '{coluna_x}' não foi encontrada no arquivo.")
 
-    if col_subgrupo and col_subgrupo in df.columns:
-        grupos = df.groupby(col_subgrupo)
-        for nome, grupo in grupos:
-            if col_y and col_y in grupo.columns:
-                plt.bar(grupo[col_x].astype(str), grupo[col_y], alpha=0.5, label=str(nome))
+    aplicar_estilo_minitab()
+
+    plt.figure(figsize=(10, 6))
+
+    if coluna_subgrupo and coluna_subgrupo in df.columns:
+        # Histograma com subgrupos (cores diferentes)
+        grupos = df.groupby(coluna_subgrupo)
+        cores = sns.color_palette("tab10", n_colors=len(grupos))
+
+        for i, (nome, grupo) in enumerate(grupos):
+            if coluna_y and coluna_y in grupo.columns:
+                plt.bar(grupo[coluna_x].astype(str), grupo[coluna_y], alpha=0.5, label=str(nome), color=cores[i])
             else:
-                sns.histplot(grupo[col_x], bins=10, kde=True, stat='density', alpha=0.5, label=str(nome))
+                sns.histplot(
+                    grupo[coluna_x],
+                    bins=10,
+                    kde=True,
+                    stat="density",
+                    alpha=0.4,
+                    label=str(nome),
+                    color=cores[i]
+                )
     else:
-        if col_y and col_y in df.columns:
-            plt.bar(df[col_x].astype(str), df[col_y], alpha=0.5)
+        if coluna_y and coluna_y in df.columns:
+            plt.bar(df[coluna_x].astype(str), df[coluna_y], alpha=0.5, color="steelblue")
         else:
-            sns.histplot(df[col_x], bins=10, kde=True, stat='density', alpha=0.5)
+            sns.histplot(
+                df[coluna_x],
+                bins=10,
+                kde=True,
+                stat="density",
+                alpha=0.4,
+                color="steelblue"
+            )
 
-    plt.xlabel(col_x)
-    plt.ylabel('Frequência (densidade)')
-    plt.title('Histograma com Curva de Densidade')
+    plt.xlabel(coluna_x)
+    plt.ylabel("Densidade")
+    plt.title("Histograma com Curva de Densidade")
     plt.legend()
     plt.tight_layout()
 
-    buf = io.BytesIO()
+    buf = BytesIO()
     plt.savefig(buf, format="png")
     buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode('utf-8')
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close()
 
     return imagem_base64
+
 
 def grafico_histograma_multiplo(df, colunas, coluna_y=None):
     if not coluna_y or not coluna_y.strip():
