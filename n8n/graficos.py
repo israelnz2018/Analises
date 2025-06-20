@@ -376,6 +376,56 @@ def gerar_bolhas_3d(df, colunas_usadas, coluna_y=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
 
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from io import BytesIO
+import base64
+import pandas as pd
+
+def gerar_superficie_3d(df, colunas_usadas):
+    if len(colunas_usadas) < 3:
+        return None  # X, Y, Z obrigatórios
+
+    col_x, col_y, col_z = colunas_usadas[0], colunas_usadas[1], colunas_usadas[2]
+
+    if col_x not in df.columns or col_y not in df.columns or col_z not in df.columns:
+        return None
+
+    dados = df[[col_x, col_y, col_z]].dropna()
+    if dados.empty:
+        return None
+
+    # Converte para float
+    dados = dados.astype(float)
+
+    # Cria malha
+    try:
+        pivot = pd.pivot_table(dados, values=col_z, index=col_y, columns=col_x)
+        X, Y = pivot.columns.values, pivot.index.values
+        X, Y = np.meshgrid(X, Y)
+        Z = pivot.values
+
+        fig = plt.figure(figsize=(10, 6))
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none', alpha=0.8)
+
+        ax.set_xlabel(col_x)
+        ax.set_ylabel(col_y)
+        ax.set_zlabel(col_z)
+        ax.set_title(f"Superfície 3D: {col_x} x {col_y} x {col_z}")
+
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close()
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        return imagem_base64
+    except Exception as e:
+        print(f"Erro ao gerar superfície 3D: {e}")
+        return None
+
 
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
     if len(colunas_usadas) != 2:
@@ -619,6 +669,7 @@ GRAFICOS = {
     "Dispersão": gerar_dispersao,
     "Tendência": gerar_tendencia,
     "Bolhas - 3D": gerar_bolhas_3d,
+    "Superfície - 3D": gerar_superficie_3d,
     
     "Gráfico de tendecias": grafico_linha_temporal,
     "grafico_ic_media": grafico_ic_media,
