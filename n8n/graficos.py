@@ -232,6 +232,39 @@ def gerar_barras(df, colunas_usadas, coluna_y=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
 
+def gerar_boxplot(df, colunas_usadas, coluna_y=None):
+    if len(colunas_usadas) < 1:
+        return None  # Pelo menos um X obrigatório
+
+    col_xs = colunas_usadas
+    col_sub = None
+
+    if "Subgrupo" in colunas_usadas:
+        col_xs = [c for c in colunas_usadas if c != "Subgrupo"]
+        col_sub = "Subgrupo"
+
+    plt.figure(figsize=(10, 6))
+
+    if col_sub and col_sub in df.columns:
+        if len(col_xs) != 1:
+            raise ValueError("⚠ Para BoxPlot com Subgrupo, selecione apenas um X contínuo.")
+        sns.boxplot(x=col_sub, y=col_xs[0], data=df, orient="v")
+        plt.title(f"Boxplot de {col_xs[0]} por {col_sub}")
+    else:
+        dados = df[col_xs].dropna()
+        sns.boxplot(data=dados, orient="v")
+        plt.title("Boxplot de variáveis contínuas")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return imagem_base64
+
+
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
     if len(colunas_usadas) != 2:
         raise ValueError("O gráfico de série temporal requer duas colunas: X (datas/períodos) e Y (valores numéricos).")
@@ -470,6 +503,7 @@ GRAFICOS = {
     "Pareto": gerar_pareto,
     "Setores (Pizza)": gerar_pizza,
     "Barras": gerar_barras,
+    "BoxPlot": gerar_boxplot,
     "Gráfico de tendecias": grafico_linha_temporal,
     "grafico_ic_media": grafico_ic_media,
     "Gráfico de disperao": grafico_dispersao,
