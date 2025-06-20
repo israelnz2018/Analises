@@ -34,6 +34,9 @@ async def analisar(
     coluna_z: str = Form(None)
 ):
     try:
+        form = await request.form()
+        field = form.get("field")  # Captura o field enviado
+
         df = await ler_arquivo(arquivo)
         colunas_usadas = []
 
@@ -58,7 +61,7 @@ async def analisar(
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
-            resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
+            resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas, field=field)
 
         if grafico and grafico.strip():
             print(f"🎨 Gráfico solicitado: {grafico.strip()}")
@@ -93,5 +96,4 @@ async def analisar(
             },
             status_code=500
         )
-
 
