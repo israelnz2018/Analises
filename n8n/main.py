@@ -30,7 +30,8 @@ async def analisar(
     ferramenta: str = Form(None),
     grafico: str = Form(None),
     coluna_y: str = Form(None),
-    colunas_x: str | list[str] = Form(None)
+    colunas_x: str | list[str] = Form(None),
+    coluna_z: str = Form(None)
 ):
     try:
         df = await ler_arquivo(arquivo)
@@ -46,18 +47,19 @@ async def analisar(
                 for item in colunas_x:
                     colunas_usadas.extend([x.strip() for x in item.split(",") if x.strip()])
 
+        if coluna_z and coluna_z.strip():
+            colunas_usadas.append(coluna_z.strip())
+
         resultado_texto = None
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
 
-        # Executa análise
         if ferramenta and ferramenta.strip():
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
             resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
 
-        # Executa gráfico (tudo do graficos.py vai para o lado direito)
         if grafico and grafico.strip():
             print(f"🎨 Gráfico solicitado: {grafico.strip()}")
             print(f"📊 Colunas usadas: {colunas_usadas}")
@@ -91,4 +93,5 @@ async def analisar(
             },
             status_code=500
         )
+
 
