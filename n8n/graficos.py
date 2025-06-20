@@ -173,7 +173,7 @@ def gerar_pareto(df, colunas_usadas, coluna_y=None):
     else:
         return "Configuração de colunas não reconhecida.", None
 
-        return imagem_base64
+        return grafico_isolado_base64
 
 
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
