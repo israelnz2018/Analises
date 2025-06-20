@@ -337,6 +337,44 @@ def gerar_tendencia(df, colunas_usadas, coluna_y=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
 
+def gerar_bolhas_3d(df, colunas_usadas, coluna_y=None):
+    if len(colunas_usadas) < 3:
+        return None  # X, Y, Z obrigatórios
+
+    col_x = colunas_usadas[0]
+    col_y = colunas_usadas[1]
+    col_z = colunas_usadas[2]
+
+    if col_x not in df.columns or col_y not in df.columns or col_z not in df.columns:
+        return None
+
+    dados = df[[col_x, col_y, col_z]].dropna()
+
+    if dados.empty:
+        return None
+
+    plt.figure(figsize=(10, 6))
+
+    plt.scatter(
+        x=dados[col_x],
+        y=dados[col_y],
+        s=dados[col_z] * 10,  # Ajusta o tamanho das bolhas
+        alpha=0.5,
+        edgecolors="w"
+    )
+
+    plt.xlabel(col_x)
+    plt.ylabel(col_y)
+    plt.title(f"Gráfico de Bolhas: {col_x} vs {col_y} (Z = tamanho das bolhas)")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return imagem_base64
 
 
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
@@ -580,6 +618,8 @@ GRAFICOS = {
     "BoxPlot": gerar_boxplot,
     "Dispersão": gerar_dispersao,
     "Tendência": gerar_tendencia,
+    "Bolhas - 3D": gerar_bolhas_3d,
+    
     "Gráfico de tendecias": grafico_linha_temporal,
     "grafico_ic_media": grafico_ic_media,
     "Gráfico de disperao": grafico_dispersao,
