@@ -299,6 +299,7 @@ def gerar_dispersao(df, colunas_usadas, coluna_y=None):
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
+    
 def gerar_tendencia(df, colunas_usadas, coluna_y=None):
     if not coluna_y or coluna_y not in df.columns:
         return None  # Y obrigatório
@@ -310,21 +311,25 @@ def gerar_tendencia(df, colunas_usadas, coluna_y=None):
 
     if col_sub and col_sub in df.columns:
         if col_x and col_x in df.columns:
+            df = df.sort_values(by=col_x)
             sns.lineplot(x=col_x, y=coluna_y, hue=col_sub, data=df)
-            plt.title(f"Tendência de {coluna_y} por {col_x} (Subgrupo: {col_sub})")
+            plt.title(f"Tendência temporal de {coluna_y} por {col_x} (Subgrupo: {col_sub})")
         else:
             df = df.reset_index()
             sns.lineplot(x=df.index, y=coluna_y, hue=col_sub, data=df)
-            plt.title(f"Tendência de {coluna_y} por índice (Subgrupo: {col_sub})")
+            plt.title(f"Tendência temporal de {coluna_y} por índice (Subgrupo: {col_sub})")
     else:
         if col_x and col_x in df.columns:
+            df = df.sort_values(by=col_x)
             sns.lineplot(x=col_x, y=coluna_y, data=df)
-            plt.title(f"Tendência de {coluna_y} por {col_x}")
+            plt.title(f"Tendência temporal de {coluna_y} por {col_x}")
         else:
             df = df.reset_index()
             sns.lineplot(x=df.index, y=coluna_y, data=df)
-            plt.title(f"Tendência de {coluna_y} por índice")
+            plt.title(f"Tendência temporal de {coluna_y} por índice")
 
+    plt.xlabel("Tempo")
+    plt.ylabel(coluna_y)
     plt.tight_layout()
 
     buf = BytesIO()
@@ -333,6 +338,7 @@ def gerar_tendencia(df, colunas_usadas, coluna_y=None):
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
+
 
 
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
