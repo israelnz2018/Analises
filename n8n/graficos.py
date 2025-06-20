@@ -74,7 +74,7 @@ def gerar_histograma(df: pd.DataFrame, colunas: list, coluna_y=None):
     return imagem_base64
 
 
-def gerar_pareto(df, colunas_usadas):
+def gerar_pareto(df, colunas_usadas, coluna_y=None):
     if len(colunas_usadas) < 1:
         return "Erro: Coluna X (atributivo) obrigatória não fornecida.", None
 
