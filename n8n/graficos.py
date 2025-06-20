@@ -138,6 +138,43 @@ def gerar_pareto(df, colunas_usadas, coluna_y=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
 
+def gerar_pizza(df, colunas_usadas, coluna_y=None):
+    if len(colunas_usadas) < 1:
+        return None  # X obrigatório
+
+    col_x = colunas_usadas[0]
+    col_y = colunas_usadas[1] if len(colunas_usadas) > 1 else None
+
+    if col_x not in df.columns:
+        return None
+
+    if col_y and col_y not in df.columns:
+        return None
+
+    plt.figure(figsize=(8, 8))
+
+    if col_y:
+        # Valida que Y é numérico
+        if not np.issubdtype(df[col_y].dropna().dtype, np.number):
+            raise ValueError(f"⚠ A coluna Y '{col_y}' deve conter dados numéricos para gerar pizza com soma.")
+        dados = df[[col_x, col_y]].dropna()
+        soma = dados.groupby(col_x)[col_y].sum().sort_values(ascending=False)
+        soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
+        plt.title(f"Pizza de {col_y} por {col_x}")
+    else:
+        contagem = df[col_x].value_counts().sort_values(ascending=False)
+        contagem.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
+        plt.title(f"Pizza de frequência por {col_x}")
+
+    plt.ylabel("")
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return imagem_base64
 
 
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
@@ -225,67 +262,6 @@ def grafico_ic_media(df, colunas_usadas, coluna_y=None):
     buffer.seek(0)
     imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
     return imagem_base64
-
-
-
-def grafico_pizza(df, colunas_usadas, coluna_y=None):
-    if len(colunas_usadas) != 1:
-        raise ValueError("O Gráfico de Pizza requer exatamente 1 coluna categórica ou discreta.")
-
-    nome_coluna = colunas_usadas[0]
-    dados = df[nome_coluna].value_counts()
-
-    aplicar_estilo_minitab()
-
-    plt.figure(figsize=(8, 8))
-    plt.pie(
-        dados.values,
-        labels=dados.index,
-        autopct='%1.1f%%',
-        startangle=140,
-        textprops={'fontsize': 12}
-    )
-    plt.title(f"Distribuição de {nome_coluna}", fontsize=14)
-
-    buffer = BytesIO()
-    plt.savefig(buffer, format='png')
-    plt.close()
-    buffer.seek(0)
-    imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-    return imagem_base64
-
-def grafico_bolhas(df, colunas_usadas, coluna_y=None):
-    if len(colunas_usadas) != 3:
-        raise ValueError("O Gráfico de Bolhas requer 3 colunas: X, Y e Tamanho.")
-
-    nome_x = colunas_usadas[0]
-    nome_y = colunas_usadas[1]
-    nome_tamanho = colunas_usadas[2]
-
-    aplicar_estilo_minitab()
-
-    plt.figure(figsize=(10, 6))
-    sns.scatterplot(
-        data=df,
-        x=nome_x,
-        y=nome_y,
-        size=nome_tamanho,
-        sizes=(50, 800),
-        legend=False,
-        alpha=0.6
-    )
-
-    plt.xlabel(nome_x)
-    plt.ylabel(nome_y)
-    plt.title("Gráfico de Bolhas")
-
-    buffer = BytesIO()
-    plt.savefig(buffer, format='png')
-    plt.close()
-    buffer.seek(0)
-    imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-    return imagem_base64
-
 
 
 def grafico_dispersao(df, colunas):
@@ -437,9 +413,9 @@ def grafico_barras_agrupado(df, colunas_x, coluna_y=None):
 GRAFICOS = {
     "Histograma": gerar_histograma,
     "Pareto": gerar_pareto,
+    "Setores (Pizza)": gerar_pizza,
     "Gráfico de tendecias": grafico_linha_temporal,
     "grafico_ic_media": grafico_ic_media,
-    "Gráfico de pizza": grafico_pizza,
     "Gráficos de bolhas": grafico_bolhas,
     "Gráfico de disperao": grafico_dispersao,
     "BoxPlot simples": grafico_boxplot_simples,
