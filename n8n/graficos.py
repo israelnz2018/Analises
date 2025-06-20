@@ -263,6 +263,41 @@ def gerar_boxplot(df, colunas_usadas, coluna_y=None):
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
+def gerar_dispersao(df, colunas_usadas, coluna_y=None):
+    if not coluna_y or coluna_y not in df.columns:
+        return None  # Y obrigatório
+
+    if len(colunas_usadas) < 1:
+        return None  # Pelo menos um X obrigatório
+
+    col_xs = colunas_usadas
+    col_sub = None
+
+    if "Subgrupo" in colunas_usadas:
+        col_xs = [c for c in colunas_usadas if c != "Subgrupo"]
+        col_sub = "Subgrupo"
+
+    x_col = col_xs[0]
+    if x_col not in df.columns:
+        return None
+
+    plt.figure(figsize=(10, 6))
+
+    if col_sub and col_sub in df.columns:
+        sns.scatterplot(x=x_col, y=coluna_y, hue=col_sub, data=df)
+        plt.title(f"Dispersão de {coluna_y} por {x_col} (Subgrupo: {col_sub})")
+    else:
+        sns.scatterplot(x=x_col, y=coluna_y, data=df)
+        plt.title(f"Dispersão de {coluna_y} por {x_col}")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return imagem_base64
 
 
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
@@ -504,6 +539,7 @@ GRAFICOS = {
     "Setores (Pizza)": gerar_pizza,
     "Barras": gerar_barras,
     "BoxPlot": gerar_boxplot,
+    "Dispersão": gerar_dispersao,
     "Gráfico de tendecias": grafico_linha_temporal,
     "grafico_ic_media": grafico_ic_media,
     "Gráfico de disperao": grafico_dispersao,
