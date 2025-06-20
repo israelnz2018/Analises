@@ -468,10 +468,27 @@ def analise_1_sample_t(df, colunas_usadas, field=None):
 
     return resultado, [imagem_base64]
 
+import pandas as pd
+import numpy as np
+from scipy import stats
+from scipy.stats import anderson
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+import seaborn as sns
 
-def teste_2sample_t(df, colunas_usadas):
+def aplicar_estilo_minitab():
+    plt.style.use('seaborn-whitegrid')
+    plt.rcParams.update({
+        "axes.titlesize": 12,
+        "axes.labelsize": 10,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9
+    })
+
+def teste_2_sample_t(df, colunas_usadas, **kwargs):
     if len(colunas_usadas) != 2:
-        return "❌ É necessário selecionar exatamente duas colunas numéricas para o Teste 2 Sample T.", None
+        return "❌ É necessário selecionar exatamente duas colunas Y numéricas para o Teste 2 Sample T.", None
 
     col1, col2 = colunas_usadas
     serie1 = pd.to_numeric(df[col1], errors="coerce").dropna()
@@ -480,7 +497,7 @@ def teste_2sample_t(df, colunas_usadas):
     if len(serie1) < 2 or len(serie2) < 2:
         return "❌ As colunas selecionadas não possuem dados suficientes para o teste.", None
 
-    # Teste de normalidade para cada grupo (Anderson-Darling)
+    # Teste de normalidade (Anderson-Darling)
     ad1 = anderson(serie1)
     ad2 = anderson(serie2)
     lim1 = ad1.critical_values[2]
@@ -488,7 +505,7 @@ def teste_2sample_t(df, colunas_usadas):
     normal1 = ad1.statistic < lim1
     normal2 = ad2.statistic < lim2
 
-    # Teste F para igualdade de variâncias
+    # Teste F para variâncias
     stat_f = np.var(serie1, ddof=1) / np.var(serie2, ddof=1)
     df1, df2 = len(serie1)-1, len(serie2)-1
     p_f = 2 * min(stats.f.cdf(stat_f, df1, df2), 1 - stats.f.cdf(stat_f, df1, df2))
@@ -516,7 +533,7 @@ def teste_2sample_t(df, colunas_usadas):
     # Gráfico estilo Minitab
     try:
         aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(6, 4))
+        fig, ax = plt.subplots(figsize=(6, 6))
 
         dados_plot = pd.DataFrame({
             'Valor': pd.concat([serie1, serie2]),
@@ -525,10 +542,12 @@ def teste_2sample_t(df, colunas_usadas):
 
         sns.boxplot(x="Grupo", y="Valor", data=dados_plot, ax=ax, width=0.6, palette="pastel")
         medias = dados_plot.groupby("Grupo")["Valor"].mean()
-        ax.plot(range(len(medias)), medias, marker="o", linestyle="-", color="black", linewidth=2, label="Média")
-        ax.set_title(f"Boxplot de {col1} e {col2}")
+        ax.plot(range(len(medias)), medias.values, marker="D", linestyle="None", color="black", markersize=6, label="Média")
+
+        ax.set_title(f"Boxplot Comparativo 2 Sample T")
         ax.set_ylabel("Valores")
         ax.legend()
+
         plt.tight_layout()
 
         buffer = BytesIO()
@@ -536,10 +555,14 @@ def teste_2sample_t(df, colunas_usadas):
         plt.close(fig)
         buffer.seek(0)
         imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    except:
+    except Exception as e:
+        print(f"Erro no gráfico: {e}")
         imagem_base64 = None
 
     return texto, imagem_base64
+
+
+
 
 def analise_teste_paired_t(df, colunas_usadas):
     if len(colunas_usadas) != 2:
@@ -1579,6 +1602,8 @@ ANALISES = {
     "Análise de distribuição estatística": analise_distribuicao_estatistica,
     "Análise de limpeza dos dados": analise_limpeza_dados,
     "1 Sample T": analise_1_sample_t,
+    "2 Sample T": analise_2_sample_t,
+
 
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
@@ -1586,7 +1611,6 @@ ANALISES = {
     "Regressão logística binária": analise_regressao_logistica_binaria,
     "Regressão logística nominal": analise_regressao_logistica_nominal,
     "Regressão logística ordinal": analise_regressao_logistica_ordinal,
-    "2 Sample T": teste_2sample_t,
     "Paired Test": analise_teste_paired_t,
     "F/Levene Test": teste_variancias,
     "One way ANOVA": teste_anova,
