@@ -416,7 +416,6 @@ GRAFICOS = {
     "Setores (Pizza)": gerar_pizza,
     "Gráfico de tendecias": grafico_linha_temporal,
     "grafico_ic_media": grafico_ic_media,
-    "Gráficos de bolhas": grafico_bolhas,
     "Gráfico de disperao": grafico_dispersao,
     "BoxPlot simples": grafico_boxplot_simples,
     "boxplot_multiplo": grafico_boxplot_multiplo,
