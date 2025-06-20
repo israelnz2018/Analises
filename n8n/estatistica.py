@@ -1,4 +1,3 @@
-
 # 🔢 Bibliotecas de análise de dados
 import pandas as pd
 import numpy as np
@@ -12,19 +11,15 @@ import statsmodels.api as sm
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.miscmodels.ordinal_model import OrderedModel
-from scipy.stats import chi2_contingency
-from scipy.stats import anderson, shapiro, kstest, norm
-from sklearn.preprocessing import PowerTransformer
 from statsmodels.stats.diagnostic import normal_ad
-
-
 
 # 🧪 Testes estatísticos
 from scipy import stats
-from scipy.stats import shapiro, anderson, kstest, norm
+from scipy.stats import chi2_contingency, anderson, shapiro, kstest, norm
 
 # 📈 Métricas de modelos
 from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import PowerTransformer
 
 # 💾 Manipulação de arquivos/imagens
 import base64
@@ -34,6 +29,7 @@ import os
 # 🧠 Funções locais do projeto
 from suporte import interpretar_coluna
 from estilo import aplicar_estilo_minitab
+
 
 # ✅ Todas as análises começam abaixo, dentro das funções (nunca aqui fora)
 
