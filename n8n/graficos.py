@@ -382,7 +382,7 @@ from io import BytesIO
 import base64
 import pandas as pd
 
-def gerar_superficie_3d(df, colunas_usadas):
+def gerar_superficie_3d(df, colunas_usadas, **kwargs):
     if len(colunas_usadas) < 3:
         return None  # X, Y, Z obrigatórios
 
@@ -395,10 +395,8 @@ def gerar_superficie_3d(df, colunas_usadas):
     if dados.empty:
         return None
 
-    # Converte para float
     dados = dados.astype(float)
 
-    # Cria malha
     try:
         pivot = pd.pivot_table(dados, values=col_z, index=col_y, columns=col_x)
         X, Y = pivot.columns.values, pivot.index.values
