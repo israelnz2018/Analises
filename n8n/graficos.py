@@ -263,6 +263,7 @@ def gerar_boxplot(df, colunas_usadas, coluna_y=None):
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
+    
 def gerar_dispersao(df, colunas_usadas, coluna_y=None):
     if not coluna_y or coluna_y not in df.columns:
         return None  # Y obrigatório
@@ -289,6 +290,40 @@ def gerar_dispersao(df, colunas_usadas, coluna_y=None):
     else:
         sns.scatterplot(x=x_col, y=coluna_y, data=df)
         plt.title(f"Dispersão de {coluna_y} por {x_col}")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return imagem_base64
+def gerar_tendencia(df, colunas_usadas, coluna_y=None):
+    if not coluna_y or coluna_y not in df.columns:
+        return None  # Y obrigatório
+
+    col_x = colunas_usadas[0] if len(colunas_usadas) > 0 else None
+    col_sub = colunas_usadas[1] if len(colunas_usadas) > 1 else None
+
+    plt.figure(figsize=(10, 6))
+
+    if col_sub and col_sub in df.columns:
+        if col_x and col_x in df.columns:
+            sns.lineplot(x=col_x, y=coluna_y, hue=col_sub, data=df)
+            plt.title(f"Tendência de {coluna_y} por {col_x} (Subgrupo: {col_sub})")
+        else:
+            df = df.reset_index()
+            sns.lineplot(x=df.index, y=coluna_y, hue=col_sub, data=df)
+            plt.title(f"Tendência de {coluna_y} por índice (Subgrupo: {col_sub})")
+    else:
+        if col_x and col_x in df.columns:
+            sns.lineplot(x=col_x, y=coluna_y, data=df)
+            plt.title(f"Tendência de {coluna_y} por {col_x}")
+        else:
+            df = df.reset_index()
+            sns.lineplot(x=df.index, y=coluna_y, data=df)
+            plt.title(f"Tendência de {coluna_y} por índice")
 
     plt.tight_layout()
 
@@ -540,6 +575,7 @@ GRAFICOS = {
     "Barras": gerar_barras,
     "BoxPlot": gerar_boxplot,
     "Dispersão": gerar_dispersao,
+    "Tendência": gerar_tendencia,
     "Gráfico de tendecias": grafico_linha_temporal,
     "grafico_ic_media": grafico_ic_media,
     "Gráfico de disperao": grafico_dispersao,
