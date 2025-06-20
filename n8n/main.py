@@ -35,7 +35,7 @@ async def analisar(
 ):
     try:
         form = await request.form()
-        field = form.get("field")  # Captura o field enviado
+        field = form.get("field")  # Captura o field enviado, se existir
 
         df = await ler_arquivo(arquivo)
         colunas_usadas = []
@@ -57,12 +57,20 @@ async def analisar(
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
 
+        # EXECUTA ANÁLISE (só passa field se a função realmente aceita)
         if ferramenta and ferramenta.strip():
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
-            resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas, field=field)
+            
+            # Verifica se a função espera field
+            try:
+                resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas, field=field)
+            except TypeError:
+                # Se der TypeError porque field foi passado indevidamente, tenta sem o field
+                resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
 
+        # EXECUTA GRÁFICO
         if grafico and grafico.strip():
             print(f"🎨 Gráfico solicitado: {grafico.strip()}")
             print(f"📊 Colunas usadas: {colunas_usadas}")
@@ -70,6 +78,7 @@ async def analisar(
             if not funcao:
                 print(f"❌ Gráfico {grafico.strip()} não encontrado no GRAFICOS.")
                 return JSONResponse(content={"erro": f"Gráfico {grafico.strip()} não encontrado."}, status_code=400)
+            
             imagem_grafico_isolado_base64 = funcao(
                 df,
                 colunas_usadas,
