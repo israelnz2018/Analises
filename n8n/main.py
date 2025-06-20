@@ -20,9 +20,6 @@ app.add_middleware(
 print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
 
 ANALISES_COM_FIELD = {"1 Sample T", "1 Wilcoxon", "1 Teste de Sinal", "1 Proporcao", "Intervalo de Confianca"}
-ANALISES_COM_SUBGRUPO = {"Análise de estabilidade", "Histograma", "Pareto", "Barras", "BoxPlot", "Dispersão", "Tendência", "Pareto simples", "Gráfifo de barras", "BoxPlot simples"}
-ANALISES_COM_X_SUBGRUPO = {"Pareto"}
-ANALISES_COM_Z = {"Bolhas - 3D", "Superfície - 3D", "Gráficos de bolhas"}
 
 @app.get("/healthz")
 def healthcheck():
@@ -70,11 +67,10 @@ async def analisar(
             if not funcao:
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
 
-            kwargs = {}
-            if ferramenta.strip() in ANALISES_COM_FIELD and field:
-                kwargs["field"] = field
-
-            resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas, **kwargs)
+            if ferramenta.strip() in ANALISES_COM_FIELD:
+                resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas, field=field)
+            else:
+                resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
 
         # Executa gráfico
         if grafico and grafico.strip():
@@ -84,17 +80,7 @@ async def analisar(
             if not funcao:
                 return JSONResponse(content={"erro": f"Gráfico {grafico.strip()} não encontrado."}, status_code=400)
 
-            kwargs = {}
-            if grafico.strip() in ANALISES_COM_SUBGRUPO:
-                subgrupo = next((c for c in colunas_usadas if c.lower() == "subgrupo"), None)
-                kwargs["subgrupo"] = subgrupo
-            if grafico.strip() in ANALISES_COM_X_SUBGRUPO:
-                x_subgrupo = next((c for c in colunas_usadas if c.lower() == "x_subgrupo"), None)
-                kwargs["x_subgrupo"] = x_subgrupo
-            if grafico.strip() in ANALISES_COM_Z:
-                kwargs["coluna_z"] = coluna_z.strip() if coluna_z else None
-
-            imagem_grafico_isolado_base64 = funcao(df, colunas_usadas, **kwargs)
+            imagem_grafico_isolado_base64 = funcao(df, colunas_usadas)
 
         return {
             "analise": resultado_texto or "",
