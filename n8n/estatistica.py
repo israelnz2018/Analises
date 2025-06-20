@@ -33,6 +33,67 @@ from estilo import aplicar_estilo_minitab
 
 # ✅ Todas as análises começam abaixo, dentro das funções (nunca aqui fora)
 
+def grafico_sumario(df, colunas_usadas):
+    coluna_y = colunas_usadas[0]
+    if coluna_y not in df.columns:
+        return (
+            "❌ A coluna selecionada para o Gráfico Sumario não foi encontrada.",
+            None
+        )
+
+    serie = df[coluna_y].dropna()
+
+    if serie.empty:
+        return (
+            "❌ A coluna selecionada não contém dados numéricos válidos.",
+            None
+        )
+
+    media = serie.mean()
+    mediana = serie.median()
+    desvio = serie.std()
+    variancia = serie.var()
+    minimo = serie.min()
+    maximo = serie.max()
+    q1 = serie.quantile(0.25)
+    q3 = serie.quantile(0.75)
+    assimetria = serie.skew()
+    curtose = serie.kurtosis()
+    n = serie.count()
+
+    resumo = f"""📊 **Gráfico Sumario da coluna '{coluna_y}'**  
+- Média: {media:.2f}  
+- Mediana: {mediana:.2f}  
+- Desvio Padrão: {desvio:.2f}  
+- Variância: {variancia:.2f}  
+- Mínimo: {minimo:.2f}  
+- 1º Quartil (Q1): {q1:.2f}  
+- 3º Quartil (Q3): {q3:.2f}  
+- Máximo: {maximo:.2f}  
+- Assimetria: {assimetria:.2f}  
+- Curtose: {curtose:.2f}  
+- N: {n}"""
+
+    # Aplica estilo seguro e compatível
+    try:
+        plt.style.use('seaborn-v0_8-whitegrid')
+    except Exception:
+        plt.style.use('default')
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.histplot(serie, bins=10, kde=True, ax=ax, color='gray')
+    ax.set_title(f"Gráfico Sumario - {coluna_y}")
+    ax.set_xlabel(coluna_y)
+    ax.set_ylabel("Frequência")
+
+    buffer = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buffer, format='png')
+    plt.close(fig)
+    buffer.seek(0)
+    imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+    return resumo, imagem_base64
 
 def analise_de_outliers(df, colunas_usadas):
     resultado_texto = "📊 **Análise de Outliers**\n"
@@ -1261,62 +1322,7 @@ Y = {equacao}
 
     return texto.strip(), imagem
 
-def grafico_sumario(df, colunas_usadas):
-    coluna_y = colunas_usadas[0]
-    if coluna_y not in df.columns:
-        return (
-            "❌ A coluna selecionada para o Gráfico Sumario não foi encontrada.",
-            None
-        )
 
-    serie = df[coluna_y].dropna()
-
-    if serie.empty:
-        return (
-            "❌ A coluna selecionada não contém dados numéricos válidos.",
-            None
-        )
-
-    media = serie.mean()
-    mediana = serie.median()
-    desvio = serie.std()
-    variancia = serie.var()
-    minimo = serie.min()
-    maximo = serie.max()
-    q1 = serie.quantile(0.25)
-    q3 = serie.quantile(0.75)
-    assimetria = serie.skew()
-    curtose = serie.kurtosis()
-    n = serie.count()
-
-    resumo = f"""📊 **Gráfico Sumario da coluna '{coluna_y}'**  
-- Média: {media:.2f}  
-- Mediana: {mediana:.2f}  
-- Desvio Padrão: {desvio:.2f}  
-- Variância: {variancia:.2f}  
-- Mínimo: {minimo:.2f}  
-- 1º Quartil (Q1): {q1:.2f}  
-- 3º Quartil (Q3): {q3:.2f}  
-- Máximo: {maximo:.2f}  
-- Assimetria: {assimetria:.2f}  
-- Curtose: {curtose:.2f}  
-- N: {n}"""
-
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    sns.histplot(serie, bins=10, kde=True, ax=ax, color='gray')
-    ax.set_title(f"Gráfico Sumario - {coluna_y}")
-    ax.set_xlabel(coluna_y)
-    ax.set_ylabel("Frequência")
-
-    buffer = BytesIO()
-    plt.tight_layout()
-    plt.savefig(buffer, format='png')
-    plt.close(fig)
-    buffer.seek(0)
-    imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-
-    return resumo, imagem_base64
 
 
 def teste_normalidade(df, colunas_usadas):
