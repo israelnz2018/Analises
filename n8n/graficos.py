@@ -379,12 +379,14 @@ def gerar_bolhas_3d(df, colunas_usadas, coluna_y=None):
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from io import BytesIO
+from scipy.interpolate import griddata
 import base64
 import pandas as pd
 
+
 def gerar_superficie_3d(df, colunas_usadas, **kwargs):
     if len(colunas_usadas) < 3:
-        return None  # X, Y, Z obrigatórios
+        return None
 
     col_x, col_y, col_z = colunas_usadas[0], colunas_usadas[1], colunas_usadas[2]
 
@@ -398,14 +400,23 @@ def gerar_superficie_3d(df, colunas_usadas, **kwargs):
     dados = dados.astype(float)
 
     try:
-        pivot = pd.pivot_table(dados, values=col_z, index=col_y, columns=col_x)
-        X, Y = pivot.columns.values, pivot.index.values
-        X, Y = np.meshgrid(X, Y)
-        Z = pivot.values
+        X = dados[col_x].values
+        Y = dados[col_y].values
+        Z = dados[col_z].values
+
+        # Cria grid
+        xi = np.linspace(X.min(), X.max(), 50)
+        yi = np.linspace(Y.min(), Y.max(), 50)
+        xi, yi = np.meshgrid(xi, yi)
+
+        # Interpola os dados
+        zi = griddata((X, Y), Z, (xi, yi), method='linear')
 
         fig = plt.figure(figsize=(10, 6))
         ax = fig.add_subplot(111, projection='3d')
-        ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='none', alpha=0.8)
+
+        # Plota superfície
+        surf = ax.plot_surface(xi, yi, zi, cmap='viridis', edgecolor='none', alpha=0.8)
 
         ax.set_xlabel(col_x)
         ax.set_ylabel(col_y)
@@ -423,6 +434,7 @@ def gerar_superficie_3d(df, colunas_usadas, **kwargs):
     except Exception as e:
         print(f"Erro ao gerar superfície 3D: {e}")
         return None
+
 
 
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
