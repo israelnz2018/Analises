@@ -304,31 +304,29 @@ def gerar_tendencia(df, colunas_usadas, coluna_y=None):
     if not coluna_y or coluna_y not in df.columns:
         return None  # Y obrigatório
 
-    col_x = colunas_usadas[0] if len(colunas_usadas) > 0 else None
-    col_sub = colunas_usadas[1] if len(colunas_usadas) > 1 else None
+    col_sub = None
+    col_x = None
+
+    if len(colunas_usadas) > 0:
+        # Verifica se o primeiro é X
+        if colunas_usadas[0] != "Subgrupo":
+            col_x = colunas_usadas[0]
+    if len(colunas_usadas) > 1:
+        col_sub = colunas_usadas[1]
 
     plt.figure(figsize=(10, 6))
 
-    if col_sub and col_sub in df.columns:
-        if col_x and col_x in df.columns:
-            df = df.sort_values(by=col_x)
-            sns.lineplot(x=col_x, y=coluna_y, hue=col_sub, data=df)
-            plt.title(f"Tendência temporal de {coluna_y} por {col_x} (Subgrupo: {col_sub})")
-        else:
-            df = df.reset_index()
-            sns.lineplot(x=df.index, y=coluna_y, hue=col_sub, data=df)
-            plt.title(f"Tendência temporal de {coluna_y} por índice (Subgrupo: {col_sub})")
-    else:
-        if col_x and col_x in df.columns:
-            df = df.sort_values(by=col_x)
-            sns.lineplot(x=col_x, y=coluna_y, data=df)
-            plt.title(f"Tendência temporal de {coluna_y} por {col_x}")
-        else:
-            df = df.reset_index()
-            sns.lineplot(x=df.index, y=coluna_y, data=df)
-            plt.title(f"Tendência temporal de {coluna_y} por índice")
+    df = df.dropna(subset=[coluna_y]).reset_index(drop=True)
+    df['sequencia'] = df.index + 1  # Sequência temporal
 
-    plt.xlabel("Tempo")
+    if col_sub and col_sub in df.columns:
+        sns.lineplot(x='sequencia', y=coluna_y, hue=col_sub, data=df, marker='o')
+        plt.title(f"Tendência temporal de {coluna_y} por sequência (Subgrupo: {col_sub})")
+    else:
+        sns.lineplot(x='sequencia', y=coluna_y, data=df, marker='o')
+        plt.title(f"Tendência temporal de {coluna_y} por sequência")
+
+    plt.xlabel("Tempo / Sequência")
     plt.ylabel(coluna_y)
     plt.tight_layout()
 
