@@ -486,7 +486,7 @@ def aplicar_estilo_minitab():
         "ytick.labelsize": 9
     })
 
-def teste_2_sample_t(df, colunas_usadas, **kwargs):
+def analise_2_sample_t(df, colunas_usadas, **kwargs):
     if len(colunas_usadas) != 2:
         return "❌ É necessário selecionar exatamente duas colunas Y numéricas para o Teste 2 Sample T.", None
 
