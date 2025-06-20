@@ -176,6 +176,61 @@ def gerar_pizza(df, colunas_usadas, coluna_y=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
 
+def gerar_barras(df, colunas_usadas, coluna_y=None):
+    if len(colunas_usadas) < 1:
+        return None  # X é obrigatório
+
+    col_x = colunas_usadas[0]
+    col_sub = colunas_usadas[1] if len(colunas_usadas) > 1 else None
+
+    if col_x not in df.columns:
+        return None
+    if coluna_y and coluna_y not in df.columns:
+        return None
+    if col_sub and col_sub not in df.columns:
+        return None
+
+    plt.figure(figsize=(10, 6))
+
+    if col_sub:
+        # Barras agrupadas ou empilhadas por subgrupo
+        if coluna_y:
+            # Y soma por X + Subgrupo
+            dados = df[[col_x, col_sub, coluna_y]].dropna()
+            soma = dados.groupby([col_x, col_sub])[coluna_y].sum().unstack().fillna(0)
+            soma.plot(kind="bar", stacked=False, ax=plt.gca())
+            plt.ylabel(f"Soma de {coluna_y}")
+        else:
+            # Frequência por X + Subgrupo
+            dados = df[[col_x, col_sub]].dropna()
+            contagem = dados.groupby([col_x, col_sub]).size().unstack().fillna(0)
+            contagem.plot(kind="bar", stacked=False, ax=plt.gca())
+            plt.ylabel("Frequência")
+        plt.title(f"Barras de {col_x} por {col_sub}")
+
+    elif coluna_y:
+        # Barras por soma Y
+        dados = df[[col_x, coluna_y]].dropna()
+        soma = dados.groupby(col_x)[coluna_y].sum()
+        soma.plot(kind="bar", ax=plt.gca())
+        plt.ylabel(f"Soma de {coluna_y}")
+        plt.title(f"Barras de {col_x} por soma de {coluna_y}")
+
+    else:
+        # Apenas X → contagem
+        contagem = df[col_x].value_counts().sort_values(ascending=False)
+        contagem.plot(kind="bar", ax=plt.gca())
+        plt.ylabel("Frequência")
+        plt.title(f"Barras de frequência por {col_x}")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return imagem_base64
 
 def grafico_linha_temporal(df, colunas_usadas, coluna_y=None):
     if len(colunas_usadas) != 2:
@@ -414,6 +469,7 @@ GRAFICOS = {
     "Histograma": gerar_histograma,
     "Pareto": gerar_pareto,
     "Setores (Pizza)": gerar_pizza,
+    "Barras": gerar_barras,
     "Gráfico de tendecias": grafico_linha_temporal,
     "grafico_ic_media": grafico_ic_media,
     "Gráfico de disperao": grafico_dispersao,
