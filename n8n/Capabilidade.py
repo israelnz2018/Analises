@@ -135,6 +135,88 @@ def analise_estabilidade(df, colunas_usadas):
 
     return texto_resumo, img_base64
     
+def analise_distribuicao_estatistica(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 1:
+        return "❌ A análise de distribuição requer 1 coluna Y.", None
+
+    y_col = colunas_usadas[0]
+    dados = df[y_col].dropna()
+    if len(dados) < 10:
+        return "❌ A análise de distribuição requer pelo menos 10 dados.", None
+
+    from scipy import stats
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from io import BytesIO
+    import base64
+
+    distribs = {
+        'Normal': stats.norm,
+        'Lognormal': stats.lognorm,
+        'Exponencial': stats.expon,
+        'Weibull': stats.weibull_min,
+        'Gama': stats.gamma
+    }
+
+    resultados = []
+
+    for nome, dist in distribs.items():
+        try:
+            params = dist.fit(dados)
+            ad_res = stats.anderson(dados, dist='norm') if nome == 'Normal' else None
+            # Para simplificação: usamos Anderson-Darling apenas no Normal
+            d, p = stats.kstest(dados, dist.cdf, args=params)
+            resultados.append({
+                'Distribuição': nome,
+                'AD': ad_res.statistic if ad_res else np.nan,
+                'P-valor': p
+            })
+        except Exception:
+            resultados.append({
+                'Distribuição': nome,
+                'AD': np.nan,
+                'P-valor': 0
+            })
+
+    # Melhor distribuição
+    melhor = max(resultados, key=lambda r: r['P-valor'])
+    nome_melhor = melhor['Distribuição']
+
+    # Texto da tabela
+    linhas = ["Distribuição                 AD        P-valor"]
+    for r in resultados:
+        ad_str = f"{r['AD']:.3f}" if not np.isnan(r['AD']) else "-"
+        p_str = f"{r['P-valor']:.3f}" if r['P-valor'] >= 0.001 else "<0.001"
+        linhas.append(f"{r['Distribuição']:<25} {ad_str:<8} {p_str}")
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.hist(dados, bins=10, density=True, alpha=0.6, color='gray', edgecolor='black')
+    params = distribs[nome_melhor].fit(dados)
+    x = np.linspace(min(dados), max(dados), 100)
+    y = distribs[nome_melhor].pdf(x, *params)
+    ax.plot(x, y, color='blue', label=f'{nome_melhor}')
+    ax.set_title(f'Histograma com ajuste da distribuição: {nome_melhor}')
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**Goodness of Fit Test (Teste de Aderência)**
+
+{chr(10).join(linhas)}
+
+**Conclusão**
+✅ A melhor distribuição é: {nome_melhor} (maior P-valor).
+"""
+
+    return texto.strip(), grafico_base64
+
+
 def analise_capabilidade_normal(df, colunas_usadas):
     nome_coluna_y = colunas_usadas[0]
     nome_coluna_x = colunas_usadas[1]
@@ -473,6 +555,8 @@ def aplicar_transformacao_johnson(df, colunas_usadas):
 ANALISES = {
     "Teste de normalidade": analise_teste_normalidade,
     "Análise de estabilidade": analise_estabilidade,
+    "Análise de distribuição estatística": analise_distribuicao_estatistica,
+
 
     "Capabilidade para dados normais": analise_capabilidade_normal,
     "Capabilidade para outras distribuições": analise_capabilidade_nao_normal,
