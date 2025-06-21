@@ -1137,6 +1137,50 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, colunas_usadas: li
 """
 
     return texto.strip(), grafico_base64
+def analise_1_proporcao(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 1:
+        return "❌ O teste 1 Proporção requer exatamente 1 coluna Y.", None
+
+    y_col = colunas_usadas[0]
+    y = df[y_col].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    # O aluno deve informar p0 no Field
+    try:
+        p0 = float(field)
+        if not (0 < p0 < 1):
+            return "❌ A proporção de referência (Field) deve estar entre 0 e 1 (ex.: 0.5).", None
+    except:
+        return "❌ Valor de referência inválido. Informe um número como 0.5 no campo Field.", None
+
+    n = len(y)
+    sucesso = np.sum(y)
+    p_hat = sucesso / n
+
+    # IC padrão 95% (ou alterar se quiser no futuro)
+    nivel_conf = 95
+    alpha = 1 - (nivel_conf / 100)
+
+    # Intervalo de confiança da proporção
+    z = stats.norm.ppf(1 - alpha / 2)
+    se = np.sqrt(p_hat * (1 - p_hat) / n)
+    ic_lower = p_hat - z * se
+    ic_upper = p_hat + z * se
+    ic_lower = max(0, ic_lower)
+    ic_upper = min(1, ic_upper)
+
+    # Teste de hipótese
+    se_h0 = np.sqrt(p0 * (1 - p0) / n)
+    z_stat = (p_hat - p0) / se_h0
+    p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar(0, p_hat, color='skyblue', width=0.4, label='Proporção amostra')
+    ax.errorbar(0, p_hat, yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
+    ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0
 
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
@@ -1153,7 +1197,9 @@ ANALISES = {
     "2 Variancas Brown-Forsythe": analise_2_variancas_brown_forsythe,
     "Bartlett": analise_bartlett,
     "Brown-Forsythe": analise_brown_forsythe,
-    "1 Intervalo de Confianca Variancia": analise_1_intervalo_confianca_variancia
+    "1 Intervalo de Confianca Variancia": analise_1_intervalo_confianca_variancia,
+    "1 Proporcao": analise_1_proporcao
+
 
 
 
