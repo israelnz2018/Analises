@@ -749,6 +749,75 @@ def analise_1_intervalo_confianca(df: pd.DataFrame, colunas_usadas: list, field=
 
     return texto.strip(), grafico_base64
 
+def analise_1_intervalo_interquartilico(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 1:
+        return "❌ O intervalo interquartílico requer exatamente 1 coluna Y.", None
+
+    y_col = colunas_usadas[0]
+    y = df[y_col].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    # Estatísticas
+    mediana = np.median(y)
+    q1 = np.percentile(y, 25)
+    q3 = np.percentile(y, 75)
+    iqr = q3 - q1
+    minimo = np.min(y)
+    maximo = np.max(y)
+    n = len(y)
+
+    # Normalidade
+    ad = stats.anderson(y)
+    sw_stat, sw_p = stats.shapiro(y)
+    dp_stat, dp_p = stats.normaltest(y)
+
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad.statistic < ad_crit[idx]
+    else:
+        ad_normal = False
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    recomendacao = ""
+    if ad_normal or sw_normal or dp_normal:
+        recomendacao = "⚠ Os dados podem ser normais. Considere também o cálculo do intervalo de confiança da média."
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6, 2))
+    ax.boxplot(y, vert=False)
+    ax.set_title("1 Intervalo Interquartílico - Boxplot")
+    ax.set_xlabel(y_col)
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**1 Intervalo Interquartílico**
+- Mediana: {mediana:.4f}
+- Q1 (25%): {q1:.4f}
+- Q3 (75%): {q3:.4f}
+- IQR (Q3 - Q1): {iqr:.4f}
+- Mínimo: {minimo:.4f}
+- Máximo: {maximo:.4f}
+- N: {n}
+
+**Normalidade dos dados**
+- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+{recomendacao}
+"""
+
+    return texto.strip(), grafico_base64
 
 
 ANALISES = {
@@ -760,7 +829,9 @@ ANALISES = {
     "2 Mann-Whitney": analise_2_mann_whitney,
     "Kruskal-Wallis": analise_kruskal_wallis,
     "Friedman Pareado": analise_friedman_pareado,
-    "1 Intervalo de Confianca": analise_1_intervalo_confianca
+    "1 Intervalo de Confianca": analise_1_intervalo_confianca,
+    "1 Intervalo Interquartilico": analise_1_intervalo_interquartilico
+
 
 
 
