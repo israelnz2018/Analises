@@ -15,11 +15,12 @@ from graficos import GRAFICOS
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://educacaopelotrabalho-production.up.railway.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
 
