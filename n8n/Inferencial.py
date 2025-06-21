@@ -306,7 +306,9 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
 """
 
     return texto.strip(), grafico_base64
-def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list):
+
+
+def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list, field=None):
     if len(colunas_usadas) != 1:
         return "❌ O teste 1 Wilcoxon requer exatamente 1 coluna Y.", None
 
@@ -357,7 +359,6 @@ def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto
     texto = f"""
 **1 Wilcoxon - Teste de Mediana**
 - Mediana amostra: {mediana_amostra:.4f}
@@ -376,6 +377,7 @@ def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 ANALISES = {
