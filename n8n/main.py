@@ -5,7 +5,11 @@ import traceback
 import os
 
 from leitura import ler_arquivo 
-from estatistica import ANALISES
+from Capabilidade import ANALISES as ANALISES_CAP
+from Exploratoria import ANALISES as ANALISES_EXP
+from Controleprocesso import ANALISES as ANALISES_CTRL
+from Inferencial import ANALISES as ANALISES_INF
+from Preditiva import ANALISES as ANALISES_PRED
 from graficos import GRAFICOS
 
 app = FastAPI()
@@ -18,6 +22,14 @@ app.add_middleware(
 )
 
 print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
+
+# Junta os ANALISES
+ANALISES = {}
+ANALISES.update(ANALISES_CAP)
+ANALISES.update(ANALISES_EXP)
+ANALISES.update(ANALISES_CTRL)
+ANALISES.update(ANALISES_INF)
+ANALISES.update(ANALISES_PRED)
 
 ANALISES_COM_FIELD = {"1 Sample T", "1 Wilcoxon", "1 Teste de Sinal", "1 Proporcao", "Intervalo de Confianca"}
 
@@ -44,7 +56,7 @@ async def analisar(
         df = await ler_arquivo(arquivo)
         colunas_usadas = []
 
-        # ✅ Trata coluna_y corretamente (para 2 Sample T e similares)
+        # ✅ Trata coluna_y
         colunas_y = []
         if coluna_y and coluna_y.strip():
             colunas_y = [y.strip() for y in coluna_y.split(",") if y.strip()]
