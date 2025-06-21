@@ -334,246 +334,329 @@ def analise_capabilidade_normal(df: pd.DataFrame, colunas_usadas: list, field=No
     return texto.strip(), grafico_base64
 
 
+def analise_capabilidade_outros(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) < 1 or not field or not isinstance(field, dict):
+        return "❌ É necessário Y, LSL, USL e a distribuição escolhida.", None
 
-def analise_capabilidade_nao_normal(df, colunas_usadas):
-    nome_coluna_y = colunas_usadas[0]
-    nome_coluna_x = colunas_usadas[1]
+    y_col = colunas_usadas[0]
+    dados = df[y_col].dropna()
+    if len(dados) < 30:
+        return "⚠ Recomenda-se pelo menos 30 dados para capabilidade.", None
 
-    dados = df[nome_coluna_y].dropna().astype(float)
-    limites = df[nome_coluna_x].dropna().unique()
+    LSL = float(field.get("Field_LSL", np.nan))
+    USL = float(field.get("Field_USL", np.nan))
+    dist_nome = field.get("Field_Distribuicao", "").strip()
+    if np.isnan(LSL) or np.isnan(USL) or dist_nome == "":
+        return "❌ LSL, USL e distribuição são obrigatórios.", None
 
-    if len(limites) < 1 or len(limites) > 2:
-        raise ValueError("A coluna de limites deve conter um ou dois valores numéricos (LSL e/ou USL).")
+    from scipy import stats
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
 
-    lsl = usl = None
-    if len(limites) == 2:
-        lsl, usl = sorted(limites)
-    elif len(limites) == 1:
-        if df[nome_coluna_x].iloc[1] != '':
-            lsl = limites[0]
-        else:
-            usl = limites[0]
+    # Mapear distribuição
+    distros = {
+        "Normal": stats.norm,
+        "Lognormal": stats.lognorm,
+        "Exponencial": stats.expon,
+        "Weibull": stats.weibull_min,
+        "Gamma": stats.gamma,
+        "Loglogística": stats.fisk
+    }
 
-    media = np.mean(dados)
-    desvio = np.std(dados, ddof=1)
-    normal1 = stats.shapiro(dados)[1] > 0.05
-    normal2 = stats.kstest(dados, 'norm', args=(media, desvio))[1] > 0.05
-    normal3 = stats.anderson(dados).statistic < 0.6810
+    if dist_nome not in distros:
+        return f"❌ Distribuição '{dist_nome}' não suportada no momento.", None
 
-    if normal1 or normal2 or normal3:
-        texto = "📊 **Análise de Capabilidade**\n\n✅ Os dados parecem seguir uma distribuição normal. Recomenda-se utilizar a análise de capabilidade normal."
-        return texto, None
+    dist = distros[dist_nome]
 
-    distribuicoes = ['lognorm', 'weibull_min', 'gamma', 'expon', 'beta']
+    # Ajuste da distribuição
+    try:
+        params = dist.fit(dados)
+    except Exception as e:
+        return f"❌ Erro ao ajustar a distribuição: {str(e)}", None
+
+    # Goodness of fit (Kolmogorov-Smirnov)
+    ks_stat, ks_p = stats.kstest(dados, dist.cdf, args=params)
+
+    # Capabilidade
+    ppm_lsl = 1e6 * dist.cdf(LSL, *params)
+    ppm_usl = 1e6 * (1 - dist.cdf(USL, *params))
+    ppm_total = ppm_lsl + ppm_usl
+    z_bench = min(
+        (dist.ppf(0.99865, *params) - LSL) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params)),
+        (USL - dist.ppf(0.00135, *params)) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params))
+    ) * 6
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(8,5))
+    ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
+    x = np.linspace(min(dados), max(dados), 100)
+    y = dist.pdf(x, *params)
+    ax.plot(x, y, 'b-', label=f'Curva {dist_nome}')
+    ax.axvline(LSL, color='red', linestyle='--', label='LSL')
+    ax.axvline(USL, color='red', linestyle='--', label='USL')
+    ax.axvline(np.mean(dados), color='green', linestyle='--', label='Média')
+    ax.set_title(f'Capabilidade - {dist_nome}')
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto
+    alerta = ""
+    if ks_p < 0.05:
+        alerta = f"⚠ A distribuição {dist_nome} não se ajusta bem aos dados (p-valor={ks_p:.4f}). Não recomendado para capabilidade."
+    else:
+        alerta = f"✅ A distribuição {dist_nome} apresentou bom ajuste (p-valor={ks_p:.4f})."
+
+    texto = f"""
+**Capabilidade - outras distribuições**
+- Distribuição escolhida: {dist_nome}
+- Parâmetros estimados: {', '.join([f'{p:.4f}' for p in params])}
+- Kolmogorov-Smirnov p-valor: {ks_p:.4f}
+
+**Resultados**
+- PPM < LSL: {ppm_lsl:.2f}
+- PPM > USL: {ppm_usl:.2f}
+- PPM Total: {ppm_total:.2f}
+- Nível sigma estimado (Z.bench): {z_bench:.2f}
+
+**Conclusão**
+{alerta}
+"""
+
+    return texto.strip(), grafico_base64
+
+def analise_capabilidade_outros(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) < 1 or not field or not isinstance(field, dict):
+        return "❌ É necessário Y, LSL, USL e a distribuição escolhida.", None
+
+    y_col = colunas_usadas[0]
+    dados = df[y_col].dropna()
+    if len(dados) < 30:
+        return "⚠ Recomenda-se pelo menos 30 dados para capabilidade.", None
+
+    LSL = float(field.get("Field_LSL", np.nan))
+    USL = float(field.get("Field_USL", np.nan))
+    dist_nome = field.get("Field_Distribuicao", "").strip()
+    if np.isnan(LSL) or np.isnan(USL) or dist_nome == "":
+        return "❌ LSL, USL e distribuição são obrigatórios.", None
+
+    from scipy import stats
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
+
+    # Mapear distribuição
+    distros = {
+        "Normal": stats.norm,
+        "Lognormal": stats.lognorm,
+        "Exponencial": stats.expon,
+        "Weibull": stats.weibull_min,
+        "Gamma": stats.gamma,
+        "Loglogística": stats.fisk
+    }
+
+    if dist_nome not in distros:
+        return f"❌ Distribuição '{dist_nome}' não suportada no momento.", None
+
+    dist = distros[dist_nome]
+
+    # Ajuste da distribuição
+    try:
+        params = dist.fit(dados)
+    except Exception as e:
+        return f"❌ Erro ao ajustar a distribuição: {str(e)}", None
+
+    # Goodness of fit (Kolmogorov-Smirnov)
+    ks_stat, ks_p = stats.kstest(dados, dist.cdf, args=params)
+
+    # Capabilidade
+    ppm_lsl = 1e6 * dist.cdf(LSL, *params)
+    ppm_usl = 1e6 * (1 - dist.cdf(USL, *params))
+    ppm_total = ppm_lsl + ppm_usl
+    z_bench = min(
+        (dist.ppf(0.99865, *params) - LSL) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params)),
+        (USL - dist.ppf(0.00135, *params)) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params))
+    ) * 6
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(8,5))
+    ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
+    x = np.linspace(min(dados), max(dados), 100)
+    y = dist.pdf(x, *params)
+    ax.plot(x, y, 'b-', label=f'Curva {dist_nome}')
+    ax.axvline(LSL, color='red', linestyle='--', label='LSL')
+    ax.axvline(USL, color='red', linestyle='--', label='USL')
+    ax.axvline(np.mean(dados), color='green', linestyle='--', label='Média')
+    ax.set_title(f'Capabilidade - {dist_nome}')
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto
+    alerta = ""
+    if ks_p < 0.05:
+        alerta = f"⚠ A distribuição {dist_nome} não se ajusta bem aos dados (p-valor={ks_p:.4f}). Não recomendado para capabilidade."
+    else:
+        alerta = f"✅ A distribuição {dist_nome} apresentou bom ajuste (p-valor={ks_p:.4f})."
+
+    texto = f"""
+**Capabilidade - outras distribuições**
+- Distribuição escolhida: {dist_nome}
+- Parâmetros estimados: {', '.join([f'{p:.4f}' for p in params])}
+- Kolmogorov-Smirnov p-valor: {ks_p:.4f}
+
+**Resultados**
+- PPM < LSL: {ppm_lsl:.2f}
+- PPM > USL: {ppm_usl:.2f}
+- PPM Total: {ppm_total:.2f}
+- Nível sigma estimado (Z.bench): {z_bench:.2f}
+
+**Conclusão**
+{alerta}
+"""
+
+    return texto.strip(), grafico_base64
+
+def analise_capabilidade_transformado(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) < 1 or not field or not isinstance(field, dict):
+        return "❌ É necessário Y, LSL e USL.", None
+
+    y_col = colunas_usadas[0]
+    dados = df[y_col].dropna()
+    if len(dados) < 30:
+        return "⚠ Recomenda-se pelo menos 30 dados para capabilidade.", None
+
+    LSL = float(field.get("Field_LSL", np.nan))
+    USL = float(field.get("Field_USL", np.nan))
+    if np.isnan(LSL) or np.isnan(USL):
+        return "❌ LSL e USL são obrigatórios.", None
+
+    from scipy import stats
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from sklearn.preprocessing import PowerTransformer
+    from io import BytesIO
+    import base64
+
+    # Testa distribuições
+    distribs = {
+        'Normal': stats.norm,
+        'Lognormal': stats.lognorm,
+        'Exponencial': stats.expon,
+        'Weibull': stats.weibull_min,
+        'Gama': stats.gamma,
+        'Loglogística': stats.fisk
+    }
+
     resultados = []
-
-    for dist_name in distribuicoes:
-        dist = getattr(stats, dist_name)
+    for nome, dist in distribs.items():
         try:
             params = dist.fit(dados)
-            stat, p = stats.kstest(dados, dist_name, args=params)
-            resultados.append((dist_name, p, params))
+            ks_stat, ks_p = stats.kstest(dados, dist.cdf, args=params)
+            resultados.append((nome, ks_p, params))
         except Exception:
-            continue
+            resultados.append((nome, 0.0, None))
 
-    resultados.sort(key=lambda x: x[1], reverse=True)
+    melhor_dist = max(resultados, key=lambda x: x[1])
+    nome_melhor, p_melhor, params_melhor = melhor_dist
 
-    texto = "📊 **Teste de Aderência às Distribuições**\n\n"
-    for nome, pval, _ in resultados:
-        texto += f"- {nome}: p = {pval:.4f}\n"
+    # Caso 1: encontrou boa distribuição
+    if p_melhor >= 0.05:
+        texto = f"""
+**Capabilidade - dados transformados**
+✅ A distribuição {nome_melhor} apresentou bom ajuste (p-valor={p_melhor:.4f}).
+Recomenda-se usar a capabilidade para essa distribuição ao invés de transformação.
+"""
+        return texto.strip(), None
 
-    if len(resultados) == 0:
-        texto += "\n❌ Nenhuma distribuição pôde ser ajustada."
-        texto += "\n\n🔁 Recomenda-se aplicar transformação matemática (ex: Yeo-Johnson)."
-        return texto, None
-
-    melhor_nome, melhor_p, melhor_params = resultados[0]
-
-    if melhor_p > 0.05:
-        texto += f"\n✅ **Melhor distribuição encontrada: {melhor_nome} (p = {melhor_p:.4f})**"
-
-        x = np.linspace(min(dados), max(dados), 500)
-        dist = getattr(stats, melhor_nome)
-
-        try:
-            y = dist.pdf(x, *melhor_params)
-        except Exception:
-            return texto + "\n\n❌ Erro ao gerar gráfico da distribuição.", None
-
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.hist(dados, bins=15, density=True, alpha=0.7, color="#A6CEE3", edgecolor='black')
-        ax.plot(x, y, 'darkred', linewidth=2)
-
-        if lsl is not None:
-            ax.axvline(lsl, color='maroon', linestyle='--')
-        if usl is not None:
-            ax.axvline(usl, color='maroon', linestyle='--')
-        ax.axvline(media, color='darkgreen', linestyle='-', linewidth=2)
-        ax.text(media, max(y) * 1.05, "Média", ha='center', fontsize=10, color='darkgreen')
-
-        ax.set_title(f'Capabilidade - {melhor_nome}')
-        ax.set_xlabel(nome_coluna_y)
-        ax.set_ylabel("Densidade")
-        plt.tight_layout()
-
-        buffer = BytesIO()
-        plt.savefig(buffer, format='png')
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-        plt.close()
-
-        return texto, imagem_base64
-
-    else:
-        texto += "\n\n❌ Nenhuma distribuição apresentou p > 0.05."
-        texto += "\n\n🔁 Recomenda-se aplicar uma transformação matemática (ex: Yeo-Johnson)."
-        return texto, None
-
-def aplicar_transformacao_johnson(df, colunas_usadas):
-    nome_coluna_y = colunas_usadas[0]
-    nome_coluna_x = colunas_usadas[1]
-
-    dados = df[nome_coluna_y].dropna().astype(float)
-    limites = df[nome_coluna_x].dropna().unique()
-
-    if len(limites) < 1 or len(limites) > 2:
-        raise ValueError("A coluna de limites deve conter um ou dois valores numéricos (LSL e/ou USL).")
-
-    lsl = usl = None
-    if len(limites) == 2:
-        lsl, usl = sorted(limites)
-    elif len(limites) == 1:
-        if df[nome_coluna_x].iloc[1] != '':
-            lsl = limites[0]
+    # Caso 2: tentar transformação Johnson
+    try:
+        pt = PowerTransformer(method='yeo-johnson')
+        dados_t = pt.fit_transform(dados.values.reshape(-1,1)).flatten()
+        ad_res = stats.anderson(dados_t)
+        ad_sig = list(ad_res.significance_level)
+        if 5 in ad_sig:
+            idx = ad_sig.index(5)
+            ad_normal = ad_res.statistic < ad_res.critical_values[idx]
         else:
-            usl = limites[0]
+            ad_normal = False
+    except Exception as e:
+        return f"❌ Erro na transformação Johnson: {str(e)}", None
 
-    pt = PowerTransformer(method='yeo-johnson')
-    dados_transformados = pt.fit_transform(dados.values.reshape(-1, 1)).flatten()
+    if not ad_normal:
+        texto = f"""
+**Capabilidade - dados transformados**
+⚠ Nenhuma distribuição apresentou bom ajuste. Nenhuma transformação Johnson obteve normalidade (Anderson-Darling estat={ad_res.statistic:.4f}).
+Recomenda-se realizar capabilidade para dados discretizados ou usar métodos não paramétricos.
+"""
+        return texto.strip(), None
 
-    stat_ad = stats.anderson(dados_transformados).statistic
-    normal = stat_ad < 0.6810
+    # Capabilidade no transformado
+    mean = np.mean(dados_t)
+    std = np.std(dados_t, ddof=1)
+    Cp = (USL - LSL) / (6 * std)
+    Cpk = min((USL - mean), (mean - LSL)) / (3 * std)
+    z_bench = min((USL - mean)/std, (mean - LSL)/std)
 
-    if normal:
-        media = np.mean(dados_transformados)
-        desvio = np.std(dados_transformados, ddof=1)
+    ppm_lsl = 1e6 * stats.norm.cdf(LSL, loc=mean, scale=std)
+    ppm_usl = 1e6 * (1 - stats.norm.cdf(USL, loc=mean, scale=std))
+    ppm_total = ppm_lsl + ppm_usl
 
-        ppl = ppu = pp = ppk = None
-        if lsl is not None:
-            ppl = (media - lsl) / (3 * desvio)
-        if usl is not None:
-            ppu = (usl - media) / (3 * desvio)
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(8,5))
+    ax.hist(dados_t, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
+    x = np.linspace(min(dados_t), max(dados_t), 100)
+    y = stats.norm.pdf(x, mean, std)
+    ax.plot(x, y, 'b-', label='Curva Normal transformada')
+    ax.axvline(LSL, color='red', linestyle='--', label='LSL')
+    ax.axvline(USL, color='red', linestyle='--', label='USL')
+    ax.axvline(mean, color='green', linestyle='--', label='Média')
+    ax.set_title('Capabilidade - Johnson Transformado')
+    ax.legend()
+    plt.tight_layout()
 
-        if ppl is not None and ppu is not None:
-            pp = (usl - lsl) / (6 * desvio)
-            ppk = min(ppl, ppu)
-        elif ppl is not None:
-            ppk = ppl
-        elif ppu is not None:
-            ppk = ppu
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-        sigma_nivel = 3 * ppk if ppk is not None else None
+    texto = f"""
+**Capabilidade - dados transformados**
+⚠ Nenhuma distribuição apresentou bom ajuste. Procedeu-se com transformação Johnson.
+- Anderson-Darling no transformado: estat={ad_res.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
 
-        texto = "🔁 **Transformação Yeo-Johnson aplicada com sucesso**\n\n"
-        texto += f"📌 Média transformada: {media:.4f}\n"
-        texto += f"📌 Desvio padrão: {desvio:.4f}\n"
-        if lsl is not None:
-            texto += f"- LSL: {lsl:.4f}\n"
-        if usl is not None:
-            texto += f"- USL: {usl:.4f}\n"
-        if pp is not None:
-            texto += f"- Pp: {pp:.4f}\n"
-        if ppk is not None:
-            texto += f"- Ppk: {ppk:.4f}\n"
-        if sigma_nivel is not None:
-            texto += f"- Nível Sigma estimado: {sigma_nivel:.4f}"
+**Resultados**
+- Cp = {Cp:.2f}
+- Cpk = {Cpk:.2f}
+- Z.bench = {z_bench:.2f}
+- PPM < LSL: {ppm_lsl:.2f}
+- PPM > USL: {ppm_usl:.2f}
+- PPM Total: {ppm_total:.2f}
 
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.hist(dados_transformados, bins=15, density=True, alpha=0.7, color="#A6CEE3", edgecolor='black')
+✅ Transformação Johnson bem-sucedida. Capabilidade calculada no transformado.
+"""
 
-        x = np.linspace(min(dados_transformados), max(dados_transformados), 500)
-        y = stats.norm.pdf(x, media, desvio)
-        ax.plot(x, y, 'darkred', linewidth=2)
-
-        if lsl is not None:
-            ax.axvline(lsl, color='maroon', linestyle='--')
-        if usl is not None:
-            ax.axvline(usl, color='maroon', linestyle='--')
-        ax.axvline(media, color='darkgreen', linestyle='-', linewidth=2)
-        ax.text(media, max(y) * 1.05, "Média", ha='center', fontsize=10, color='darkgreen')
-
-        ax.set_title("Capabilidade (dados transformados)")
-        ax.set_xlabel(nome_coluna_y + " (transformado)")
-        ax.set_ylabel("Densidade")
-        plt.tight_layout()
-
-        buffer = BytesIO()
-        plt.savefig(buffer, format='png')
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-        plt.close()
-
-        return texto, imagem_base64
-
-    else:
-        total = len(dados)
-        abaixo_lsl = len(dados[dados < lsl]) if lsl is not None else 0
-        acima_usl = len(dados[dados > usl]) if usl is not None else 0
-        fora = abaixo_lsl + acima_usl
-        percentual_fora = fora / total
-
-        try:
-            sigma_estimado = stats.norm.ppf(1 - percentual_fora / 2)
-        except:
-            sigma_estimado = None
-
-        texto = "🔁 **Transformação Yeo-Johnson falhou em normalizar os dados**\n"
-        texto += f"\n❌ Dados continuam não normais após transformação."
-        texto += f"\n📊 Estimando capabilidade com base em dados discretos:"
-        texto += f"\n- Total de amostras: {total}"
-        if lsl is not None:
-            texto += f"\n- Abaixo do LSL: {abaixo_lsl}"
-        if usl is not None:
-            texto += f"\n- Acima do USL: {acima_usl}"
-        texto += f"\n- % Fora dos limites: {percentual_fora:.2%}"
-        if sigma_estimado:
-            texto += f"\n- Nível Sigma estimado (aproximado): {sigma_estimado:.2f}"
-
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.hist(dados, bins=15, color="#A6CEE3", edgecolor='black', alpha=0.8)
-
-        if lsl is not None:
-            ax.axvline(lsl, color='maroon', linestyle='--', label='LSL')
-        if usl is not None:
-            ax.axvline(usl, color='maroon', linestyle='--', label='USL')
-        ax.axvline(np.mean(dados), color='darkgreen', linestyle='-', linewidth=2, label='Média')
-        ax.set_title("Capabilidade (dados discretos)")
-        ax.set_xlabel(nome_coluna_y)
-        ax.set_ylabel("Frequência")
-        ax.legend()
-        plt.tight_layout()
-
-        buffer = BytesIO()
-        plt.savefig(buffer, format='png')
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-        plt.close()
-
-        return texto, imagem_base64, False
-
+    return texto.strip(), grafico_base64
 
 ANALISES = {
     "Teste de normalidade": analise_teste_normalidade,
     "Análise de estabilidade": analise_estabilidade,
     "Análise de distribuição estatística": analise_distribuicao_estatistica,
-    "Capabilidade - dados normais": analise_capabilidade_normal
+    "Capabilidade - dados normais": analise_capabilidade_normal,
+    "Capabilidade - outras distribuições": analise_capabilidade_outros,
+    "Capabilidade - com dados transformados": analise_capabilidade_transformado
 
 
-
-    "Capabilidade para outras distribuições": analise_capabilidade_nao_normal,
-    "Capabilidade com dados transformados": aplicar_transformacao_johnson
 }
 
