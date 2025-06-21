@@ -145,11 +145,7 @@ from suporte import *
 
 def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
     if len(colunas_usadas) != 2:
-        return {
-            "analise": "❌ O teste t pareado requer exatamente 2 colunas Y.",
-            "grafico_base64": None,
-            "colunas_utilizadas": colunas_usadas
-        }
+        return "❌ O teste t pareado requer exatamente 2 colunas Y.", None
 
     col1, col2 = colunas_usadas
     dados1 = df[col1].dropna()
@@ -221,9 +217,7 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
 {conclusao}
 """
 
-    return interpretacao, imagem_base64
-
-
+    return texto.strip(), grafico_base64
 
 from suporte import *
 
