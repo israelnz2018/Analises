@@ -695,44 +695,147 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, colunas_usadas: list, 
     return texto.strip(), grafico_base64
 
 
-
-def analise_chi_quadrado(df, colunas_usadas):
+def analise_arvore_decisao(df: pd.DataFrame, colunas_usadas: list, field=None):
     if len(colunas_usadas) < 2:
-        raise ValueError("O teste qui-quadrado requer pelo menos duas colunas: uma Y e uma X.")
+        return "❌ A árvore de decisão requer 1 Y e pelo menos 1 X.", None
 
-    col_y = colunas_usadas[0]
-    col_x = colunas_usadas[1]
-    col_freq = colunas_usadas[2] if len(colunas_usadas) >= 3 else None
+    y_col = colunas_usadas[0]
+    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
+    xs_discreto = []
+    if "Xs_discreto" in colunas_usadas:
+        idx = colunas_usadas.index("Xs_discreto")
+        xs_discreto = colunas_usadas[idx+1:]
 
-    if col_freq and col_freq in df.columns:
-        tabela = df.pivot_table(index=col_x, columns=col_y, values=col_freq, aggfunc="sum", fill_value=0)
+    cols_todas = [y_col] + xs_continuo + xs_discreto
+    df_valid = df[cols_todas].dropna()
+    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 5:
+        return "❌ O modelo requer mais dados válidos.", None
+
+    Y = df_valid[y_col]
+    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
+    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
+    X_final = pd.concat([X_cont, X_disc], axis=1)
+    x_cols_final = X_final.columns.tolist()
+
+    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, export_text, plot_tree
+    from sklearn.metrics import accuracy_score, r2_score
+    import matplotlib.pyplot as plt
+
+    if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
+        # Regressão
+        model = DecisionTreeRegressor(max_depth=4, random_state=42)
+        model.fit(X_final, Y)
+        Y_pred = model.predict(X_final)
+        score = r2_score(Y, Y_pred)
+        score_txt = f"R²: {score:.4f}"
     else:
-        tabela = pd.crosstab(df[col_x], df[col_y])
+        # Classificação
+        model = DecisionTreeClassifier(max_depth=4, random_state=42)
+        model.fit(X_final, Y)
+        Y_pred = model.predict(X_final)
+        acc = accuracy_score(Y, Y_pred)
+        score_txt = f"Percentual de acerto: {acc*100:.2f}%"
 
-    chi2, p, dof, expected = chi2_contingency(tabela)
+    # Importância das variáveis
+    importancias = ", ".join([f"{c}={v*100:.2f}%" for c, v in zip(x_cols_final, model.feature_importances_)])
 
-    resumo = f"""🔎 **Qui-Quadrado**
-{tabela.to_string()}
-Estatística: {chi2:.4f}
-GL: {dof}
-P-valor: {p:.4f}
+    # Regras
+    regras = export_text(model, feature_names=x_cols_final)
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(10, 6))
+    plot_tree(model, feature_names=x_cols_final, class_names=[str(c) for c in Y.unique()] if not pd.api.types.is_numeric_dtype(Y) else None,
+              filled=True, rounded=True, fontsize=8, ax=ax)
+    plt.tight_layout()
+
+    from io import BytesIO
+    import base64
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**Árvore de Decisão**
+{score_txt}
+- Número de folhas: {model.get_n_leaves()}
+- Profundidade da árvore: {model.get_depth()}
+- Importância das variáveis: {importancias}
+
+**Regras**
+{regras}
 """
 
-    conclusao = "❗ Existe associação." if p < 0.05 else "✅ Não há associação."
+    return texto.strip(), grafico_base64
 
-    aplicar_estilo_minitab()
-    tabela.plot(kind='bar')
-    plt.title("Distribuição das Categorias")
-    plt.xlabel(col_x)
-    plt.ylabel("Frequência")
+def analise_random_forest(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) < 2:
+        return "❌ O Random Forest requer 1 Y e pelo menos 1 X.", None
 
-    buffer = BytesIO()
-    plt.savefig(buffer, format="png")
-    plt.close()
-    buffer.seek(0)
-    imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    y_col = colunas_usadas[0]
+    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
+    xs_discreto = []
+    if "Xs_discreto" in colunas_usadas:
+        idx = colunas_usadas.index("Xs_discreto")
+        xs_discreto = colunas_usadas[idx+1:]
 
-    return resumo + conclusao, imagem_base64
+    cols_todas = [y_col] + xs_continuo + xs_discreto
+    df_valid = df[cols_todas].dropna()
+    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 5:
+        return "❌ O modelo requer mais dados válidos.", None
+
+    Y = df_valid[y_col]
+    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
+    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
+    X_final = pd.concat([X_cont, X_disc], axis=1)
+    x_cols_final = X_final.columns.tolist()
+
+    from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+    from sklearn.metrics import accuracy_score, r2_score
+    import matplotlib.pyplot as plt
+
+    if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
+        # Regressão
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X_final, Y)
+        Y_pred = model.predict(X_final)
+        score = r2_score(Y, Y_pred)
+        score_txt = f"R²: {score:.4f}"
+    else:
+        # Classificação
+        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model.fit(X_final, Y)
+        Y_pred = model.predict(X_final)
+        acc = accuracy_score(Y, Y_pred)
+        score_txt = f"Percentual de acerto: {acc*100:.2f}%"
+
+    # Importância das variáveis
+    importancias = model.feature_importances_
+    importancia_str = ", ".join([f"{c}={v*100:.2f}%" for c,v in zip(x_cols_final, importancias)])
+
+    # Gráfico das importâncias
+    fig, ax = plt.subplots(figsize=(8, 5))
+    sorted_idx = importancias.argsort()
+    ax.barh([x_cols_final[i] for i in sorted_idx], importancias[sorted_idx])
+    ax.set_title("Importância das Variáveis - Random Forest")
+    ax.set_xlabel("Importância")
+    plt.tight_layout()
+
+    from io import BytesIO
+    import base64
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**Random Forest**
+{score_txt}
+- Número de árvores: 100
+- Importância das variáveis: {importancia_str}
+"""
+
+    return texto.strip(), grafico_base64
 
 
 ANALISES = {
@@ -741,13 +844,9 @@ ANALISES = {
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Regressão logística binária": analise_regressao_logistica_binaria,
     "Regressão logística ordinal": analise_regressao_logistica_ordinal,
-    "Regressão logística nominal": analise_regressao_logistica_nominal
-
-
-
-
-
-    
+    "Regressão logística nominal": analise_regressao_logistica_nominal,
+    "Árvore de decisão": analise_arvore_decisao,
+    "Random Forest": analise_random_forest
 
    
 }
