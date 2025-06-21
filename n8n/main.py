@@ -9,6 +9,7 @@ from Capabilidade import ANALISES as ANALISES_CAP
 from Exploratoria import ANALISES as ANALISES_EXP
 from Inferencial import ANALISES as ANALISES_INF
 from Preditiva import ANALISES as ANALISES_PRED
+from Controledeprocesso import ANALISES as ANALISES_PROC
 from graficos import GRAFICOS
 
 # Inicializa app
@@ -32,6 +33,7 @@ ANALISES.update(ANALISES_CAP)
 ANALISES.update(ANALISES_EXP)
 ANALISES.update(ANALISES_INF)
 ANALISES.update(ANALISES_PRED)
+ANALISES.update(ANALISES_PROC)
 print("✅ ANALISES carregados com sucesso")
 
 ANALISES_COM_FIELD = {"1 Sample T", "1 Wilcoxon", "1 Teste de Sinal", "1 Proporcao", "Intervalo de Confianca"}
@@ -39,6 +41,7 @@ ANALISES_COM_FIELD = {"1 Sample T", "1 Wilcoxon", "1 Teste de Sinal", "1 Proporc
 @app.get("/healthz")
 def healthcheck():
     return JSONResponse({"status": "ok"})
+
 
 @app.post("/analise")
 async def analisar(
