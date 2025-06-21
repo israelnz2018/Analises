@@ -837,6 +837,106 @@ def analise_random_forest(df: pd.DataFrame, colunas_usadas: list, field=None):
 
     return texto.strip(), grafico_base64
 
+def analise_arima(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 1:
+        return "❌ O ARIMA requer apenas 1 coluna Y (série temporal).", None
+
+    y_col = colunas_usadas[0]
+    df_valid = df[[y_col]].dropna()
+    if len(df_valid) < 10:
+        return "❌ A série temporal requer pelo menos 10 observações.", None
+
+    Y = df_valid[y_col].values
+
+    try:
+        import pmdarima as pm
+    except ImportError:
+        return "❌ O pacote pmdarima não está disponível neste ambiente.", None
+
+    modelo = pm.auto_arima(Y, seasonal=False, stepwise=True, suppress_warnings=True)
+    ordem = modelo.order
+    aic = modelo.aic()
+    bic = modelo.bic()
+
+    # Previsão
+    horizonte = int(field) if field and str(field).isdigit() else 5
+    previsao = modelo.predict(n_periods=horizonte)
+
+    # Gráfico
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(range(len(Y)), Y, label='Série Original', color='black')
+    ax.plot(range(len(Y), len(Y)+horizonte), previsao, label='Previsão', color='blue')
+    ax.set_title(f'ARIMA{ordem} - Previsão {horizonte} períodos')
+    ax.legend()
+    plt.tight_layout()
+
+    from io import BytesIO
+    import base64
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto
+    texto = f"""
+**ARIMA**
+- Equação ARIMA: ARIMA{ordem}
+- AIC: {aic:.2f}
+- BIC: {bic:.2f}
+- Previsão para os próximos {horizonte} períodos: {', '.join([f"{p:.2f}" for p in previsao])}
+
+**Conclusão**
+✅ Modelo ajustado automaticamente. AIC e BIC indicam qualidade do ajuste. Avalie o gráfico e, se necessário, refine o modelo manualmente.
+"""
+
+    return texto.strip(), grafico_base64
+
+def analise_holt_winters(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 1:
+        return "❌ O Holt-Winters requer apenas 1 coluna Y (série temporal).", None
+
+    y_col = colunas_usadas[0]
+    df_valid = df[[y_col]].dropna()
+    if len(df_valid) < 10:
+        return "❌ A série temporal requer pelo menos 10 observações.", None
+
+    Y = df_valid[y_col].values
+
+    from statsmodels.tsa.holtwinters import ExponentialSmoothing
+
+    # Auto-ajuste: tentamos com tendência e sem sazonalidade (simples e robusto)
+    modelo = ExponentialSmoothing(Y, trend='add', seasonal=None).fit()
+    previsao = modelo.forecast(int(field) if field and str(field).isdigit() else 5)
+
+    # Gráfico
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(range(len(Y)), Y, label='Série Original', color='black')
+    ax.plot(range(len(Y), len(Y)+len(previsao)), previsao, label='Previsão', color='blue')
+    ax.set_title('Holt-Winters (Suavização Exponencial)')
+    ax.legend()
+    plt.tight_layout()
+
+    from io import BytesIO
+    import base64
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto
+    texto = f"""
+**Holt-Winters (Suavização Exponencial)**
+- Componente de tendência: aditivo
+- Sazonalidade: não aplicada
+- Previsão para os próximos {len(previsao)} períodos: {', '.join([f"{p:.2f}" for p in previsao])}
+
+**Conclusão**
+✅ Modelo ajustado com suavização exponencial. Simples e robusto para séries com tendência. Avalie o gráfico para validar a qualidade da previsão.
+"""
+
+    return texto.strip(), grafico_base64
 
 ANALISES = {
     "Tipo de modelo de regressão": analise_tipo_modelo_regressao,
@@ -846,7 +946,8 @@ ANALISES = {
     "Regressão logística ordinal": analise_regressao_logistica_ordinal,
     "Regressão logística nominal": analise_regressao_logistica_nominal,
     "Árvore de decisão": analise_arvore_decisao,
-    "Random Forest": analise_random_forest
-
+    "Random Forest": analise_random_forest,
+    "ARIMA": analise_arima,
+    "Holt-Winters": analise_holt_winters
    
 }
