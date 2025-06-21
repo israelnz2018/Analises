@@ -6,6 +6,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Aplica o estilo global para todos os gráficos (estilo tipo Minitab)
+plt.style.use('seaborn-v0_8-whitegrid')
+plt.rcParams.update({
+    'axes.edgecolor': 'black',
+    'axes.linewidth': 1.2,
+    'grid.color': 'gray',
+    'grid.linestyle': ':',
+    'grid.linewidth': 0.7,
+    'axes.grid': True,
+    'legend.frameon': True,
+    'legend.edgecolor': 'black',
+    'legend.fancybox': False
+})
+
 # 📦 Modelos estatísticos
 import statsmodels.api as sm
 from statsmodels.stats.stattools import durbin_watson
@@ -28,7 +42,7 @@ import os
 
 # 🧠 Funções locais do projeto
 from suporte import interpretar_coluna
-from estilo import aplicar_estilo_minitab
+
 
 
 # ✅ Todas as análises começam abaixo, dentro das funções (nunca aqui fora)
