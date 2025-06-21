@@ -908,6 +908,59 @@ def analise_2_variancas(df: pd.DataFrame, colunas_usadas: list, field=None):
 
     return texto.strip(), grafico_base64
 
+
+def analise_2_variancas_brown_forsythe(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 2:
+        return "❌ O teste 2 Variâncias Brown-Forsythe requer exatamente 2 colunas Y.", None
+
+    col1, col2 = colunas_usadas
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
+
+    if len(dados1) < 5 or len(dados2) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
+
+    # Variâncias
+    var1 = np.var(dados1, ddof=1)
+    var2 = np.var(dados2, ddof=1)
+
+    # Brown-Forsythe (Levene com center=median)
+    stat, p_valor = stats.levene(dados1, dados2, center='median')
+
+    # Gráficos
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    # Boxplot
+    axes[0].boxplot([dados1, dados2], labels=[col1, col2])
+    axes[0].set_title("Boxplot por Grupo")
+    axes[0].set_ylabel("Valores")
+
+    # Barplot variâncias
+    axes[1].bar([col1, col2], [var1, var2], color=['skyblue', 'lightgreen'])
+    axes[1].set_title("Comparação das Variâncias")
+    axes[1].set_ylabel("Variância")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**2 Variâncias Brown-Forsythe**
+- Variância {col1}: {var1:.4f}
+- Variância {col2}: {var2:.4f}
+- Estatística Brown-Forsythe: {stat:.4f}
+- p-valor: {p_valor:.4f}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
+"""
+
+    return texto.strip(), grafico_base64
+
+
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
     "2 Sample T": analise_2_sample_t,
@@ -919,7 +972,9 @@ ANALISES = {
     "Friedman Pareado": analise_friedman_pareado,
     "1 Intervalo de Confianca": analise_1_intervalo_confianca,
     "1 Intervalo Interquartilico": analise_1_intervalo_interquartilico,
-    "2 Variancas": analise_2_variancas
+    "2 Variancas": analise_2_variancas,
+    "2 Variancas Brown-Forsythe": analise_2_variancas_brown_forsythe
+
 
 
 
