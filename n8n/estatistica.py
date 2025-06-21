@@ -587,7 +587,6 @@ def analise_2_sample_t(df, colunas_usadas, **kwargs):
 - Estatística t = {t_stat:.4f}, p = {p_valor:.4f}  
 - {"✅ Não há diferença significativa" if p_valor > 0.05 else "❌ Diferença estatisticamente significativa entre as médias"}"""
 
-    # Gráfico estilo Minitab
     try:
         aplicar_estilo_minitab()
         fig, ax = plt.subplots(figsize=(6, 6))
@@ -613,12 +612,12 @@ def analise_2_sample_t(df, colunas_usadas, **kwargs):
         buffer.seek(0)
         imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
     except Exception as e:
-        print(f"Erro no gráfico: {e}")
+        erro_grafico = f"\n❌ Erro ao gerar o gráfico: {str(e)}"
+        print(erro_grafico)
+        texto += erro_grafico
         imagem_base64 = None
 
     return texto, imagem_base64
-
-
 
 
 def analise_teste_paired_t(df, colunas_usadas):
