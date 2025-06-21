@@ -2,7 +2,7 @@
 import pandas as pd
 import numpy as np
 
-# 📊 Visualização de dados 
+# 📊 Visualização de dados
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -20,6 +20,10 @@ plt.rcParams.update({
     'legend.fancybox': False
 })
 
+# 🧪 Testes estatísticos
+from scipy import stats
+from scipy.stats import chi2_contingency, anderson, shapiro, kstest, norm
+
 # 📦 Modelos estatísticos
 import statsmodels.api as sm
 from statsmodels.stats.stattools import durbin_watson
@@ -27,23 +31,17 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.miscmodels.ordinal_model import OrderedModel
 from statsmodels.stats.diagnostic import normal_ad
 
-# 🧪 Testes estatísticos
-from scipy import stats
-from scipy.stats import chi2_contingency, anderson, shapiro, kstest, norm
-
 # 📈 Métricas de modelos
 from sklearn.metrics import roc_curve, auc
 from sklearn.preprocessing import PowerTransformer
 
 # 💾 Manipulação de arquivos/imagens
-import base64
 from io import BytesIO
+import base64
 import os
 
 # 🧠 Funções locais do projeto
 from suporte import interpretar_coluna
-
-
 
 # ✅ Todas as análises começam abaixo, dentro das funções (nunca aqui fora)
 
@@ -341,11 +339,7 @@ def analise_estabilidade(df, colunas_usadas):
 
     return texto_resumo, img_base64
 
-import matplotlib.pyplot as plt
-import scipy.stats as stats
-import numpy as np
-from io import BytesIO
-import base64
+
 
 def analise_distribuicao_estatistica(df, colunas_usadas):
     # Garante que coluna_y seja o nome da coluna
@@ -465,10 +459,6 @@ def analise_limpeza_dados(df, colunas_usadas):
     texto_final = "<br>".join(resultado)
     return texto_final, None
 
-from scipy import stats
-import matplotlib.pyplot as plt
-from io import BytesIO
-import base64
 
 def analise_1_sample_t(df, colunas_usadas, field=None):
     if len(colunas_usadas) < 1 or not field:
@@ -539,14 +529,7 @@ def analise_1_sample_t(df, colunas_usadas, field=None):
 
     return resultado, [imagem_base64]
 
-import pandas as pd
-import numpy as np
-from scipy import stats
-from scipy.stats import anderson
-import matplotlib.pyplot as plt
-from io import BytesIO
-import base64
-import seaborn as sns
+
 
 def aplicar_estilo_minitab():
     plt.style.use('seaborn-whitegrid')
