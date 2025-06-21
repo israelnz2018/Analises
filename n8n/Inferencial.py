@@ -318,6 +318,12 @@ def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list, field=None):
     if len(y) < 5:
         return "❌ O teste requer ao menos 5 valores não nulos.", None
 
+    # Valor de referência
+    try:
+        valor_ref = float(field) if field is not None else 0
+    except:
+        return "❌ Valor de referência inválido. Informe um número válido no campo Field.", None
+
     # Testes de normalidade
     ad = stats.anderson(y)
     sw_stat, sw_p = stats.shapiro(y)
@@ -339,15 +345,15 @@ def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list, field=None):
     if ad_normal or sw_normal or dp_normal:
         recomendacao = "⚠ Pelo menos um teste indicou normalidade dos dados. Considere realizar o teste 1 Sample T em vez do Wilcoxon."
 
-    # Wilcoxon Signed-Rank Test (mediana = 0)
-    w_stat, p_valor = stats.wilcoxon(y, zero_method='wilcox', correction=False)
+    # Wilcoxon Signed-Rank Test (comparando com valor_ref)
+    w_stat, p_valor = stats.wilcoxon(y - valor_ref, zero_method='wilcox', correction=False)
 
     mediana_amostra = np.median(y)
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.boxplot(y, vert=False)
-    ax.axvline(0, color='red', linestyle='--', label='Mediana H0 (0)')
+    ax.axvline(valor_ref, color='red', linestyle='--', label=f'Mediana H0 ({valor_ref})')
     ax.axvline(mediana_amostra, color='blue', linestyle='-', label=f'Mediana amostra: {mediana_amostra:.2f}')
     ax.set_title("1 Wilcoxon - Boxplot com Mediana H0")
     ax.set_xlabel(y_col)
@@ -362,6 +368,7 @@ def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list, field=None):
     texto = f"""
 **1 Wilcoxon - Teste de Mediana**
 - Mediana amostra: {mediana_amostra:.4f}
+- Valor de referência (H0): {valor_ref}
 - Estatística W: {w_stat:.4f}
 - p-valor: {p_valor:.4f}
 
@@ -373,10 +380,11 @@ def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list, field=None):
 {recomendacao}
 
 **Conclusão**
-{"✅ Rejeitamos H0: mediana diferente de 0." if p_valor < 0.05 else "⚠ Não rejeitamos H0: mediana não difere significativamente de 0."}
+{"✅ Rejeitamos H0: mediana diferente do valor de referência." if p_valor < 0.05 else "⚠ Não rejeitamos H0: mediana não difere significativamente do valor de referência."}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
