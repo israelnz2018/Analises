@@ -1313,6 +1313,63 @@ def analise_k_proporcoes(df: pd.DataFrame, colunas_usadas: list, field=None):
 """
 
     return texto.strip(), grafico_base64
+def analise_associacao(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 2:
+        return "❌ A análise de associação requer exatamente 2 colunas (Y e X).", None
+
+    y_col, x_col = colunas_usadas
+
+    # Tenta identificar se são dados brutos (categóricos) ou tabela de contagem
+    try:
+        # Verifica se os dados são todos numéricos e inteiros (indicando tabela de contagem)
+        if pd.api.types.is_numeric_dtype(df[y_col]) and pd.api.types.is_numeric_dtype(df[x_col]):
+            # Tabela já está em formato de contingência
+            # Assumimos que os valores são as contagens
+            table = df.pivot_table(values=x_col, index=y_col, aggfunc='sum').fillna(0).to_numpy()
+            y_labels = df[y_col].unique()
+            x_labels = df[x_col].unique()
+        else:
+            # São dados brutos → monta a tabela
+            table = pd.crosstab(df[y_col], df[x_col])
+            y_labels = table.index.tolist()
+            x_labels = table.columns.tolist()
+            table = table.to_numpy()
+    except:
+        return "❌ Não foi possível processar os dados para a análise de associação.", None
+
+    # Qui-quadrado
+    stat, p_valor, dof, expected = stats.chi2_contingency(table)
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6, 4))
+    proporcoes = table / table.sum()
+    ax.imshow(proporcoes, cmap='Blues', aspect='auto')
+    ax.set_xticks(range(len(x_labels)))
+    ax.set_xticklabels(x_labels)
+    ax.set_yticks(range(len(y_labels)))
+    ax.set_yticklabels(y_labels)
+    ax.set_title("Mapa de calor das proporções")
+    for i in range(proporcoes.shape[0]):
+        for j in range(proporcoes.shape[1]):
+            ax.text(j, i, f"{proporcoes[i, j]:.2f}", ha="center", va="center", color="black")
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**Análise de Associação (Qui-quadrado)**
+- Estatística Qui-quadrado: {stat:.4f}
+- p-valor: {p_valor:.4f}
+- Graus de liberdade: {dof}
+
+**Conclusão**
+{"✅ Rejeitamos H0: existe associação entre as variáveis." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há evidência de associação entre as variáveis."}
+"""
+
+    return texto.strip(), grafico_base64
 
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
@@ -1332,21 +1389,9 @@ ANALISES = {
     "1 Intervalo de Confianca Variancia": analise_1_intervalo_confianca_variancia,
     "1 Proporcao": analise_1_proporcao,
     "2 Proporcoes": analise_2_proporcoes,
-    "K Proporcoes": analise_k_proporcoes
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
+    "K Proporcoes": analise_k_proporcoes,
+    "Qui-quadrado": analise_associacao
+  
 
 }
 
