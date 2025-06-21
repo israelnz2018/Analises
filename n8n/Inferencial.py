@@ -581,6 +581,94 @@ def analise_kruskal_wallis(df: pd.DataFrame, colunas_usadas: list, field=None):
 """
 
     return texto.strip(), grafico_base64
+def analise_friedman_pareado(df: pd.DataFrame, colunas_usadas: list, field=None):
+    ys = [c for c in colunas_usadas if c != ""]
+    x = None
+    if "Subgrupo" in colunas_usadas:
+        x = colunas_usadas[-1]
+
+    if len(ys) < 2:
+        return "❌ O Friedman requer pelo menos 2 colunas Y ou 1 Y + Subgrupo com 2 ou mais categorias.", None
+
+    if x and x in df.columns:
+        y_col = ys[0]
+        df_valid = df[[y_col, x]].dropna()
+        pivot = df_valid.pivot(columns=x, values=y_col)
+
+        if pivot.shape[1] < 2:
+            return "❌ O Friedman requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
+
+        grupos = [pivot[col].values for col in pivot.columns]
+
+    else:
+        df_valid = df[ys].dropna()
+        if df_valid.shape[1] < 2:
+            return "❌ O Friedman requer pelo menos 2 colunas Y com dados.", None
+
+        grupos = [df_valid[col].values for col in df_valid.columns]
+
+    # Friedman
+    stat, p_valor = stats.friedmanchisquare(*grupos)
+
+    # Normalidade dos resíduos
+    recomendacao = ""
+    residuos = np.array(grupos).T - np.mean(grupos, axis=0)
+    residuos_flat = residuos.flatten()
+    ad = stats.anderson(residuos_flat)
+    sw_stat, sw_p = stats.shapiro(residuos_flat)
+    dp_stat, dp_p = stats.normaltest(residuos_flat)
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad.statistic < ad_crit[idx]
+    else:
+        ad_normal = False
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    if ad_normal or sw_normal or dp_normal:
+        recomendacao = "⚠ Pelo menos um teste indicou normalidade dos resíduos. Considere realizar um ANOVA Repeated Measures."
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6, 4))
+    if x and x in df.columns:
+        df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
+        medias = df_valid.groupby(x)[y_col].mean()
+        ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+    else:
+        ax.boxplot(grupos, labels=ys)
+        medias = [np.mean(g) for g in grupos]
+        ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
+
+    ax.set_title("Friedman Pareado - Boxplot por Grupo")
+    ax.set_xlabel("Grupo")
+    ax.set_ylabel("Valor")
+    plt.suptitle("")
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**Friedman Pareado**
+- Estatística: {stat:.4f}
+- p-valor: {p_valor:.4f}
+
+- Anderson-Darling (resíduos): estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk (resíduos): p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson (resíduos): p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: pelo menos um grupo tem distribuição diferente." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre os grupos."}
+"""
+
+    return texto.strip(), grafico_base64
 
 
 ANALISES = {
@@ -590,7 +678,9 @@ ANALISES = {
     "One way ANOVA": analise_one_way_anova,
     "1 Wilcoxon": analise_1_wilcoxon,
     "2 Mann-Whitney": analise_2_mann_whitney,
-    "Kruskal-Wallis": analise_kruskal_wallis
+    "Kruskal-Wallis": analise_kruskal_wallis,
+    "Friedman Pareado": analise_friedman_pareado
+
 
 
     
