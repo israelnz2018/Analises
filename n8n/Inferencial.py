@@ -331,7 +331,8 @@ def teste_anova(df, colunas_usadas):
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
     "2 Sample T": analise_2_sample_t,
-    "Paired Test": analise_teste_paired_t,
+    "2 Paired Test": analise_paired_t,
+    
     "F/Levene Test": teste_variancias,
     "One way ANOVA": teste_anova
 }
