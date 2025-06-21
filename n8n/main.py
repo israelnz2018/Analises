@@ -7,7 +7,6 @@ import os
 from leitura import ler_arquivo 
 from Capabilidade import ANALISES as ANALISES_CAP
 from Exploratoria import ANALISES as ANALISES_EXP
-from Controleprocesso import ANALISES as ANALISES_CTRL
 from Inferencial import ANALISES as ANALISES_INF
 from Preditiva import ANALISES as ANALISES_PRED
 from graficos import GRAFICOS
@@ -28,7 +27,6 @@ print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
 ANALISES = {}
 ANALISES.update(ANALISES_CAP)
 ANALISES.update(ANALISES_EXP)
-ANALISES.update(ANALISES_CTRL)
 ANALISES.update(ANALISES_INF)
 ANALISES.update(ANALISES_PRED)
 
