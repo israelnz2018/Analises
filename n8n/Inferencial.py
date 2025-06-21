@@ -221,6 +221,77 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
 
 from suporte import *
 
+def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
+    if len(colunas_usadas) != 2:
+        return "❌ O One way ANOVA requer uma coluna Y e uma coluna X (categorias).", None
+
+    col_y, col_x = colunas_usadas
+    y = df[col_y].dropna()
+    x = df[col_x].dropna()
+
+    df_valid = df[[col_y, col_x]].dropna()
+    y = df_valid[col_y]
+    x = df_valid[col_x]
+
+    grupos = [grupo[1].values for grupo in df_valid.groupby(col_x)[col_y]]
+
+    f_stat, p_valor = stats.f_oneway(*grupos)
+
+    # Estatísticas descritivas por grupo
+    stats_por_grupo = df_valid.groupby(col_x)[col_y].agg(['mean', 'std', 'count']).reset_index()
+
+    # Teste de normalidade dos resíduos
+    modelo = y - y.mean()
+    normalidade = stats.anderson(modelo)
+    ad_stat = normalidade.statistic
+    ad_crit = normalidade.critical_values
+    ad_sig = normalidade.significance_level
+    ad_aprovado = ad_stat < ad_crit[list(ad_sig).index(5)] if 5 in ad_sig else False
+
+    # Conclusão
+    conclusao = "✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ Resíduos podem não ser normais (Anderson-Darling)."
+    if p_valor < 0.05:
+        conclusao += f" ✅ Rejeitamos H0 (p = {p_valor:.4f}). Existem diferenças significativas entre as médias dos grupos."
+    else:
+        conclusao += f" ⚠ Não rejeitamos H0 (p = {p_valor:.4f}). Não há diferenças significativas entre as médias dos grupos."
+
+    # Gráfico: boxplot múltiplo com médias conectadas
+    fig, ax = plt.subplots(figsize=(6, 4))
+    df_valid.boxplot(column=col_y, by=col_x, ax=ax, grid=False)
+    medias = df_valid.groupby(col_x)[col_y].mean()
+    ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+    ax.set_title("One Way ANOVA - Boxplot por Grupo")
+    ax.set_xlabel(col_x)
+    ax.set_ylabel(col_y)
+    plt.suptitle("")
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Montar texto
+    descricoes = "\n".join([
+        f"- {row[col_x]}: média={row['mean']:.4f}, desvio={row['std']:.4f}, n={int(row['count'])}"
+        for _, row in stats_por_grupo.iterrows()
+    ])
+
+    texto = f"""
+**One Way ANOVA**
+- Estatística F: {f_stat:.4f}
+- p-valor: {p_valor:.4f}
+- Anderson-Darling (resíduos): estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_aprovado else 'Reprovada'}
+{descricoes}
+
+**Conclusão**
+{conclusao}
+"""
+
+    return texto.strip(), grafico_base64
+
+
 def teste_variancias(df, colunas_usadas):
     if len(colunas_usadas) != 2:
         return "❌ Selecione exatamente duas colunas para comparar as variâncias.", None
@@ -270,65 +341,15 @@ def teste_variancias(df, colunas_usadas):
 
 from suporte import *
 
-def teste_anova(df, colunas_usadas):
-    if len(colunas_usadas) < 2:
-        return "❌ O Teste ANOVA exige no mínimo duas colunas com dados numéricos (grupos).", None
 
-    dados_grupos = [df[coluna].dropna() for coluna in colunas_usadas]
-    normalidade = []
-    for i, grupo in enumerate(dados_grupos):
-        stat, critico, _ = stats.anderson(grupo)
-        if stat < critico[2]:  
-            normalidade.append(f"✅ Grupo {colunas_usadas[i]}: distribuição normal (Anderson-Darling)")
-        else:
-            normalidade.append(f"⚠️ Grupo {colunas_usadas[i]}: não segue distribuição normal")
-
-    try:
-        f_stat, p_valor = stats.f_oneway(*dados_grupos)
-    except Exception as e:
-        return f"❌ Erro ao executar o teste ANOVA: {str(e)}", None
-
-    interpretacao = f"""📊 **Teste ANOVA (Análise de Variância)**  
-🔹 Grupos comparados: {", ".join(colunas_usadas)}  
-🔹 Estatística F: {f_stat:.4f}  
-🔹 Valor-p: {p_valor:.4f}  
-
-📌 Este teste verifica se há diferença significativa entre as médias dos grupos.  
-- Se **valor-p < 0.05**, rejeitamos H₀ e concluímos que **pelo menos um grupo tem média diferente**.
-- Se **valor-p ≥ 0.05**, **não há evidências suficientes** para afirmar que as médias diferem.
-
-🔍 **Verificação de normalidade (Anderson-Darling, 5%)**:
-""" + "\n".join(normalidade)
-
-    try:
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.boxplot(dados_grupos, vert=False, patch_artist=True,
-                   labels=colunas_usadas, boxprops=dict(facecolor="skyblue"))
-        medias = [grupo.mean() for grupo in dados_grupos]
-        for i, media in enumerate(medias, start=1):
-            ax.plot(media, i, marker="o", color="red")
-        ax.set_title("Boxplot por Grupo (ANOVA)")
-
-        buffer = BytesIO()
-        plt.tight_layout()
-        plt.savefig(buffer, format="png")
-        plt.close(fig)
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    except Exception as e:
-        print("Erro ao gerar o gráfico:", str(e))
-        imagem_base64 = None
-
-    return interpretacao, imagem_base64
 
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
     "2 Sample T": analise_2_sample_t,
     "2 Paired Test": analise_paired_t,
+    "One way ANOVA": analise_one_way_anova
     
     "F/Levene Test": teste_variancias,
-    "One way ANOVA": teste_anova
 }
 
 
