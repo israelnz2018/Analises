@@ -233,72 +233,138 @@ def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, fie
 
 
 
-def analise_regressao_linear_multipla(df, colunas):
-    colunas = [interpretar_coluna(df, c) for c in colunas]
+def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) < 2:
+        return "❌ A regressão linear múltipla requer 1 Y e pelo menos 1 X.", None
 
-    y_col = colunas[-1]
-    x_cols = colunas[:-1]
+    y_col = colunas_usadas[0]
+    x_cols = colunas_usadas[1:]
 
-    X = df[x_cols].apply(pd.to_numeric, errors='coerce')
-    Y = pd.to_numeric(df[y_col], errors='coerce')
+    df_valid = df[[y_col] + x_cols].dropna()
+    if len(df_valid) < len(x_cols) + 3:
+        return "❌ O modelo requer mais dados válidos.", None
 
-    dados = pd.concat([X, Y], axis=1).dropna()
-    X = dados[x_cols]
-    Y = dados[y_col]
+    Y = df_valid[y_col].values
+    X_full = df_valid[x_cols].values
+    n, p_full = X_full.shape
 
-    if len(dados) < 3:
-        raise ValueError("Não há dados suficientes após remoção de NaNs para análise.")
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import r2_score
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    import statsmodels.api as sm
 
-    X_const = sm.add_constant(X)
-    modelo = sm.OLS(Y, X_const).fit()
+    def calcular_modelo(X_sub, cols_sub):
+        model = LinearRegression().fit(X_sub, Y)
+        Y_pred = model.predict(X_sub)
+        r2 = r2_score(Y, Y_pred)
+        r2_adj = 1 - (1 - r2) * (n - 1) / (n - X_sub.shape[1] - 1)
 
-    eq_terms = [f"{coef:.2f}*{var}" for var, coef in modelo.params.items() if var != 'const']
-    equacao = f"{modelo.params['const']:.2f} + " + " + ".join(eq_terms)
+        # R2 preditivo leave-one-out
+        erros = []
+        for i in range(n):
+            Xi = np.delete(X_sub, i, axis=0)
+            Yi = np.delete(Y, i)
+            m_lo = LinearRegression().fit(Xi, Yi)
+            y_lo = m_lo.predict(X_sub[i].reshape(1, -1))[0]
+            erros.append((Y[i] - y_lo) ** 2)
+        ss_res_pred = np.sum(erros)
+        ss_tot = np.sum((Y - np.mean(Y)) ** 2)
+        r2_pred = 1 - ss_res_pred / ss_tot
 
-    r2 = modelo.rsquared
-    r2_adj = modelo.rsquared_adj
-    erro_padrao = modelo.mse_resid**0.5
-    p_valor_modelo = modelo.f_pvalue
+        # VIF
+        vif = []
+        if X_sub.shape[1] > 1:
+            X_sub_sm = sm.add_constant(X_sub)
+            for i in range(1, X_sub_sm.shape[1]):  # ignora const
+                vif.append(variance_inflation_factor(X_sub_sm, i))
+        else:
+            vif.append(1.0)
 
-    vif_data = pd.DataFrame()
-    vif_data["Variável"] = X_const.columns
-    vif_data["VIF"] = [variance_inflation_factor(X_const.values, i) for i in range(X_const.shape[1])]
+        # Mallows Cp
+        resid = Y - Y_pred
+        mse_full = np.sum((Y - LinearRegression().fit(X_full, Y).predict(X_full)) ** 2) / (n - p_full - 1)
+        cp = (np.sum(resid ** 2) / mse_full) - (n - 2 * (X_sub.shape[1] + 1))
 
-    residuos = modelo.resid
-    residuos_padronizados = (residuos - residuos.mean()) / residuos.std()
-    outliers = sum(abs(residuos_padronizados) > 3)
+        # Durbin-Watson
+        dw = sm.stats.stattools.durbin_watson(resid)
 
-    stat_ad, crit_vals, sig_levels = stats.anderson(residuos, dist='norm')
-    limiar_5 = crit_vals[sig_levels.tolist().index(5.0)]
-    passou_normalidade = stat_ad < limiar_5
+        return {
+            "modelo": model,
+            "cols": cols_sub,
+            "r2": r2,
+            "r2_adj": r2_adj,
+            "r2_pred": r2_pred,
+            "vif": vif,
+            "cp": cp,
+            "dw": dw,
+            "Y_pred": Y_pred
+        }
 
-    dw = durbin_watson(residuos)
+    # Testar todos os subconjuntos (limitado a até 5 variáveis para não sobrecarregar)
+    from itertools import combinations
+    resultados = []
+    limite = min(len(x_cols), 5)
+    for k in range(1, limite + 1):
+        for subset in combinations(range(len(x_cols)), k):
+            cols_sub = [x_cols[i] for i in subset]
+            X_sub = df_valid[cols_sub].values
+            resultados.append(calcular_modelo(X_sub, cols_sub))
 
-    texto = f"""📊 Regressão Linear Múltipla
+    # Escolher melhor modelo pelo R2 preditivo
+    melhor = max(resultados, key=lambda r: r["r2_pred"])
 
-🔹 Equação:
-Y = {equacao}
+    # Verificar simplicidade
+    simples = sorted(resultados, key=lambda r: len(r["cols"]))
+    modelo_recomendado = melhor
+    for m in simples:
+        if (melhor["r2_pred"] - m["r2_pred"]) < 0.01:
+            modelo_recomendado = m
+            break
 
-🔹 Qualidade do modelo:
-- R² = {r2:.3f}
-- R² ajustado = {r2_adj:.3f}
-- Erro padrão da estimativa = {erro_padrao:.3f}
-- Valor-p do modelo = {p_valor_modelo:.4f}
+    # Gráfico: resíduos vs preditos
+    residuos = Y - modelo_recomendado["Y_pred"]
+    fig, ax = plt.subplots(figsize=(6,4))
+    ax.scatter(modelo_recomendado["Y_pred"], residuos, color='black')
+    ax.axhline(0, color='red', linestyle='--')
+    ax.set_xlabel("Valores preditos")
+    ax.set_ylabel("Resíduos")
+    ax.set_title("Resíduos vs Valores Preditos")
+    plt.tight_layout()
 
-🔹 VIF:
-""" + "\n".join([f"  - {row['Variável']}: {row['VIF']:.2f}" for _, row in vif_data.iterrows() if row['Variável'] != 'const']) + f"""
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-🔹 Resíduos:
-- Anderson-Darling (5%): {'✅' if passou_normalidade else '❌'} (estat={stat_ad:.4f}, lim={limiar_5:.4f})
-- Durbin-Watson: {dw:.2f}
-- Outliers (>|3|): {outliers}
+    # Texto
+    linhas = [f"Modelo recomendado: {', '.join(modelo_recomendado['cols'])}"]
+    linhas.append(f"R²: {modelo_recomendado['r2']:.4f}")
+    linhas.append(f"R² ajustado: {modelo_recomendado['r2_adj']:.4f}")
+    linhas.append(f"R² preditivo: {modelo_recomendado['r2_pred']:.4f}")
+    linhas.append(f"Mallows Cp: {modelo_recomendado['cp']:.4f}")
+    linhas.append(f"Durbin-Watson: {modelo_recomendado['dw']:.4f}")
+    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(modelo_recomendado['cols'], modelo_recomendado['vif'])]))
+
+    conclusao = []
+    if modelo_recomendado['r2_pred'] > 0.5:
+        conclusao.append("✅ R² preditivo adequado.")
+    else:
+        conclusao.append("⚠ R² preditivo baixo.")
+
+    if all(v < 10 for v in modelo_recomendado['vif']):
+        conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
+    else:
+        conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
+
+    texto = f"""
+**Regressão Linear Múltipla**
+{chr(10).join(linhas)}
+
+**Conclusão**
+{chr(10).join(conclusao)}
 """
 
-    aplicar_estilo_minitab()
-    plt.figure(figsize=(6, 4))
-    sns.histplot(residuos, kde=True, color="steelblue", edgecolor="black")
-    plt.title("Histograma dos Resíduos")
-    return texto.strip(), salvar_grafico()
+    return texto.strip(), grafico_base64
 
 def analise_regressao_logistica_binaria(df, colunas_usadas):
     if len(colunas_usadas) < 2:
@@ -498,11 +564,13 @@ P-valor: {p:.4f}
 
 ANALISES = {
     "Tipo de modelo de regressão": analise_tipo_modelo_regressao,
-    "Regressão linear simples": analise_regressao_linear_simples
+    "Regressão linear simples": analise_regressao_linear_simples,
+    "Regressão linear múltipla": analise_regressao_linear_multipla
+
 
     
 
-    "Regressão linear múltipla": analise_regressao_linear_multipla,
+   
     "Regressão logística binária": analise_regressao_logistica_binaria,
     "Regressão logística nominal": analise_regressao_logistica_nominal,
     "Regressão logística ordinal": analise_regressao_logistica_ordinal,
