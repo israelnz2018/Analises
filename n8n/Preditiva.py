@@ -136,45 +136,101 @@ Modelo recomendado: {modelo_recomendado}
 
     return texto.strip(), grafico_base64
 
-def analise_regressao_linear_simples(df, colunas):
-    colunas = [interpretar_coluna(df, c) for c in colunas]
-    X = df[colunas[0]].astype(str).str.strip().str.replace(",", ".").str.replace(r"[^\d\.\-]", "", regex=True)
-    Y = df[colunas[1]].astype(str).str.strip().str.replace(",", ".").str.replace(r"[^\d\.\-]", "", regex=True)
-    X = pd.to_numeric(X, errors="coerce")
-    Y = pd.to_numeric(Y, errors="coerce")
-    validos = ~(X.isna() | Y.isna())
-    X = X[validos]
-    Y = Y[validos]
+def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 2:
+        return "❌ A regressão linear simples requer 1 Y e 1 X.", None
 
-    if len(X) < 2 or len(Y) < 2:
-        raise ValueError("Não há dados numéricos suficientes para a regressão.")
+    y_col, x_col = colunas_usadas
+    df_valid = df[[x_col, y_col]].dropna()
 
-    X_const = sm.add_constant(X)
-    modelo = sm.OLS(Y, X_const).fit()
+    if len(df_valid) < 5:
+        return "❌ O modelo requer ao menos 5 observações válidas.", None
 
-    a = modelo.params.iloc[0]
-    b = modelo.params.iloc[1]
-    p_valor = modelo.pvalues.iloc[1]
-    r2 = modelo.rsquared
-    r2_ajustado = modelo.rsquared_adj
-    erro_padrao = np.sqrt(modelo.mse_resid)
+    X = df_valid[x_col].values
+    Y = df_valid[y_col].values
 
-    resumo = f"""
-**Equação da reta:**  y = {a:.3f} + {b:.3f}·x  
-**Valor-p da inclinação:**  {p_valor:.4f}  
-**Coeficiente de determinação (R²):**  {r2:.4f}  
-**R² ajustado:**  {r2_ajustado:.4f}  
-**Erro padrão da estimativa:**  {erro_padrao:.4f}
-""".strip()
+    # Ajuste do modelo
+    coef = np.polyfit(X, Y, 1)
+    y_pred = np.polyval(coef, X)
+    intercepto, angular = coef[1], coef[0]
 
-    aplicar_estilo_minitab()
-    plt.figure(figsize=(8, 6))
-    sns.regplot(x=X, y=Y, ci=None, line_kws={"color": "red"})
-    plt.xlabel(colunas[0])
-    plt.ylabel(colunas[1])
-    plt.title("Regressão Linear Simples")
+    ss_res = np.sum((Y - y_pred) ** 2)
+    ss_tot = np.sum((Y - np.mean(Y)) ** 2)
+    r2 = 1 - ss_res / ss_tot
+    r2_adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - 2)
 
-    return resumo, salvar_grafico()
+    # p-valor do coeficiente
+    X_mat = np.vstack([np.ones_like(X), X]).T
+    beta, residuals, rank, s = np.linalg.lstsq(X_mat, Y, rcond=None)
+    mse = ss_res / (len(Y) - 2)
+    var_beta = mse * np.linalg.inv(X_mat.T @ X_mat)
+    se_beta1 = np.sqrt(var_beta[1,1])
+    t_stat = beta[1] / se_beta1
+    p_valor_beta1 = 2 * (1 - stats.t.cdf(abs(t_stat), df=len(Y)-2))
+
+    # R2 preditivo leave-one-out
+    erros = []
+    for i in range(len(Y)):
+        X_train = np.delete(X, i)
+        Y_train = np.delete(Y, i)
+        coef_lo = np.polyfit(X_train, Y_train, 1)
+        y_pred_lo = np.polyval(coef_lo, X[i])
+        erros.append((Y[i] - y_pred_lo) ** 2)
+    ss_pred = np.sum(erros)
+    r2_pred = 1 - ss_pred / ss_tot
+
+    # Normalidade dos resíduos
+    residuos = Y - y_pred
+    ad = stats.anderson(residuos)
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad.statistic < ad_crit[idx]
+    else:
+        ad_normal = False
+
+    # Conclusão
+    conclusao = []
+    conclusao.append("✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_normal else "⚠ Resíduos podem não ser normais (Anderson-Darling).")
+    conclusao.append(f"✅ Coeficiente angular significativo (p = {p_valor_beta1:.4f})." if p_valor_beta1 < 0.05 else f"⚠ Coeficiente angular não significativo (p = {p_valor_beta1:.4f}).")
+    if ad_normal and p_valor_beta1 < 0.05 and r2_pred > 0.5:
+        conclusao.append("✅ Modelo validado.")
+    else:
+        conclusao.append("⚠ Modelo pode não ser adequado. Verifique os indicadores acima.")
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6,4))
+    ax.scatter(X, Y, color='black', label='Dados')
+    ax.plot(X, y_pred, color='blue', label='Reta ajustada')
+    ax.set_title("Regressão Linear Simples")
+    ax.set_xlabel(x_col)
+    ax.set_ylabel(y_col)
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto
+    texto = f"""
+**Regressão Linear Simples**
+- Equação: Y = {intercepto:.4f} + {angular:.4f} * X
+- R²: {r2:.4f}
+- R² ajustado: {r2_adj:.4f}
+- R² preditivo: {r2_pred:.4f}
+- p-valor do coeficiente angular: {p_valor_beta1:.4f}
+- Anderson-Darling dos resíduos: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+
+**Conclusão**
+{chr(10).join(conclusao)}
+"""
+
+    return texto.strip(), grafico_base64
+
+
 
 
 def analise_regressao_linear_multipla(df, colunas):
@@ -442,8 +498,10 @@ P-valor: {p:.4f}
 
 ANALISES = {
     "Tipo de modelo de regressão": analise_tipo_modelo_regressao,
+    "Regressão linear simples": analise_regressao_linear_simples
 
-    "Regressão linear simples": analise_regressao_linear_simples,
+    
+
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Regressão logística binária": analise_regressao_logistica_binaria,
     "Regressão logística nominal": analise_regressao_logistica_nominal,
