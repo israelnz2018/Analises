@@ -222,6 +222,11 @@ def analise_capabilidade_normal(df: pd.DataFrame, colunas_usadas: list, field=No
 
     y_col = colunas_usadas[0]
     dados = df[y_col].dropna()
+
+    subgrupo_col = None
+    if len(colunas_usadas) > 1:
+        subgrupo_col = colunas_usadas[1] if colunas_usadas[1] != "" else None
+
     if len(dados) < 30:
         return "⚠ Recomenda-se pelo menos 30 dados para análise de capabilidade.", None
 
@@ -242,11 +247,7 @@ def analise_capabilidade_normal(df: pd.DataFrame, colunas_usadas: list, field=No
     ks_stat, ks_p = stats.kstest((dados - np.mean(dados)) / np.std(dados, ddof=1), 'norm')
 
     ad_sig = list(ad_res.significance_level)
-    ad_normal = False
-    if 5 in ad_sig:
-        idx = ad_sig.index(5)
-        ad_normal = ad_res.statistic < ad_res.critical_values[idx]
-
+    ad_normal = 5 in ad_sig and ad_res.statistic < ad_res.critical_values[ad_sig.index(5)]
     sw_normal = sw_p > 0.05
     ks_normal = ks_p > 0.05
 
@@ -260,14 +261,17 @@ def analise_capabilidade_normal(df: pd.DataFrame, colunas_usadas: list, field=No
 """
         return texto.strip(), None
 
-    # Estatísticas
     mean = np.mean(dados)
-    std_within = np.std(dados, ddof=1)
     std_overall = np.std(dados, ddof=0)
+
+    if subgrupo_col and subgrupo_col in df.columns:
+        grupos = df[[y_col, subgrupo_col]].dropna().groupby(subgrupo_col)[y_col]
+        std_within = np.sqrt(np.mean(grupos.var(ddof=1)))
+    else:
+        std_within = np.std(dados, ddof=1)
 
     Cp = (USL - LSL) / (6 * std_within)
     Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
-
     Pp = (USL - LSL) / (6 * std_overall)
     Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
 
@@ -283,17 +287,17 @@ def analise_capabilidade_normal(df: pd.DataFrame, colunas_usadas: list, field=No
     ppm_overall_total = ppm_overall_lsl + ppm_overall_usl
 
     # Gráfico
-    fig, ax = plt.subplots(figsize=(8,5))
-    count, bins, ignored = ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
     x = np.linspace(min(dados), max(dados), 100)
     y_within = stats.norm.pdf(x, mean, std_within)
     y_overall = stats.norm.pdf(x, mean, std_overall)
 
     ax.plot(x, y_within, 'r-', label='Curto prazo')
     ax.plot(x, y_overall, 'k--', label='Longo prazo')
-    ax.axvline(LSL, color='red', linestyle='dashed', label='LSL')
-    ax.axvline(USL, color='red', linestyle='dashed', label='USL')
-    ax.axvline(mean, color='green', linestyle='dashed', label='Média')
+    ax.axvline(LSL, color='red', linestyle='--', label='LSL')
+    ax.axvline(USL, color='red', linestyle='--')
+    ax.axvline(mean, color='green', linestyle='--', label='Média')
     ax.set_title('Capabilidade - Dados Normais')
     ax.legend()
     plt.tight_layout()
@@ -332,6 +336,7 @@ def analise_capabilidade_normal(df: pd.DataFrame, colunas_usadas: list, field=No
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_capabilidade_outros(df: pd.DataFrame, colunas_usadas: list, field=None):
