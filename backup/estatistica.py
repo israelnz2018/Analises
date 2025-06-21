@@ -2,41 +2,142 @@
 import pandas as pd
 import numpy as np
 
-# 📊 Visualização de dados 
+# 📊 Visualização de dados
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+# 🧪 Testes estatísticos
+from scipy import stats
+from scipy.stats import chi2_contingency, anderson, shapiro, kstest, norm
 
 # 📦 Modelos estatísticos
 import statsmodels.api as sm
 from statsmodels.stats.stattools import durbin_watson
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.miscmodels.ordinal_model import OrderedModel
-from scipy.stats import chi2_contingency
-from scipy.stats import anderson, shapiro, kstest, norm
-from sklearn.preprocessing import PowerTransformer
 from statsmodels.stats.diagnostic import normal_ad
-
-
-
-# 🧪 Testes estatísticos
-from scipy import stats
-from scipy.stats import shapiro, anderson, kstest, norm
 
 # 📈 Métricas de modelos
 from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import PowerTransformer
 
 # 💾 Manipulação de arquivos/imagens
-import base64
 from io import BytesIO
+import base64
 import os
 
 # 🧠 Funções locais do projeto
 from suporte import interpretar_coluna
-from estilo import aplicar_estilo_minitab
+
 
 # ✅ Todas as análises começam abaixo, dentro das funções (nunca aqui fora)
 
+def grafico_sumario(df, colunas_usadas):
+    coluna_y = colunas_usadas[0]
+    if coluna_y not in df.columns:
+        return (
+            "❌ A coluna selecionada para o Gráfico Sumario não foi encontrada.",
+            None
+        )
 
+    serie = df[coluna_y].dropna()
+
+    if serie.empty:
+        return (
+            "❌ A coluna selecionada não contém dados numéricos válidos.",
+            None
+        )
+
+    media = serie.mean()
+    mediana = serie.median()
+    desvio = serie.std()
+    variancia = serie.var()
+    minimo = serie.min()
+    maximo = serie.max()
+    q1 = serie.quantile(0.25)
+    q3 = serie.quantile(0.75)
+    assimetria = serie.skew()
+    curtose = serie.kurtosis()
+    n = serie.count()
+
+    resumo = f"""📊 **Gráfico Sumario da coluna '{coluna_y}'**  
+- Média: {media:.2f}  
+- Mediana: {mediana:.2f}  
+- Desvio Padrão: {desvio:.2f}  
+- Variância: {variancia:.2f}  
+- Mínimo: {minimo:.2f}  
+- 1º Quartil (Q1): {q1:.2f}  
+- 3º Quartil (Q3): {q3:.2f}  
+- Máximo: {maximo:.2f}  
+- Assimetria: {assimetria:.2f}  
+- Curtose: {curtose:.2f}  
+- N: {n}"""
+
+    # Aplica estilo seguro e compatível
+    try:
+        plt.style.use('seaborn-v0_8-whitegrid')
+    except Exception:
+        plt.style.use('default')
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.histplot(serie, bins=10, kde=True, ax=ax, color='gray')
+    ax.set_title(f"Gráfico Sumario - {coluna_y}")
+    ax.set_xlabel(coluna_y)
+    ax.set_ylabel("Frequência")
+
+    buffer = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buffer, format='png')
+    plt.close(fig)
+    buffer.seek(0)
+    imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+    return resumo, imagem_base64
+
+def analise_de_outliers(df, colunas_usadas):
+    resultado_texto = "📊 **Análise de Outliers**\n"
+    aplicar_estilo_minitab()
+    fig, axs = plt.subplots(len(colunas_usadas), 1, figsize=(6, 4 * len(colunas_usadas)))
+    if len(colunas_usadas) == 1:
+        axs = [axs]
+
+    encontrou_outliers = False
+
+    for ax, coluna in zip(axs, colunas_usadas):
+        if coluna not in df.columns:
+            resultado_texto += f"- ❌ A coluna '{coluna}' não foi encontrada.\n"
+            continue
+
+        serie = df[coluna].dropna()
+        if serie.empty:
+            resultado_texto += f"- ❌ A coluna '{coluna}' não contém dados numéricos válidos.\n"
+            continue
+
+        q1 = serie.quantile(0.25)
+        q3 = serie.quantile(0.75)
+        iqr = q3 - q1
+        limite_inferior = q1 - 1.5 * iqr
+        limite_superior = q3 + 1.5 * iqr
+        outliers = serie[(serie < limite_inferior) | (serie > limite_superior)]
+
+        sns.boxplot(x=serie, orient="h", ax=ax, flierprops=dict(marker='*', markersize=8, markerfacecolor='red'))
+        ax.set_title(f"Boxplot - {coluna}")
+        ax.set_xlabel(coluna)
+
+        if not outliers.empty:
+            encontrou_outliers = True
+            resultado_texto += f"- ⚠ A coluna '{coluna}' possui {len(outliers)} outlier(s): {list(outliers.values)}\n"
+        else:
+            resultado_texto += f"- ✅ A coluna '{coluna}' não possui outliers detectados.\n"
+
+    buffer = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buffer, format='png')
+    plt.close(fig)
+    buffer.seek(0)
+    imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+    return resultado_texto, imagem_base64
 
 def salvar_grafico():
     caminho = "grafico.png"
@@ -47,6 +148,619 @@ def salvar_grafico():
         img_base64 = base64.b64encode(f.read()).decode("utf-8")
     os.remove(caminho)
     return img_base64
+
+def analise_correlacao_person(df, colunas_usadas):
+    if len(colunas_usadas) < 2:
+        return "❌ É necessário ao menos uma variável Y e uma variável X.", None
+
+    nome_coluna_y = colunas_usadas[0]
+    nomes_colunas_x = colunas_usadas[1:]
+
+    if nome_coluna_y not in df.columns:
+        return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada.", None
+
+    for col in nomes_colunas_x:
+        if col not in df.columns:
+            return f"❌ A coluna X '{col}' não foi encontrada.", None
+
+    serie_y = df[nome_coluna_y].dropna()
+    if serie_y.empty:
+        return f"❌ A coluna Y '{nome_coluna_y}' não contém dados válidos.", None
+
+    linhas = []
+    for nome_x in nomes_colunas_x:
+        serie_x = df[nome_x].dropna()
+        if serie_x.empty:
+            linhas.append(f"- {nome_x}: ❌ Dados X inválidos.")
+            continue
+
+        # Ajustar para tamanho igual
+        data = pd.concat([serie_y, serie_x], axis=1).dropna()
+        if data.empty:
+            linhas.append(f"- {nome_x}: ❌ Sem dados pareados suficientes.")
+            continue
+
+        r, p = stats.pearsonr(data.iloc[:, 0], data.iloc[:, 1])
+
+        if abs(r) < 0.3:
+            forca = "fraca"
+        elif abs(r) < 0.7:
+            forca = "moderada"
+        else:
+            forca = "forte"
+
+        dependencia = "existe dependência estatística" if p < 0.05 else "não há dependência estatística"
+
+        linhas.append(
+            f"- {nome_x}: Coeficiente de Pearson = {r:.2f}, p-valor = {p:.4f} → Correlação {forca}, {dependencia}."
+        )
+
+    resumo = f"""📊 **Análise de Correlação de Pearson**
+Coluna Y: **{nome_coluna_y}**
+Resultados:
+""" + "\n".join(linhas)
+
+    return resumo, None
+
+def analise_matrix_correlacao(df, colunas_usadas):
+    if len(colunas_usadas) < 2:
+        return "❌ É necessário ao menos duas colunas para gerar a matriz de correlação.", None
+
+    # Valida colunas
+    for col in colunas_usadas:
+        if col not in df.columns:
+            return f"❌ Coluna '{col}' não encontrada no dataframe.", None
+
+    # Prepara dados
+    dados = df[colunas_usadas].dropna()
+    if dados.empty:
+        return "❌ Dados insuficientes após remoção de valores ausentes.", None
+
+    # Calcula matriz de correlação
+    matriz_cor = dados.corr(method='pearson')
+
+    # Prepara resumo textual
+    linhas_resumo = []
+    for i in range(len(colunas_usadas)):
+        for j in range(i + 1, len(colunas_usadas)):
+            col1 = colunas_usadas[i]
+            col2 = colunas_usadas[j]
+            r = matriz_cor.loc[col1, col2]
+
+            if abs(r) < 0.3:
+                forca = "fraca"
+            elif abs(r) < 0.7:
+                forca = "moderada"
+            else:
+                forca = "forte"
+
+            linhas_resumo.append(f"- {col1} vs {col2}: correlação {forca} (r={r:.2f})")
+
+    resumo = "📊 **Matriz de Correlação (Pearson)**\n" + "\n".join(linhas_resumo)
+
+    # Gerar gráfico
+    aplicar_estilo_minitab()
+    sns.pairplot(dados, kind='reg', plot_kws={'line_kws': {'color': 'red'}, 'scatter_kws': {'s': 20}})
+    
+    from io import BytesIO
+    import base64
+    buffer = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buffer, format='png')
+    plt.close()
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+    return resumo, img_base64
+    
+def analise_estabilidade(df, colunas_usadas):
+    if not colunas_usadas or colunas_usadas[0] not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no dataframe.", None
+
+    nome_coluna_y = colunas_usadas[0]
+    nome_coluna_subgrupo = colunas_usadas[1] if len(colunas_usadas) > 1 else None
+
+    dados = df[[nome_coluna_y]].copy()
+    if nome_coluna_subgrupo and nome_coluna_subgrupo in df.columns:
+        dados['Subgrupo'] = df[nome_coluna_subgrupo]
+    else:
+        dados['Subgrupo'] = range(1, len(dados) + 1)
+
+    if dados.empty or dados[nome_coluna_y].dropna().empty:
+        return "❌ Dados insuficientes para análise.", None
+
+    aplicar_estilo_minitab()
+    texto_resumo = f"📊 **Análise de Estabilidade da coluna '{nome_coluna_y}'**\n"
+
+    # Decide se faz I-MR ou XBar-R
+    if nome_coluna_subgrupo and nome_coluna_subgrupo in df.columns:
+        # Carta XBar-R
+        fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+
+        sns.lineplot(x="Subgrupo", y=nome_coluna_y, data=dados, ax=axs[0], marker="o")
+        axs[0].set_title("Carta X-Barra")
+        axs[0].set_ylabel("Média")
+
+        grupo_stats = dados.groupby('Subgrupo')[nome_coluna_y].agg(['mean', 'std'])
+        r_values = grupo_stats['std'] * (2 ** 0.5)  # aproximação do range
+
+        axs[1].plot(grupo_stats.index, r_values, marker="o")
+        axs[1].set_title("Carta R")
+        axs[1].set_ylabel("Amplitude (aprox)")
+
+        texto_resumo += "- Carta X-BarraR usada (subgrupos detectados).\n"
+    else:
+        # Carta I-MR
+        fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+
+        sns.lineplot(x="Subgrupo", y=nome_coluna_y, data=dados, ax=axs[0], marker="o")
+        axs[0].set_title("Carta Individual")
+        axs[0].set_ylabel("Valor")
+
+        mr = dados[nome_coluna_y].diff().abs()
+        axs[1].plot(dados['Subgrupo'][1:], mr[1:], marker="o")
+        axs[1].set_title("Carta MR")
+        axs[1].set_ylabel("Movimento Range")
+
+        texto_resumo += "- Carta I-MR usada (sem subgrupos).\n"
+
+    # Simples regra: verificar outliers nos gráficos (pontos fora de 3 sigma)
+    media = dados[nome_coluna_y].mean()
+    sigma = dados[nome_coluna_y].std()
+    outliers = dados[(dados[nome_coluna_y] > media + 3*sigma) | (dados[nome_coluna_y] < media - 3*sigma)]
+
+    if not outliers.empty:
+        texto_resumo += f"- ⚠ Detectados {len(outliers)} pontos fora dos limites (3 sigma). Processo potencialmente instável.\n"
+    else:
+        texto_resumo += "- ✅ Nenhum ponto fora dos limites (3 sigma). Processo aparentemente estável.\n"
+
+    # Exportar gráfico
+    from io import BytesIO
+    import base64
+    buffer = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buffer, format='png')
+    plt.close(fig)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+
+    return texto_resumo, img_base64
+
+
+
+def analise_distribuicao_estatistica(df, colunas_usadas):
+    # Garante que coluna_y seja o nome da coluna
+    if isinstance(colunas_usadas, list):
+        if len(colunas_usadas) > 0:
+            coluna_y = colunas_usadas[0]
+        else:
+            return "Erro: Nenhuma coluna Y fornecida.", None
+    else:
+        coluna_y = colunas_usadas
+
+    # Validação
+    if not coluna_y or coluna_y not in df.columns:
+        return "Erro: Coluna Y não encontrada no arquivo.", None
+
+    dados = df[coluna_y].dropna().values
+    distribs = [
+        ("Normal", stats.norm),
+        ("Lognormal (3P)", stats.lognorm),
+        ("Exponential (2P)", stats.expon),
+        ("Weibull (3P)", stats.weibull_min),
+        ("Smallest Extreme Value", stats.gumbel_l),
+        ("Largest Extreme Value", stats.gumbel_r),
+        ("Gamma (3P)", stats.gamma),
+        ("Logistic", stats.logistic)
+    ]
+
+    resultados = []
+    melhor_p = -1
+    melhor_nome = "Normal"
+    melhor_dist = stats.norm
+    melhor_params = stats.norm.fit(dados)
+
+    for nome, dist in distribs:
+        try:
+            params = dist.fit(dados)
+            if nome == "Normal":
+                ad_stat, crit_vals, _ = stats.anderson(dados, dist='norm')
+                p_value = 1 - ad_stat / max(crit_vals)
+                p_value = max(min(p_value, 1.0), 0.0)
+            else:
+                ad_stat = np.nan
+                p_value = np.nan
+            resultados.append((nome, ad_stat, p_value))
+
+            if not np.isnan(p_value) and p_value > melhor_p:
+                melhor_p = p_value
+                melhor_nome = nome
+                melhor_dist = dist
+                melhor_params = params
+        except Exception:
+            resultados.append((nome, np.nan, np.nan))
+
+    linhas = ["<strong>Distribuição</strong> | <strong>AD</strong> | <strong>p-value</strong>"]
+    for nome, ad, p in resultados:
+        ad_txt = f"{ad:.3f}" if not np.isnan(ad) else "*"
+        p_txt = f"{p:.3f}" if not np.isnan(p) else "*"
+        linhas.append(f"{nome} | {ad_txt} | {p_txt}")
+    tabela = "<br>".join(linhas)
+
+    plt.figure(figsize=(6,4))
+    try:
+        if melhor_dist and melhor_params is not None:
+            stats.probplot(dados, dist=melhor_dist, sparams=melhor_params[:-2], plot=plt)
+            plt.title(f'Probability Plot - {melhor_nome}')
+        else:
+            stats.probplot(dados, dist="norm", plot=plt)
+            plt.title('Probability Plot - Normal')
+    except Exception:
+        plt.text(0.5, 0.5, 'Erro ao gerar plot', ha='center')
+        plt.axis('off')
+
+    buf = BytesIO()
+    plt.tight_layout()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    grafico_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    recomendacoes = [
+        f"A distribuição {nome} apresentou p-value {f'{p:.3f}' if not np.isnan(p) else '*'}"
+        for nome, ad, p in resultados
+    ]
+    conclusao = "Distribuições mais adequadas são aquelas com p-value maior que 0.05."
+
+    resultado_texto = (
+        tabela + "<br><br>" +
+        "<br>".join(recomendacoes) + "<br><br>" +
+        conclusao
+    )
+
+    return resultado_texto, grafico_base64
+
+def analise_limpeza_dados(df, colunas_usadas):
+    linhas_total = len(df)
+    colunas_total = df.shape[1]
+    linhas_duplicadas = df.duplicated().sum()
+
+    resultado = [
+        f"<strong>Total de linhas esperadas:</strong> {linhas_total}",
+        f"<strong>Total de colunas:</strong> {colunas_total}",
+        f"<strong>Linhas duplicadas detectadas:</strong> {linhas_duplicadas}<br>"
+    ]
+
+    for coluna in df.columns:
+        n_valores = df[coluna].notnull().sum()
+        n_gaps = linhas_total - n_valores
+
+        if n_gaps > 0:
+            # Descobre onde começa o primeiro NaN
+            idx_gaps = df[df[coluna].isnull()].index
+            primeira_linha_gap = idx_gaps[0] + 2 if len(idx_gaps) > 0 else "?"
+            resultado.append(
+                f"Coluna <strong>{coluna}</strong>: {n_gaps} linhas faltando (primeiro gap na linha {primeira_linha_gap})"
+            )
+
+    texto_final = "<br>".join(resultado)
+    return texto_final, None
+
+
+def analise_1_sample_t(df, colunas_usadas, field=None):
+    if len(colunas_usadas) < 1 or not field:
+        return "⚠ É obrigatório informar a coluna Y e o valor de referência.", []
+
+    col_y = colunas_usadas[0]
+    if col_y not in df.columns:
+        return f"⚠ Coluna {col_y} não encontrada no arquivo.", []
+
+    dados = df[col_y].dropna().astype(float)
+
+    if dados.empty:
+        return "⚠ Não há dados válidos na coluna Y.", []
+
+    try:
+        ref = float(field)
+    except ValueError:
+        return "⚠ O valor de referência informado não é numérico.", []
+
+    # Estatísticas
+    n = len(dados)
+    media = dados.mean()
+    desvio = dados.std(ddof=1)
+    erro_media = desvio / (n ** 0.5)
+    ic_low, ic_up = stats.t.interval(0.95, n-1, loc=media, scale=erro_media)
+
+    # Teste t
+    t_stat, p_value = stats.ttest_1samp(dados, ref)
+
+    # Relatório
+    resultado = (
+        f"**Estatísticas Descritivas**\n"
+        f"N: {n}\n"
+        f"Média: {media:.2f}\n"
+        f"Desvio Padrão: {desvio:.2f}\n"
+        f"Erro Padrão da Média: {erro_media:.2f}\n"
+        f"IC 95% para μ: ({ic_low:.2f}, {ic_up:.2f})\n\n"
+        f"**Teste t para uma amostra (1 Sample T)**\n"
+        f"H₀: μ = {ref}\n"
+        f"H₁: μ ≠ {ref}\n"
+        f"T-Valor: {t_stat:.2f}\n"
+        f"P-Valor: {p_value:.3f}\n"
+    )
+
+    if p_value < 0.05:
+        resultado += "➡ Resultado: Rejeita H0 (diferença significativa)."
+    else:
+        resultado += "➡ Resultado: Não rejeita H0 (sem diferença significativa)."
+
+    # Boxplot
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+
+    ax.plot(media, 1, 'kx', markersize=12)
+    ax.hlines(1, ic_low, ic_up, colors='blue', lw=3)
+    ax.plot(ref, 1, 'ro')
+    ax.text(ref, 1.05, 'H0', color='red')
+
+    ax.set_title(f"Boxplot de {col_y}\n(com H0 e intervalo de confiança de 95% para a média)")
+    ax.set_xlabel(col_y)
+
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    return resultado, [imagem_base64]
+
+
+
+def aplicar_estilo_minitab():
+    plt.style.use('seaborn-whitegrid')
+    plt.rcParams.update({
+        "axes.titlesize": 12,
+        "axes.labelsize": 10,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9
+    })
+
+def analise_2_sample_t(df, colunas_usadas, **kwargs):
+    if len(colunas_usadas) != 2:
+        return "❌ É necessário selecionar exatamente duas colunas Y numéricas para o Teste 2 Sample T.", None
+
+    col1, col2 = colunas_usadas
+    serie1 = pd.to_numeric(df[col1], errors="coerce").dropna()
+    serie2 = pd.to_numeric(df[col2], errors="coerce").dropna()
+
+    if len(serie1) < 2 or len(serie2) < 2:
+        return "❌ As colunas selecionadas não possuem dados suficientes para o teste.", None
+
+    # Teste de normalidade (Anderson-Darling)
+    ad1 = anderson(serie1)
+    ad2 = anderson(serie2)
+    lim1 = ad1.critical_values[2]
+    lim2 = ad2.critical_values[2]
+    normal1 = ad1.statistic < lim1
+    normal2 = ad2.statistic < lim2
+
+    # Teste F para variâncias
+    stat_f = np.var(serie1, ddof=1) / np.var(serie2, ddof=1)
+    df1, df2 = len(serie1)-1, len(serie2)-1
+    p_f = 2 * min(stats.f.cdf(stat_f, df1, df2), 1 - stats.f.cdf(stat_f, df1, df2))
+    equal_var = p_f > 0.05
+
+    # Teste t
+    t_stat, p_valor = stats.ttest_ind(serie1, serie2, equal_var=equal_var)
+
+    texto = f"""📊 **Teste T para 2 Amostras Independentes**
+
+🔹 Coluna 1: {col1}  
+🔹 Coluna 2: {col2}  
+
+🔹 Teste de normalidade (Anderson-Darling, 5%):  
+- {col1}: {"✅ Normal" if normal1 else "❌ Não normal"} (estatística = {ad1.statistic:.4f}, limite crítico = {lim1:.4f})  
+- {col2}: {"✅ Normal" if normal2 else "❌ Não normal"} (estatística = {ad2.statistic:.4f}, limite crítico = {lim2:.4f})  
+
+🔹 Teste F para igualdade de variâncias:  
+- Estatística F = {stat_f:.4f}, p = {p_f:.4f} → {"✅ Variâncias iguais" if equal_var else "❌ Variâncias diferentes"}
+
+🔹 Resultado do Teste T:  
+- Estatística t = {t_stat:.4f}, p = {p_valor:.4f}  
+- {"✅ Não há diferença significativa" if p_valor > 0.05 else "❌ Diferença estatisticamente significativa entre as médias"}"""
+
+    try:
+        aplicar_estilo_minitab()
+        fig, ax = plt.subplots(figsize=(6, 6))
+
+        dados_plot = pd.DataFrame({
+            'Valor': pd.concat([serie1, serie2]),
+            'Grupo': [col1] * len(serie1) + [col2] * len(serie2)
+        })
+
+        sns.boxplot(x="Grupo", y="Valor", data=dados_plot, ax=ax, width=0.6, palette="pastel")
+        medias = dados_plot.groupby("Grupo")["Valor"].mean()
+        ax.plot(range(len(medias)), medias.values, marker="D", linestyle="None", color="black", markersize=6, label="Média")
+
+        ax.set_title(f"Boxplot Comparativo 2 Sample T")
+        ax.set_ylabel("Valores")
+        ax.legend()
+
+        plt.tight_layout()
+
+        buffer = BytesIO()
+        plt.savefig(buffer, format="png")
+        plt.close(fig)
+        buffer.seek(0)
+        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    except Exception as e:
+        erro_grafico = f"\n❌ Erro ao gerar o gráfico: {str(e)}"
+        print(erro_grafico)
+        texto += erro_grafico
+        imagem_base64 = None
+
+    return texto, imagem_base64
+
+
+def analise_teste_paired_t(df, colunas_usadas):
+    if len(colunas_usadas) != 2:
+        return "❌ O teste pareado requer exatamente duas colunas.", None
+
+    col1, col2 = colunas_usadas
+    serie1 = pd.to_numeric(df[col1], errors="coerce")
+    serie2 = pd.to_numeric(df[col2], errors="coerce")
+
+    diferencas = (serie1 - serie2).dropna()
+    if len(diferencas) < 2:
+        return "❌ Dados insuficientes para o teste pareado.", None
+
+    stat, p_valor = stats.ttest_rel(serie1, serie2, nan_policy='omit')
+    media = diferencas.mean()
+    desvio = diferencas.std(ddof=1)
+    n = len(diferencas)
+
+    t_crit = stats.t.ppf(1 - 0.025, df=n - 1)
+    erro = desvio / np.sqrt(n)
+    ic = (media - t_crit * erro, media + t_crit * erro)
+
+    interpretacao = f"""📊 **Teste T Pareado**  
+🔹 Comparação entre: {col1} e {col2}  
+🔹 Número de pares: {n}  
+🔹 Média das diferenças: {media:.4f}  
+🔹 Desvio padrão das diferenças: {desvio:.4f}  
+🔹 Intervalo de confiança (95%): ({ic[0]:.4f}, {ic[1]:.4f})  
+🔹 Valor-p: {p_valor:.4f}  
+
+📌 **Conclusão**: {"❌ As médias são estatisticamente diferentes." if p_valor < 0.05 else "✅ Não há diferença estatística entre as médias."}"""
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.boxplot(diferencas, vert=False, patch_artist=True, boxprops=dict(facecolor='skyblue'))
+    ax.set_title("Boxplot das Diferenças")
+    ax.set_xlabel("Diferenças")
+    ax.axvline(0, color='gray', linestyle='--', linewidth=1)
+    ax.plot(media, 1, marker="x", color="red", markersize=10, label="Média")
+    ax.hlines(1, ic[0], ic[1], color="black", linewidth=2, label="IC 95%")
+    ax.legend()
+    plt.tight_layout()
+
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    plt.close(fig)
+    buffer.seek(0)
+    imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+    return interpretacao, imagem_base64
+
+def teste_variancias(df, colunas_usadas):
+    if len(colunas_usadas) != 2:
+        return "❌ Selecione exatamente duas colunas para comparar as variâncias.", None
+
+    col1, col2 = colunas_usadas
+    serie1 = pd.to_numeric(df[col1], errors="coerce").dropna()
+    serie2 = pd.to_numeric(df[col2], errors="coerce").dropna()
+
+    if len(serie1) < 3 or len(serie2) < 3:
+        return "❌ É necessário pelo menos 3 dados em cada grupo para realizar o teste de variâncias.", None
+
+    # 🧪 Teste de normalidade (Anderson-Darling)
+    p_norm1 = anderson(serie1).critical_values[2]
+    p_norm2 = anderson(serie2).critical_values[2]
+    normal1 = stats.normaltest(serie1).pvalue > 0.05
+    normal2 = stats.normaltest(serie2).pvalue > 0.05
+
+    aviso = ""
+    if not (normal1 and normal2):
+        aviso = "⚠️ A premissa de normalidade foi violada em pelo menos um dos grupos.\n\n"
+
+    # 🧪 Teste F
+    stat_f = np.var(serie1, ddof=1) / np.var(serie2, ddof=1)
+    df1, df2 = len(serie1)-1, len(serie2)-1
+    p_f = 2 * min(stats.f.cdf(stat_f, df1, df2), 1 - stats.f.cdf(stat_f, df1, df2))
+
+    interpretacao = f"""📊 **Teste de Igualdade de Variâncias (F-Teste)**  
+🔹 Grupos comparados: {col1} e {col2}  
+🔹 Estatística F: {stat_f:.4f}  
+🔹 Valor-p (bilateral): {p_f:.4f}  
+
+{"✅ As variâncias são significativamente diferentes." if p_f < 0.05 else "➖ Não há evidência de diferença entre as variâncias."}
+"""
+
+    # 🎨 Gráfico de boxplot com estilo Minitab
+    try:
+        aplicar_estilo_minitab()
+        df_plot = pd.DataFrame({
+            "Valor": pd.concat([serie1, serie2]),
+            "Grupo": [col1] * len(serie1) + [col2] * len(serie2)
+        })
+        plt.figure(figsize=(8, 5))
+        sns.boxplot(x="Valor", y="Grupo", data=df_plot, orient="h", palette="pastel", showmeans=True,
+                    meanprops={"marker": "o", "markerfacecolor": "black", "markeredgecolor": "black"})
+        plt.title("Comparação das Variâncias (Boxplot)")
+        imagem_base64 = salvar_grafico()
+    except Exception as e:
+        print("Erro ao gerar gráfico:", str(e))
+        imagem_base64 = None
+
+    return aviso + "```\n" + interpretacao + "\n```", imagem_base64
+
+def teste_anova(df, colunas_usadas):
+    if len(colunas_usadas) < 2:
+        return "❌ O Teste ANOVA exige no mínimo duas colunas com dados numéricos (grupos).", None
+
+    dados_grupos = [df[coluna].dropna() for coluna in colunas_usadas]
+    normalidade = []
+    for i, grupo in enumerate(dados_grupos):
+        stat, critico, _ = stats.anderson(grupo)
+        if stat < critico[2]:  # 5%
+            normalidade.append(f"✅ Grupo {colunas_usadas[i]}: distribuição normal (Anderson-Darling)")
+        else:
+            normalidade.append(f"⚠️ Grupo {colunas_usadas[i]}: não segue distribuição normal")
+
+    # Teste ANOVA
+    try:
+        f_stat, p_valor = stats.f_oneway(*dados_grupos)
+    except Exception as e:
+        return f"❌ Erro ao executar o teste ANOVA: {str(e)}", None
+
+    # Interpretação
+    interpretacao = f"""📊 **Teste ANOVA (Análise de Variância)**  
+🔹 Grupos comparados: {", ".join(colunas_usadas)}  
+🔹 Estatística F: {f_stat:.4f}  
+🔹 Valor-p: {p_valor:.4f}  
+
+📌 Este teste verifica se há diferença significativa entre as médias dos grupos.  
+- Se **valor-p < 0.05**, rejeitamos H₀ e concluímos que **pelo menos um grupo tem média diferente**.
+- Se **valor-p ≥ 0.05**, **não há evidências suficientes** para afirmar que as médias diferem.
+
+🔍 **Verificação de normalidade (Anderson-Darling, 5%)**:
+""" + "\n".join(normalidade)
+
+    # Gráfico
+    try:
+        aplicar_estilo_minitab()
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.boxplot(dados_grupos, vert=False, patch_artist=True,
+                   labels=colunas_usadas, boxprops=dict(facecolor="skyblue"))
+        medias = [grupo.mean() for grupo in dados_grupos]
+        for i, media in enumerate(medias, start=1):
+            ax.plot(media, i, marker="o", color="red")
+        ax.set_title("Boxplot por Grupo (ANOVA)")
+        plt.tight_layout()
+
+        buffer = BytesIO()
+        plt.savefig(buffer, format="png")
+        plt.close(fig)
+        buffer.seek(0)
+        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    except Exception as e:
+        print("Erro ao gerar o gráfico:", str(e))
+        imagem_base64 = None
+
+    return interpretacao, imagem_base64
+
 
 def analise_capabilidade_normal(df, colunas_usadas):
     from scipy.stats import norm, shapiro, anderson, kstest
@@ -591,61 +1305,8 @@ Y = {equacao}
 
     return texto.strip(), imagem
 
-def analise_descritiva(df, colunas_usadas):
-    coluna_y = colunas_usadas[0]  # ✅ pegando diretamente a coluna
-    if coluna_y not in df.columns:
-        return (
-            "❌ A coluna selecionada para análise descritiva não foi encontrada.",
-            None
-        )
 
-    serie = df[coluna_y].dropna()
 
-    if serie.empty:
-        return (
-            "❌ A coluna selecionada não contém dados numéricos válidos.",
-            None
-        )
-
-    media = serie.mean()
-    mediana = serie.median()
-    desvio = serie.std()
-    variancia = serie.var()
-    minimo = serie.min()
-    maximo = serie.max()
-    q1 = serie.quantile(0.25)
-    q3 = serie.quantile(0.75)
-    assimetria = serie.skew()
-    curtose = serie.kurtosis()
-    n = serie.count()
-
-    resumo = f"""📊 **Análise Descritiva da coluna '{coluna_y}'**  
-- Média: {media:.2f}  
-- Mediana: {mediana:.2f}  
-- Desvio Padrão: {desvio:.2f}  
-- Variância: {variancia:.2f}  
-- Mínimo: {minimo:.2f}  
-- 1º Quartil (Q1): {q1:.2f}  
-- 3º Quartil (Q3): {q3:.2f}  
-- Máximo: {maximo:.2f}  
-- Assimetria: {assimetria:.2f}  
-- Curtose: {curtose:.2f}  
-- N: {n}"""
-
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(8, 1.5))
-    sns.boxplot(x=serie, orient='h', ax=ax)
-    ax.set_title(f"Boxplot - {coluna_y}")
-    ax.set_xlabel(coluna_y)
-
-    buffer = BytesIO()
-    plt.tight_layout()
-    plt.savefig(buffer, format='png')
-    plt.close(fig)
-    buffer.seek(0)
-    imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-
-    return resumo, imagem_base64
 
 def teste_normalidade(df, colunas_usadas):
     if not colunas_usadas:
@@ -913,252 +1574,33 @@ def analise_regressao_logistica_ordinal(df, colunas_usadas):
     except Exception as e:
         return f"Erro ao ajustar modelo: {str(e)}", None
 
-def teste_2sample_t(df, colunas_usadas):
-    if len(colunas_usadas) != 2:
-        return "❌ É necessário selecionar exatamente duas colunas numéricas para o Teste 2 Sample T.", None
-
-    col1, col2 = colunas_usadas
-    serie1 = pd.to_numeric(df[col1], errors="coerce").dropna()
-    serie2 = pd.to_numeric(df[col2], errors="coerce").dropna()
-
-    if len(serie1) < 2 or len(serie2) < 2:
-        return "❌ As colunas selecionadas não possuem dados suficientes para o teste.", None
-
-    # Teste de normalidade para cada grupo (Anderson-Darling)
-    ad1 = anderson(serie1)
-    ad2 = anderson(serie2)
-    lim1 = ad1.critical_values[2]
-    lim2 = ad2.critical_values[2]
-    normal1 = ad1.statistic < lim1
-    normal2 = ad2.statistic < lim2
-
-    # Teste F para igualdade de variâncias
-    stat_f = np.var(serie1, ddof=1) / np.var(serie2, ddof=1)
-    df1, df2 = len(serie1)-1, len(serie2)-1
-    p_f = 2 * min(stats.f.cdf(stat_f, df1, df2), 1 - stats.f.cdf(stat_f, df1, df2))
-    equal_var = p_f > 0.05
-
-    # Teste t
-    t_stat, p_valor = stats.ttest_ind(serie1, serie2, equal_var=equal_var)
-
-    texto = f"""📊 **Teste T para 2 Amostras Independentes**
-
-🔹 Coluna 1: {col1}  
-🔹 Coluna 2: {col2}  
-
-🔹 Teste de normalidade (Anderson-Darling, 5%):  
-- {col1}: {"✅ Normal" if normal1 else "❌ Não normal"} (estatística = {ad1.statistic:.4f}, limite crítico = {lim1:.4f})  
-- {col2}: {"✅ Normal" if normal2 else "❌ Não normal"} (estatística = {ad2.statistic:.4f}, limite crítico = {lim2:.4f})  
-
-🔹 Teste F para igualdade de variâncias:  
-- Estatística F = {stat_f:.4f}, p = {p_f:.4f} → {"✅ Variâncias iguais" if equal_var else "❌ Variâncias diferentes"}
-
-🔹 Resultado do Teste T:  
-- Estatística t = {t_stat:.4f}, p = {p_valor:.4f}  
-- {"✅ Não há diferença significativa" if p_valor > 0.05 else "❌ Diferença estatisticamente significativa entre as médias"}"""
-
-    # Gráfico estilo Minitab
-    try:
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(6, 4))
-
-        dados_plot = pd.DataFrame({
-            'Valor': pd.concat([serie1, serie2]),
-            'Grupo': [col1] * len(serie1) + [col2] * len(serie2)
-        })
-
-        sns.boxplot(x="Grupo", y="Valor", data=dados_plot, ax=ax, width=0.6, palette="pastel")
-        medias = dados_plot.groupby("Grupo")["Valor"].mean()
-        ax.plot(range(len(medias)), medias, marker="o", linestyle="-", color="black", linewidth=2, label="Média")
-        ax.set_title(f"Boxplot de {col1} e {col2}")
-        ax.set_ylabel("Valores")
-        ax.legend()
-        plt.tight_layout()
-
-        buffer = BytesIO()
-        plt.savefig(buffer, format="png")
-        plt.close(fig)
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    except:
-        imagem_base64 = None
-
-    return texto, imagem_base64
-
-def analise_teste_paired_t(df, colunas_usadas):
-    if len(colunas_usadas) != 2:
-        return "❌ O teste pareado requer exatamente duas colunas.", None
-
-    col1, col2 = colunas_usadas
-    serie1 = pd.to_numeric(df[col1], errors="coerce")
-    serie2 = pd.to_numeric(df[col2], errors="coerce")
-
-    diferencas = (serie1 - serie2).dropna()
-    if len(diferencas) < 2:
-        return "❌ Dados insuficientes para o teste pareado.", None
-
-    stat, p_valor = stats.ttest_rel(serie1, serie2, nan_policy='omit')
-    media = diferencas.mean()
-    desvio = diferencas.std(ddof=1)
-    n = len(diferencas)
-
-    t_crit = stats.t.ppf(1 - 0.025, df=n - 1)
-    erro = desvio / np.sqrt(n)
-    ic = (media - t_crit * erro, media + t_crit * erro)
-
-    interpretacao = f"""📊 **Teste T Pareado**  
-🔹 Comparação entre: {col1} e {col2}  
-🔹 Número de pares: {n}  
-🔹 Média das diferenças: {media:.4f}  
-🔹 Desvio padrão das diferenças: {desvio:.4f}  
-🔹 Intervalo de confiança (95%): ({ic[0]:.4f}, {ic[1]:.4f})  
-🔹 Valor-p: {p_valor:.4f}  
-
-📌 **Conclusão**: {"❌ As médias são estatisticamente diferentes." if p_valor < 0.05 else "✅ Não há diferença estatística entre as médias."}"""
-
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.boxplot(diferencas, vert=False, patch_artist=True, boxprops=dict(facecolor='skyblue'))
-    ax.set_title("Boxplot das Diferenças")
-    ax.set_xlabel("Diferenças")
-    ax.axvline(0, color='gray', linestyle='--', linewidth=1)
-    ax.plot(media, 1, marker="x", color="red", markersize=10, label="Média")
-    ax.hlines(1, ic[0], ic[1], color="black", linewidth=2, label="IC 95%")
-    ax.legend()
-    plt.tight_layout()
-
-    buffer = BytesIO()
-    plt.savefig(buffer, format="png")
-    plt.close(fig)
-    buffer.seek(0)
-    imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-
-    return interpretacao, imagem_base64
-
-def teste_variancias(df, colunas_usadas):
-    if len(colunas_usadas) != 2:
-        return "❌ Selecione exatamente duas colunas para comparar as variâncias.", None
-
-    col1, col2 = colunas_usadas
-    serie1 = pd.to_numeric(df[col1], errors="coerce").dropna()
-    serie2 = pd.to_numeric(df[col2], errors="coerce").dropna()
-
-    if len(serie1) < 3 or len(serie2) < 3:
-        return "❌ É necessário pelo menos 3 dados em cada grupo para realizar o teste de variâncias.", None
-
-    # 🧪 Teste de normalidade (Anderson-Darling)
-    p_norm1 = anderson(serie1).critical_values[2]
-    p_norm2 = anderson(serie2).critical_values[2]
-    normal1 = stats.normaltest(serie1).pvalue > 0.05
-    normal2 = stats.normaltest(serie2).pvalue > 0.05
-
-    aviso = ""
-    if not (normal1 and normal2):
-        aviso = "⚠️ A premissa de normalidade foi violada em pelo menos um dos grupos.\n\n"
-
-    # 🧪 Teste F
-    stat_f = np.var(serie1, ddof=1) / np.var(serie2, ddof=1)
-    df1, df2 = len(serie1)-1, len(serie2)-1
-    p_f = 2 * min(stats.f.cdf(stat_f, df1, df2), 1 - stats.f.cdf(stat_f, df1, df2))
-
-    interpretacao = f"""📊 **Teste de Igualdade de Variâncias (F-Teste)**  
-🔹 Grupos comparados: {col1} e {col2}  
-🔹 Estatística F: {stat_f:.4f}  
-🔹 Valor-p (bilateral): {p_f:.4f}  
-
-{"✅ As variâncias são significativamente diferentes." if p_f < 0.05 else "➖ Não há evidência de diferença entre as variâncias."}
-"""
-
-    # 🎨 Gráfico de boxplot com estilo Minitab
-    try:
-        aplicar_estilo_minitab()
-        df_plot = pd.DataFrame({
-            "Valor": pd.concat([serie1, serie2]),
-            "Grupo": [col1] * len(serie1) + [col2] * len(serie2)
-        })
-        plt.figure(figsize=(8, 5))
-        sns.boxplot(x="Valor", y="Grupo", data=df_plot, orient="h", palette="pastel", showmeans=True,
-                    meanprops={"marker": "o", "markerfacecolor": "black", "markeredgecolor": "black"})
-        plt.title("Comparação das Variâncias (Boxplot)")
-        imagem_base64 = salvar_grafico()
-    except Exception as e:
-        print("Erro ao gerar gráfico:", str(e))
-        imagem_base64 = None
-
-    return aviso + "```\n" + interpretacao + "\n```", imagem_base64
-
-def teste_anova(df, colunas_usadas):
-    if len(colunas_usadas) < 2:
-        return "❌ O Teste ANOVA exige no mínimo duas colunas com dados numéricos (grupos).", None
-
-    dados_grupos = [df[coluna].dropna() for coluna in colunas_usadas]
-    normalidade = []
-    for i, grupo in enumerate(dados_grupos):
-        stat, critico, _ = stats.anderson(grupo)
-        if stat < critico[2]:  # 5%
-            normalidade.append(f"✅ Grupo {colunas_usadas[i]}: distribuição normal (Anderson-Darling)")
-        else:
-            normalidade.append(f"⚠️ Grupo {colunas_usadas[i]}: não segue distribuição normal")
-
-    # Teste ANOVA
-    try:
-        f_stat, p_valor = stats.f_oneway(*dados_grupos)
-    except Exception as e:
-        return f"❌ Erro ao executar o teste ANOVA: {str(e)}", None
-
-    # Interpretação
-    interpretacao = f"""📊 **Teste ANOVA (Análise de Variância)**  
-🔹 Grupos comparados: {", ".join(colunas_usadas)}  
-🔹 Estatística F: {f_stat:.4f}  
-🔹 Valor-p: {p_valor:.4f}  
-
-📌 Este teste verifica se há diferença significativa entre as médias dos grupos.  
-- Se **valor-p < 0.05**, rejeitamos H₀ e concluímos que **pelo menos um grupo tem média diferente**.
-- Se **valor-p ≥ 0.05**, **não há evidências suficientes** para afirmar que as médias diferem.
-
-🔍 **Verificação de normalidade (Anderson-Darling, 5%)**:
-""" + "\n".join(normalidade)
-
-    # Gráfico
-    try:
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.boxplot(dados_grupos, vert=False, patch_artist=True,
-                   labels=colunas_usadas, boxprops=dict(facecolor="skyblue"))
-        medias = [grupo.mean() for grupo in dados_grupos]
-        for i, media in enumerate(medias, start=1):
-            ax.plot(media, i, marker="o", color="red")
-        ax.set_title("Boxplot por Grupo (ANOVA)")
-        plt.tight_layout()
-
-        buffer = BytesIO()
-        plt.savefig(buffer, format="png")
-        plt.close(fig)
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    except Exception as e:
-        print("Erro ao gerar o gráfico:", str(e))
-        imagem_base64 = None
-
-    return interpretacao, imagem_base64
 
 
 
 # Dicionário de análises estatísticas
 ANALISES = {
-    "regressao_simples": analise_regressao_linear_simples,
-    "regressao_multipla": analise_regressao_linear_multipla,
-    "analise_descritiva": analise_descritiva,
-    "teste_normalidade": teste_normalidade,
-    "regressao_logistica_binaria": analise_regressao_logistica_binaria,
-    "regressao_logistica_nominal": analise_regressao_logistica_nominal,
-    "regressao_logistica_ordinal": analise_regressao_logistica_ordinal,
-    "teste_2sample_t": teste_2sample_t,
-    "teste_paired_t": analise_teste_paired_t,
-    "teste_variancias": teste_variancias,
-    "teste_anova": teste_anova,
-    "analise_chi_quadrado": analise_chi_quadrado,
-    "capabilidade_normal": analise_capabilidade_normal,
-    "capabilidade_nao_normal": analise_capabilidade_nao_normal,
-    "transformacao_johnson": aplicar_transformacao_johnson
+    "Gráfico Sumario": grafico_sumario,
+    "Análise de outliers": analise_de_outliers,
+    "Correlação de person": analise_correlacao_person,
+    "Matrix de dispersão": analise_matrix_correlacao,
+    "Análise de estabilidade": analise_estabilidade,
+    "Análise de distribuição estatística": analise_distribuicao_estatistica,
+    "Análise de limpeza dos dados": analise_limpeza_dados,
+    "1 Sample T": analise_1_sample_t,
+    "2 Sample T": analise_2_sample_t,
+
+
+    "Regressão linear simples": analise_regressao_linear_simples,
+    "Regressão linear múltipla": analise_regressao_linear_multipla,
+    "Teste de normalidade": teste_normalidade,
+    "Regressão logística binária": analise_regressao_logistica_binaria,
+    "Regressão logística nominal": analise_regressao_logistica_nominal,
+    "Regressão logística ordinal": analise_regressao_logistica_ordinal,
+    "Paired Test": analise_teste_paired_t,
+    "F/Levene Test": teste_variancias,
+    "One way ANOVA": teste_anova,
+    "Qui- quadrado": analise_chi_quadrado,
+    "Capabilidade para dados normais": analise_capabilidade_normal,
+    "Capabilidade para outras distribuições": analise_capabilidade_nao_normal,
+    "Capabilidade com dados transformados": aplicar_transformacao_johnson
 }
