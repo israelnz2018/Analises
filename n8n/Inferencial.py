@@ -1181,6 +1181,84 @@ def analise_1_proporcao(df: pd.DataFrame, colunas_usadas: list, field=None):
     ax.bar(0, p_hat, color='skyblue', width=0.4, label='Proporção amostra')
     ax.errorbar(0, p_hat, yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
     ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0
+def analise_2_proporcoes(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 2:
+        return "❌ O teste 2 Proporções requer exatamente 2 colunas Y.", None
+
+    col1, col2 = colunas_usadas
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
+
+    if len(dados1) < 5 or len(dados2) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
+
+    # Nível de confiança
+    try:
+        nivel_conf = float(field)
+        if not (50 <= nivel_conf < 100):
+            return "❌ O nível de confiança deve ser entre 50 e 99.9.", None
+    except:
+        return "❌ Valor do nível de confiança inválido. Informe um número como 95 no campo Field.", None
+
+    alpha = 1 - (nivel_conf / 100)
+
+    # Estatísticas
+    n1 = len(dados1)
+    n2 = len(dados2)
+    sucesso1 = np.sum(dados1)
+    sucesso2 = np.sum(dados2)
+    p1 = sucesso1 / n1
+    p2 = sucesso2 / n2
+
+    # Teste de hipótese
+    p_pool = (sucesso1 + sucesso2) / (n1 + n2)
+    se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+    z_stat = (p1 - p2) / se
+    p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+
+    # IC da diferença
+    se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+    z = stats.norm.ppf(1 - alpha / 2)
+    diff = p1 - p2
+    ic_lower = diff - z * se_diff
+    ic_upper = diff + z * se_diff
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
+    ax.errorbar([0, 1], [p1, p2],
+                yerr=[[p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)),
+                       p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2))],
+                      [min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1,
+                       min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2]],
+                fmt='o', color='black', capsize=5)
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels([col1, col2])
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("Proporção")
+    ax.set_title(f"2 Proporções - IC {nivel_conf:.1f}% e Teste H0: p1 = p2")
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**2 Proporções**
+- Proporção {col1}: {p1:.4f}
+- Proporção {col2}: {p2:.4f}
+- Diferença: {diff:.4f}
+- Nível de confiança: {nivel_conf:.1f}%
+- Intervalo da diferença: [{ic_lower:.4f}, {ic_upper:.4f}]
+- Estatística Z: {z_stat:.4f}
+- p-valor: {p_valor:.4f}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as proporções são diferentes." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as proporções."}
+"""
+
+    return texto.strip(), grafico_base64
 
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
@@ -1198,7 +1276,9 @@ ANALISES = {
     "Bartlett": analise_bartlett,
     "Brown-Forsythe": analise_brown_forsythe,
     "1 Intervalo de Confianca Variancia": analise_1_intervalo_confianca_variancia,
-    "1 Proporcao": analise_1_proporcao
+    "1 Proporcao": analise_1_proporcao,
+    "2 Proporcoes": analise_2_proporcoes
+
 
 
 
