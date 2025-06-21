@@ -1,5 +1,141 @@
 from suporte import *
 
+def analise_tipo_modelo_regressao(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 2:
+        return "❌ O Tipo de modelo de regressão requer 1 Y e 1 X.", None
+
+    y_col, x_col = colunas_usadas
+    df_valid = df[[x_col, y_col]].dropna()
+    if len(df_valid) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    X_raw = df_valid[x_col].values
+    Y = df_valid[y_col].values
+
+    resultados = {}
+
+    # Define os modelos
+    modelos = {
+        "Linear": np.polyfit(X_raw, Y, 1),
+        "Quadrático": np.polyfit(X_raw, Y, 2),
+        "Cúbico": np.polyfit(X_raw, Y, 3)
+    }
+
+    # Logarítmico
+    X_log = np.log(X_raw[X_raw > 0])
+    Y_log = Y[X_raw > 0]
+    if len(X_log) >= 5:
+        modelos["Logarítmico"] = np.polyfit(X_log, Y_log, 1)
+
+    # Exponencial (lineariza com log Y)
+    Y_exp = Y[Y > 0]
+    X_exp = X_raw[Y > 0]
+    if len(Y_exp) >= 5:
+        modelos["Exponencial"] = np.polyfit(X_exp, np.log(Y_exp), 1)
+
+    # Calcula métricas
+    for nome, coef in modelos.items():
+        if nome == "Logarítmico":
+            y_pred = np.polyval(coef, np.log(X_raw))
+        elif nome == "Exponencial":
+            y_pred = np.exp(np.polyval(coef, X_raw))
+        else:
+            y_pred = np.polyval(coef, X_raw)
+
+        ss_res = np.sum((Y - y_pred) ** 2)
+        ss_tot = np.sum((Y - np.mean(Y)) ** 2)
+        r2 = 1 - ss_res / ss_tot
+        adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - len(coef) - 1)
+
+        # R2 preditivo leave-one-out
+        erros = []
+        for i in range(len(Y)):
+            X_train = np.delete(X_raw, i)
+            Y_train = np.delete(Y, i)
+            if nome == "Logarítmico":
+                X_train_t = np.log(X_train[X_train > 0])
+                Y_train_t = Y_train[X_train > 0]
+                if len(X_train_t) < 2:
+                    continue
+                coef_lo = np.polyfit(X_train_t, Y_train_t, 1)
+                y_pred_lo = np.polyval(coef_lo, np.log(X_raw[i]))
+            elif nome == "Exponencial":
+                Y_train_t = Y_train[Y_train > 0]
+                X_train_t = X_train[Y_train > 0]
+                if len(Y_train_t) < 2:
+                    continue
+                coef_lo = np.polyfit(X_train_t, np.log(Y_train_t), 1)
+                y_pred_lo = np.exp(np.polyval(coef_lo, X_raw[i]))
+            else:
+                coef_lo = np.polyfit(X_train, Y_train, len(coef) - 1)
+                y_pred_lo = np.polyval(coef_lo, X_raw[i])
+            erros.append((Y[i] - y_pred_lo) ** 2)
+
+        if len(erros) > 0:
+            ss_pred = np.sum(erros)
+            r2_pred = 1 - ss_pred / ss_tot
+        else:
+            r2_pred = float('nan')
+
+        resultados[nome] = {
+            "coef": coef,
+            "r2": r2,
+            "r2_adj": adj,
+            "r2_pred": r2_pred
+        }
+
+    # Escolher o modelo
+    melhor = max(resultados.items(), key=lambda x: x[1]["r2_pred"] if not np.isnan(x[1]["r2_pred"]) else -np.inf)
+    nome_vencedor, res_vencedor = melhor
+
+    # Verificar simplicidade
+    simples = ["Linear", "Quadrático", "Cúbico", "Logarítmico", "Exponencial"]
+    mais_simples = [m for m in simples if m in resultados][:simples.index(nome_vencedor)+1]
+    modelo_recomendado = nome_vencedor
+    for m in mais_simples:
+        if (resultados[nome_vencedor]["r2_pred"] - resultados[m]["r2_pred"]) < 0.01:
+            modelo_recomendado = m
+            break
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6,4))
+    ax.scatter(X_raw, Y, color='black', label='Dados')
+    if modelo_recomendado == "Logarítmico":
+        X_plot = X_raw[X_raw > 0]
+        y_fit = np.polyval(resultados["Logarítmico"]["coef"], np.log(X_plot))
+    elif modelo_recomendado == "Exponencial":
+        y_fit = np.exp(np.polyval(resultados["Exponencial"]["coef"], X_raw))
+    else:
+        y_fit = np.polyval(resultados[modelo_recomendado]["coef"], X_raw)
+
+    ax.plot(X_raw, y_fit, color='blue', label=f'Modelo: {modelo_recomendado}')
+    ax.set_title("Tipo de Modelo de Regressão")
+    ax.set_xlabel(x_col)
+    ax.set_ylabel(y_col)
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto
+    linhas = []
+    for nome, r in resultados.items():
+        coef_txt = " + ".join([f"{c:.4f}*X^{i}" for i, c in enumerate(r["coef"][::-1])])
+        linhas.append(f"- {nome}: R²={r['r2']:.4f}, R² ajustado={r['r2_adj']:.4f}, R² preditivo={r['r2_pred']:.4f}\n  Equação: {coef_txt}")
+
+    texto = f"""
+**Tipo de Modelo de Regressão**
+{chr(10).join(linhas)}
+
+**Conclusão**
+Modelo recomendado: {modelo_recomendado}
+"""
+
+    return texto.strip(), grafico_base64
+
 def analise_regressao_linear_simples(df, colunas):
     colunas = [interpretar_coluna(df, c) for c in colunas]
     X = df[colunas[0]].astype(str).str.strip().str.replace(",", ".").str.replace(r"[^\d\.\-]", "", regex=True)
@@ -305,6 +441,8 @@ P-valor: {p:.4f}
 
 
 ANALISES = {
+    "Tipo de modelo de regressão": analise_tipo_modelo_regressao,
+
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Regressão logística binária": analise_regressao_logistica_binaria,
