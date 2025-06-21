@@ -7,7 +7,6 @@ import os
 import io
 from io import BytesIO
 from suporte import aplicar_estilo_minitab
-from suporte import interpretar_coluna
 
 
 def salvar_grafico():
