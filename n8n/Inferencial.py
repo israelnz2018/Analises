@@ -472,6 +472,115 @@ def analise_2_mann_whitney(df: pd.DataFrame, colunas_usadas: list, field=None):
 
     return texto.strip(), grafico_base64
 
+def analise_kruskal_wallis(df: pd.DataFrame, colunas_usadas: list, field=None):
+    ys = [c for c in colunas_usadas if c != ""]
+    x = None
+    if "Subgrupo" in colunas_usadas:
+        x = colunas_usadas[-1]
+
+    if len(ys) == 0:
+        return "❌ O Kruskal-Wallis requer pelo menos 1 coluna Y.", None
+
+    if x and x in df.columns:
+        # Kruskal-Wallis com Y consolidado + subgrupo
+        y_col = ys[0]
+        df_valid = df[[y_col, x]].dropna()
+        grupos = [grupo[1].values for grupo in df_valid.groupby(x)[y_col]]
+
+        if len(grupos) < 2:
+            return "❌ O Kruskal-Wallis requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
+
+    else:
+        # Kruskal-Wallis com colunas Ys como grupos
+        grupos = []
+        for y_col in ys:
+            grupo = df[y_col].dropna().values
+            if len(grupo) > 0:
+                grupos.append(grupo)
+
+        if len(grupos) < 2:
+            return "❌ O Kruskal-Wallis requer pelo menos 2 colunas Y com dados.", None
+
+    # Kruskal-Wallis
+    h_stat, p_valor = stats.kruskal(*grupos)
+
+    # Normalidade dos dados: concatena e testa
+    recomendacao = ""
+    normal_flag = False
+    if x and x in df.columns:
+        for nome, g in df_valid.groupby(x)[y_col]:
+            dados = g.dropna()
+            if len(dados) >= 5:
+                ad = stats.anderson(dados)
+                sw_stat, sw_p = stats.shapiro(dados)
+                dp_stat, dp_p = stats.normaltest(dados)
+                ad_crit = ad.critical_values
+                ad_sig = list(ad.significance_level)
+                if 5 in ad_sig:
+                    idx = ad_sig.index(5)
+                    ad_normal = ad.statistic < ad_crit[idx]
+                else:
+                    ad_normal = False
+                sw_normal = sw_p > 0.05
+                dp_normal = dp_p > 0.05
+                if ad_normal or sw_normal or dp_normal:
+                    normal_flag = True
+    else:
+        for i, g in enumerate(grupos):
+            if len(g) >= 5:
+                ad = stats.anderson(g)
+                sw_stat, sw_p = stats.shapiro(g)
+                dp_stat, dp_p = stats.normaltest(g)
+                ad_crit = ad.critical_values
+                ad_sig = list(ad.significance_level)
+                if 5 in ad_sig:
+                    idx = ad_sig.index(5)
+                    ad_normal = ad.statistic < ad_crit[idx]
+                else:
+                    ad_normal = False
+                sw_normal = sw_p > 0.05
+                dp_normal = dp_p > 0.05
+                if ad_normal or sw_normal or dp_normal:
+                    normal_flag = True
+
+    if normal_flag:
+        recomendacao = "⚠ Pelo menos um grupo apresentou indícios de normalidade. Considere realizar o teste One Way ANOVA."
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6, 4))
+    if x and x in df.columns:
+        df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
+        medias = df_valid.groupby(x)[y_col].mean()
+        ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+    else:
+        ax.boxplot(grupos, labels=ys)
+        medias = [np.mean(g) for g in grupos]
+        ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
+
+    ax.set_title("Kruskal-Wallis - Boxplot por Grupo")
+    ax.set_xlabel("Grupo")
+    ax.set_ylabel("Valor")
+    plt.suptitle("")
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**Kruskal-Wallis**
+- Estatística H: {h_stat:.4f}
+- p-valor: {p_valor:.4f}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: pelo menos um grupo tem distribuição diferente." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as distribuições dos grupos."}
+"""
+
+    return texto.strip(), grafico_base64
 
 
 ANALISES = {
@@ -480,7 +589,9 @@ ANALISES = {
     "2 Paired Test": analise_paired_t,
     "One way ANOVA": analise_one_way_anova,
     "1 Wilcoxon": analise_1_wilcoxon,
-    "2 Mann-Whitney": analise_2_mann_whitney
+    "2 Mann-Whitney": analise_2_mann_whitney,
+    "Kruskal-Wallis": analise_kruskal_wallis
+
 
     
 
