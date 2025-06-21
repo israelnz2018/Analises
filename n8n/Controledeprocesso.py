@@ -1,4 +1,4 @@
-
+from suporte import *
 
 def analise_carta_imr(df: pd.DataFrame, colunas_usadas: list, field=None):
     if len(colunas_usadas) != 1:
