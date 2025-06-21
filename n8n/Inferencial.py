@@ -219,28 +219,41 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
 
     return texto.strip(), grafico_base64
 
-
 def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
-    if len(colunas_usadas) != 2:
-        return "❌ O One way ANOVA requer uma coluna Y e uma coluna X (categorias).", None
+    ys = [c for c in colunas_usadas if c != ""]
+    x = None
+    if "X" in colunas_usadas:
+        x = colunas_usadas[-1]
 
-    col_y, col_x = colunas_usadas
-    df_valid = df[[col_y, col_x]].dropna()
-    y = df_valid[col_y]
-    x = df_valid[col_x]
+    if len(ys) == 0:
+        return "❌ O One way ANOVA requer pelo menos 1 coluna Y.", None
 
-    grupos = [grupo[1].values for grupo in df_valid.groupby(col_x)[col_y]]
+    if x and x in df.columns:
+        # ANOVA com Y consolidado e X como grupo
+        y_col = ys[0]
+        df_valid = df[[y_col, x]].dropna()
+        y = df_valid[y_col]
+        grupos = [grupo[1].values for grupo in df_valid.groupby(x)[y_col]]
 
-    if len(grupos) < 2:
-        return "❌ O One way ANOVA requer pelo menos 2 grupos distintos na coluna X.", None
+        if len(grupos) < 2:
+            return "❌ O One way ANOVA requer pelo menos 2 grupos distintos na coluna X.", None
+
+    else:
+        # ANOVA com colunas Ys como grupos
+        grupos = []
+        for y_col in ys:
+            grupo = df[y_col].dropna().values
+            if len(grupo) > 0:
+                grupos.append(grupo)
+
+        if len(grupos) < 2:
+            return "❌ O One way ANOVA requer pelo menos 2 colunas Y com dados.", None
 
     f_stat, p_valor = stats.f_oneway(*grupos)
 
-    # Estatísticas descritivas por grupo
-    stats_por_grupo = df_valid.groupby(col_x)[col_y].agg(['mean', 'std', 'count']).reset_index()
-
-    # Teste de normalidade dos resíduos
-    residuos = y - y.groupby(x).transform('mean')
+    # Normalidade dos resíduos
+    concatenado = np.concatenate(grupos)
+    residuos = concatenado - np.mean(concatenado)
     normalidade = stats.anderson(residuos)
     ad_stat = normalidade.statistic
     ad_crit = normalidade.critical_values
@@ -258,14 +271,20 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
     else:
         conclusao += f" ⚠ Não rejeitamos H0 (p = {p_valor:.4f}). Não há diferenças significativas entre as médias dos grupos."
 
-    # Gráfico: boxplot múltiplo com médias conectadas
+    # Gráfico
     fig, ax = plt.subplots(figsize=(6, 4))
-    df_valid.boxplot(column=col_y, by=col_x, ax=ax, grid=False)
-    medias = df_valid.groupby(col_x)[col_y].mean()
-    ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+    if x and x in df.columns:
+        df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
+        medias = df_valid.groupby(x)[y_col].mean()
+        ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+    else:
+        ax.boxplot(grupos, labels=ys)
+        medias = [np.mean(g) for g in grupos]
+        ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
+
     ax.set_title("One Way ANOVA - Boxplot por Grupo")
-    ax.set_xlabel(col_x)
-    ax.set_ylabel(col_y)
+    ax.set_xlabel("Grupo")
+    ax.set_ylabel("Valor")
     plt.suptitle("")
     ax.legend()
     plt.tight_layout()
@@ -275,32 +294,18 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Montar texto
-    descricoes = "\n".join([
-        f"- {row[col_x]}: média={row['mean']:.4f}, desvio={row['std']:.4f}, n={int(row['count'])}"
-        for _, row in stats_por_grupo.iterrows()
-    ])
-
+    # Texto
     texto = f"""
 **One Way ANOVA**
 - Estatística F: {f_stat:.4f}
 - p-valor: {p_valor:.4f}
 - Anderson-Darling (resíduos): estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_aprovado else 'Reprovada'}
-{descricoes}
 
 **Conclusão**
 {conclusao}
 """
 
     return texto.strip(), grafico_base64
-
-
-
-
-
-
-
-
 
 
 ANALISES = {
