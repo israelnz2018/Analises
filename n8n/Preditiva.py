@@ -238,20 +238,30 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
         return "❌ A regressão linear múltipla requer 1 Y e pelo menos 1 X.", None
 
     y_col = colunas_usadas[0]
-    x_cols = colunas_usadas[1:]
+    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
+    xs_discreto = []
+    if "Xs_discreto" in colunas_usadas:
+        idx = colunas_usadas.index("Xs_discreto")
+        xs_discreto = colunas_usadas[idx+1:]
 
-    df_valid = df[[y_col] + x_cols].dropna()
-    if len(df_valid) < len(x_cols) + 3:
+    # Validação
+    cols_todas = [y_col] + xs_continuo + xs_discreto
+    df_valid = df[cols_todas].dropna()
+    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[y_col].values
-    X_full = df_valid[x_cols].values
-    n, p_full = X_full.shape
+    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
+    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
+    X_final = pd.concat([X_cont, X_disc], axis=1)
+    x_cols_final = X_final.columns.tolist()
+    n, p_full = X_final.shape
 
     from sklearn.linear_model import LinearRegression
     from sklearn.metrics import r2_score
     from statsmodels.stats.outliers_influence import variance_inflation_factor
     import statsmodels.api as sm
+    from itertools import combinations
 
     def calcular_modelo(X_sub, cols_sub):
         model = LinearRegression().fit(X_sub, Y)
@@ -259,7 +269,7 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
         r2 = r2_score(Y, Y_pred)
         r2_adj = 1 - (1 - r2) * (n - 1) / (n - X_sub.shape[1] - 1)
 
-        # R2 preditivo leave-one-out
+        # R² preditivo leave-one-out
         erros = []
         for i in range(n):
             Xi = np.delete(X_sub, i, axis=0)
@@ -274,15 +284,15 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
         # VIF
         vif = []
         if X_sub.shape[1] > 1:
-            X_sub_sm = sm.add_constant(X_sub)
-            for i in range(1, X_sub_sm.shape[1]):  # ignora const
-                vif.append(variance_inflation_factor(X_sub_sm, i))
+            X_sm = sm.add_constant(X_sub)
+            for i in range(1, X_sm.shape[1]):  # ignora const
+                vif.append(variance_inflation_factor(X_sm, i))
         else:
             vif.append(1.0)
 
         # Mallows Cp
         resid = Y - Y_pred
-        mse_full = np.sum((Y - LinearRegression().fit(X_full, Y).predict(X_full)) ** 2) / (n - p_full - 1)
+        mse_full = np.sum((Y - LinearRegression().fit(X_final, Y).predict(X_final)) ** 2) / (n - p_full - 1)
         cp = (np.sum(resid ** 2) / mse_full) - (n - 2 * (X_sub.shape[1] + 1))
 
         # Durbin-Watson
@@ -300,20 +310,18 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
             "Y_pred": Y_pred
         }
 
-    # Testar todos os subconjuntos (limitado a até 5 variáveis para não sobrecarregar)
-    from itertools import combinations
+    # Subset selection (limite de 5 para praticidade)
     resultados = []
-    limite = min(len(x_cols), 5)
-    for k in range(1, limite + 1):
-        for subset in combinations(range(len(x_cols)), k):
-            cols_sub = [x_cols[i] for i in subset]
-            X_sub = df_valid[cols_sub].values
+    if len(x_cols_final) > 5:
+        x_cols_final = x_cols_final[:5]  # limita para evitar sobrecarga
+
+    for k in range(1, len(x_cols_final) + 1):
+        for subset in combinations(range(len(x_cols_final)), k):
+            cols_sub = [x_cols_final[i] for i in subset]
+            X_sub = X_final[cols_sub].values
             resultados.append(calcular_modelo(X_sub, cols_sub))
 
-    # Escolher melhor modelo pelo R2 preditivo
     melhor = max(resultados, key=lambda r: r["r2_pred"])
-
-    # Verificar simplicidade
     simples = sorted(resultados, key=lambda r: len(r["cols"]))
     modelo_recomendado = melhor
     for m in simples:
@@ -321,10 +329,9 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
             modelo_recomendado = m
             break
 
-    # Gráfico: resíduos vs preditos
-    residuos = Y - modelo_recomendado["Y_pred"]
+    # Gráfico resíduos vs preditos
     fig, ax = plt.subplots(figsize=(6,4))
-    ax.scatter(modelo_recomendado["Y_pred"], residuos, color='black')
+    ax.scatter(modelo_recomendado["Y_pred"], Y - modelo_recomendado["Y_pred"], color='black')
     ax.axhline(0, color='red', linestyle='--')
     ax.set_xlabel("Valores preditos")
     ax.set_ylabel("Resíduos")
@@ -350,7 +357,6 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
         conclusao.append("✅ R² preditivo adequado.")
     else:
         conclusao.append("⚠ R² preditivo baixo.")
-
     if all(v < 10 for v in modelo_recomendado['vif']):
         conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
     else:
@@ -365,6 +371,7 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
 """
 
     return texto.strip(), grafico_base64
+
 
 def analise_regressao_logistica_binaria(df, colunas_usadas):
     if len(colunas_usadas) < 2:
