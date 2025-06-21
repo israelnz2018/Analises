@@ -11,7 +11,10 @@ from Inferencial import ANALISES as ANALISES_INF
 from Preditiva import ANALISES as ANALISES_PRED
 from graficos import GRAFICOS
 
+# Inicializa app
 app = FastAPI()
+
+# Configura CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://educacaopelotrabalho-production.up.railway.app"],
@@ -19,7 +22,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+print("✅ CORS configurado com domínio: https://educacaopelotrabalho-production.up.railway.app")
 
 print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
 
@@ -29,6 +32,7 @@ ANALISES.update(ANALISES_CAP)
 ANALISES.update(ANALISES_EXP)
 ANALISES.update(ANALISES_INF)
 ANALISES.update(ANALISES_PRED)
+print("✅ ANALISES carregados com sucesso")
 
 ANALISES_COM_FIELD = {"1 Sample T", "1 Wilcoxon", "1 Teste de Sinal", "1 Proporcao", "Intervalo de Confianca"}
 
