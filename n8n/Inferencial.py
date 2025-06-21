@@ -220,24 +220,19 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
     return texto.strip(), grafico_base64
 
 def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
-    ys = [c for c in colunas_usadas if c != ""]
-    x = None
-    if "X" in colunas_usadas:
-        x = colunas_usadas[-1]
+    ys = [c for c in colunas_usadas if c not in ["", "Subgrupo"]]
+    x = "Subgrupo" if "Subgrupo" in colunas_usadas else None
 
     if len(ys) == 0:
         return "❌ O One way ANOVA requer pelo menos 1 coluna Y.", None
 
     if x and x in df.columns:
-        # ANOVA com Y consolidado e X como grupo
+        # ANOVA com Y consolidado e Subgrupo como fator
         y_col = ys[0]
         df_valid = df[[y_col, x]].dropna()
-        y = df_valid[y_col]
+        if df_valid[x].nunique() < 2:
+            return "❌ O One way ANOVA requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
         grupos = [grupo[1].values for grupo in df_valid.groupby(x)[y_col]]
-
-        if len(grupos) < 2:
-            return "❌ O One way ANOVA requer pelo menos 2 grupos distintos na coluna X.", None
-
     else:
         # ANOVA com colunas Ys como grupos
         grupos = []
@@ -245,10 +240,10 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
             grupo = df[y_col].dropna().values
             if len(grupo) > 0:
                 grupos.append(grupo)
-
         if len(grupos) < 2:
             return "❌ O One way ANOVA requer pelo menos 2 colunas Y com dados.", None
 
+    # Teste ANOVA
     f_stat, p_valor = stats.f_oneway(*grupos)
 
     # Normalidade dos resíduos
@@ -264,7 +259,6 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
     else:
         ad_aprovado = False
 
-    # Conclusão
     conclusao = "✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ Resíduos podem não ser normais (Anderson-Darling)."
     if p_valor < 0.05:
         conclusao += f" ✅ Rejeitamos H0 (p = {p_valor:.4f}). Existem diferenças significativas entre as médias dos grupos."
@@ -294,7 +288,6 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto
     texto = f"""
 **One Way ANOVA**
 - Estatística F: {f_stat:.4f}
@@ -306,6 +299,7 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list, field=None):
