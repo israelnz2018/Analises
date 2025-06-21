@@ -143,55 +143,86 @@ def analise_2_sample_t(df, colunas_usadas, **kwargs):
 
 from suporte import *
 
-def analise_teste_paired_t(df, colunas_usadas):
+def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
     if len(colunas_usadas) != 2:
-        return "❌ O teste pareado requer exatamente duas colunas.", None
+        return {
+            "analise": "❌ O teste t pareado requer exatamente 2 colunas Y.",
+            "grafico_base64": None,
+            "colunas_utilizadas": colunas_usadas
+        }
 
     col1, col2 = colunas_usadas
-    serie1 = pd.to_numeric(df[col1], errors="coerce")
-    serie2 = pd.to_numeric(df[col2], errors="coerce")
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
 
-    diferencas = (serie1 - serie2).dropna()
-    if len(diferencas) < 2:
-        return "❌ Dados insuficientes para o teste pareado.", None
+    # Garantir tamanhos iguais para o pareamento
+    min_len = min(len(dados1), len(dados2))
+    dados1 = dados1.iloc[:min_len]
+    dados2 = dados2.iloc[:min_len]
 
-    stat, p_valor = stats.ttest_rel(serie1, serie2, nan_policy='omit')
-    media = diferencas.mean()
-    desvio = diferencas.std(ddof=1)
+    diferencas = dados1 - dados2
+
+    # Teste de normalidade (Anderson-Darling)
+    normalidade = stats.anderson(diferencas)
+    ad_stat = normalidade.statistic
+    ad_crit = normalidade.critical_values
+    ad_sig = normalidade.significance_level
+    ad_aprovado = ad_stat < ad_crit[list(ad_sig).index(5)] if 5 in ad_sig else False
+
+    # Teste t pareado
+    t_stat, p_valor = stats.ttest_rel(dados1, dados2, nan_policy='omit')
+    media_diff = np.mean(diferencas)
+    desvio_diff = np.std(diferencas, ddof=1)
     n = len(diferencas)
+    se_diff = desvio_diff / np.sqrt(n)
+    intervalo = stats.t.interval(0.95, n-1, loc=media_diff, scale=se_diff)
 
-    t_crit = stats.t.ppf(1 - 0.025, df=n - 1)
-    erro = desvio / np.sqrt(n)
-    ic = (media - t_crit * erro, media + t_crit * erro)
+    # Conclusão
+    conclusao = "✅ As diferenças seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ As diferenças podem não ser normais (Anderson-Darling)."
+    if p_valor < 0.05:
+        conclusao += f" ✅ Rejeitamos H0 (p = {p_valor:.4f}). Existe diferença significativa entre as médias."
+    else:
+        conclusao += f" ⚠ Não rejeitamos H0 (p = {p_valor:.4f}). Não há diferença significativa entre as médias."
 
-    interpretacao = f"""📊 **Teste T Pareado**  
-🔹 Comparação entre: {col1} e {col2}  
-🔹 Número de pares: {n}  
-🔹 Média das diferenças: {media:.4f}  
-🔹 Desvio padrão das diferenças: {desvio:.4f}  
-🔹 Intervalo de confiança (95%): ({ic[0]:.4f}, {ic[1]:.4f})  
-🔹 Valor-p: {p_valor:.4f}  
-
-📌 **Conclusão**: {"❌ As médias são estatisticamente diferentes." if p_valor < 0.05 else "✅ Não há diferença estatística entre as médias."}"""
-
-    aplicar_estilo_minitab()
+    # Gráfico
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.boxplot(diferencas, vert=False, patch_artist=True, boxprops=dict(facecolor='skyblue'))
-    ax.set_title("Boxplot das Diferenças")
-    ax.set_xlabel("Diferenças")
-    ax.axvline(0, color='gray', linestyle='--', linewidth=1)
-    ax.plot(media, 1, marker="x", color="red", markersize=10, label="Média")
-    ax.hlines(1, ic[0], ic[1], color="black", linewidth=2, label="IC 95%")
-    ax.legend()
+    ax.hist(diferencas, bins=8, color='skyblue', edgecolor='black')
+    ax.set_title("Histogram of Differences\n(with Ho and 95% t-confidence interval for the mean)")
+    ax.set_xlabel("Differences")
+    ax.set_ylabel("Frequency")
+
+    # Adiciona H0 (linha no 0)
+    ax.axvline(0, color='red', linestyle='--', label='H0')
+
+    # Adiciona intervalo de confiança
+    ax.hlines(-0.5, intervalo[0], intervalo[1], color='blue', lw=4)
+    ax.text(media_diff, -1, "X̄", color='blue', ha='center')
+
+    plt.legend()
     plt.tight_layout()
 
-    buffer = BytesIO()
-    plt.savefig(buffer, format="png")
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
     plt.close(fig)
-    buffer.seek(0)
-    imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto da análise
+    texto = f"""
+**Teste t Pareado**
+- Média das diferenças: {media_diff:.4f}
+- Desvio padrão das diferenças: {desvio_diff:.4f}
+- N: {n}
+- Intervalo 95%: [{intervalo[0]:.4f}, {intervalo[1]:.4f}]
+- Estatística t: {t_stat:.4f}
+- p-valor: {p_valor:.4f}
+- Anderson-Darling: estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_aprovado else 'Reprovada'}
+
+**Conclusão**
+{conclusao}
+"""
 
     return interpretacao, imagem_base64
+
 
 
 from suporte import *
