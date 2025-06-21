@@ -598,56 +598,102 @@ def analise_regressao_logistica_ordinal(df: pd.DataFrame, colunas_usadas: list, 
     return texto.strip(), grafico_base64
 
 
-
-def analise_regressao_logistica_ordinal(df, colunas_usadas):
+def analise_regressao_logistica_nominal(df: pd.DataFrame, colunas_usadas: list, field=None):
     if len(colunas_usadas) < 2:
-        return "❌ É necessário selecionar uma coluna Y (ordinal) e pelo menos uma coluna X.", None
+        return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
 
-    nome_coluna_y = colunas_usadas[0]
-    nomes_colunas_x = colunas_usadas[1:]
+    y_col = colunas_usadas[0]
+    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
+    xs_discreto = []
+    if "Xs_discreto" in colunas_usadas:
+        idx = colunas_usadas.index("Xs_discreto")
+        xs_discreto = colunas_usadas[idx+1:]
 
-    y_raw = df[nome_coluna_y].dropna()
-    if not pd.api.types.is_categorical_dtype(y_raw) or not y_raw.cat.ordered:
-        categorias_ordenadas = sorted(y_raw.dropna().unique())
-        y = pd.Categorical(y_raw, categories=categorias_ordenadas, ordered=True)
+    cols_todas = [y_col] + xs_continuo + xs_discreto
+    df_valid = df[cols_todas].dropna()
+    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 3:
+        return "❌ O modelo requer mais dados válidos.", None
+
+    Y = df_valid[y_col]
+    if len(Y.unique()) < 3:
+        return "❌ Y deve ter pelo menos 3 categorias para regressão logística nominal.", None
+
+    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
+    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
+    X_final = pd.concat([X_cont, X_disc], axis=1)
+    x_cols_final = X_final.columns.tolist()
+
+    import statsmodels.api as sm
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+
+    model = sm.MNLogit(Y, sm.add_constant(X_final))
+    res = model.fit(disp=0)
+
+    # R² de McFadden
+    ll_null = sm.MNLogit(Y, np.ones((len(Y),1))).fit(disp=0).llf
+    ll_model = res.llf
+    r2_mcf = 1 - ll_model / ll_null
+
+    # VIF
+    vif = []
+    if X_final.shape[1] > 1:
+        X_sm = sm.add_constant(X_final)
+        for i in range(1, X_sm.shape[1]):
+            vif.append(variance_inflation_factor(X_sm.values, i))
     else:
-        y = y_raw
+        vif.append(1.0)
 
-    X_raw = df[nomes_colunas_x].apply(pd.to_numeric, errors="coerce")
-    df_modelo = pd.concat([pd.Series(y, name=nome_coluna_y), X_raw], axis=1).dropna()
-    y = df_modelo[nome_coluna_y]
-    X = df_modelo[nomes_colunas_x]
+    # Predição e acurácia
+    Y_pred = res.predict().idxmax(axis=1)
+    cm = confusion_matrix(Y, Y_pred, labels=Y.unique())
+    acerto = (cm.diagonal().sum()) / cm.sum()
 
-    modelo = OrderedModel(y, X, distr="logit")
-    resultado = modelo.fit(method="bfgs", disp=0)
+    # Gráfico matriz de confusão
+    fig, ax = plt.subplots(figsize=(6, 4))
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=Y.unique())
+    disp.plot(ax=ax, cmap="Blues", colorbar=False)
+    ax.set_title("Matriz de Confusão - Regressão Logística Nominal")
+    plt.tight_layout()
 
-    pseudo_r2 = 1 - resultado.llf / resultado.llnull
-    resumo = resultado.summary().as_text()
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    interpretar = f"""📊 **Regressão Logística Ordinal**  
-🔹 Y: {nome_coluna_y}  
-🔹 X: {", ".join(nomes_colunas_x)}  
-🔹 Pseudo R²: {pseudo_r2:.4f}"""
+    # Texto
+    linhas = []
+    for (cat, coef, pval) in zip(res.params.index, res.params.values, res.pvalues.values):
+        coef_str = ", ".join([f"{c:.4f}" for c in coef])
+        pval_str = ", ".join([f"{p:.4f}" for p in pval])
+        linhas.append(f"- {cat}: coef=[{coef_str}], p-valor=[{pval_str}]")
+    linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
+    linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
+    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c,v in zip(x_cols_final, vif)]))
 
-    imagem_base64 = None
-    try:
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(6, 4))
-        df_modelo[nome_coluna_y].value_counts().sort_index().plot(kind="bar", ax=ax, color="skyblue")
-        ax.set_title("Distribuição da variável resposta")
-        ax.set_xlabel(nome_coluna_y)
-        ax.set_ylabel("Frequência")
-        plt.tight_layout()
+    conclusao = []
+    if r2_mcf > 0.2:
+        conclusao.append("✅ Modelo apresenta bom ajuste (R² de McFadden adequado).")
+    else:
+        conclusao.append("⚠ R² de McFadden baixo, modelo pode não ter bom ajuste.")
+    if all(v < 10 for v in vif):
+        conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
+    else:
+        conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
 
-        buffer = BytesIO()
-        plt.savefig(buffer, format="png")
-        plt.close(fig)
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    except:
-        imagem_base64 = None
+    texto = f"""
+**Regressão Logística Nominal**
+{chr(10).join(linhas)}
 
-    return interpretar + "\n\n```\n" + resumo + "\n```", imagem_base64
+**Matriz de Confusão**
+{cm}
+
+**Conclusão**
+{chr(10).join(conclusao)}
+"""
+
+    return texto.strip(), grafico_base64
+
 
 
 def analise_chi_quadrado(df, colunas_usadas):
@@ -694,7 +740,9 @@ ANALISES = {
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Regressão logística binária": analise_regressao_logistica_binaria,
-    "Regressão logística ordinal": analise_regressao_logistica_ordinal
+    "Regressão logística ordinal": analise_regressao_logistica_ordinal,
+    "Regressão logística nominal": analise_regressao_logistica_nominal
+
 
 
 
@@ -702,6 +750,4 @@ ANALISES = {
     
 
    
-    "Regressão logística nominal": analise_regressao_logistica_nominal,
-    "Qui- quadrado": analise_chi_quadrado
 }
