@@ -373,61 +373,124 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
     return texto.strip(), grafico_base64
 
 
-def analise_regressao_logistica_binaria(df, colunas_usadas):
+def analise_regressao_logistica_binaria(df: pd.DataFrame, colunas_usadas: list, field=None):
     if len(colunas_usadas) < 2:
-        return "❌ É necessário selecionar uma coluna Y (resposta binária) e pelo menos uma coluna X (numérica).", None
+        return "❌ A regressão logística binária requer 1 Y e pelo menos 1 X.", None
 
-    nome_coluna_y = colunas_usadas[0]
-    nomes_colunas_x = colunas_usadas[1:]
+    y_col = colunas_usadas[0]
+    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
+    xs_discreto = []
+    if "Xs_discreto" in colunas_usadas:
+        idx = colunas_usadas.index("Xs_discreto")
+        xs_discreto = colunas_usadas[idx+1:]
 
-    y_raw = df[nome_coluna_y].dropna()
-    X_raw = df[nomes_colunas_x]
-    df_modelo = pd.concat([y_raw, X_raw], axis=1).dropna()
-    y = df_modelo[nome_coluna_y]
-    X = df_modelo[nomes_colunas_x]
+    # Validação
+    cols_todas = [y_col] + xs_continuo + xs_discreto
+    df_valid = df[cols_todas].dropna()
+    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 3:
+        return "❌ O modelo requer mais dados válidos.", None
 
-    if y.dtype == object or str(y.dtype).startswith('category'):
-        y = pd.factorize(y)[0]
+    Y = df_valid[y_col].values
+    if len(set(Y)) != 2:
+        return "❌ A variável Y deve ser binária (duas categorias).", None
 
-    X = sm.add_constant(X)
-    modelo = sm.Logit(y, X)
-    resultado = modelo.fit(disp=0)
+    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
+    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
+    X_final = pd.concat([X_cont, X_disc], axis=1)
+    x_cols_final = X_final.columns.tolist()
 
-    pseudo_r2 = resultado.prsquared
-    resumo = resultado.summary2().as_text()
+    import statsmodels.api as sm
+    from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-    interpretacao = f"""📊 **Regressão Logística Binária**  
-🔹 Variável de resposta (Y): {nome_coluna_y}  
-🔹 Variáveis preditoras (X): {", ".join(nomes_colunas_x)}  
-🔹 Pseudo R²: {pseudo_r2:.4f}"""
+    X_sm = sm.add_constant(X_final)
+    model = sm.Logit(Y, X_sm).fit(disp=0)
+    Y_pred_prob = model.predict(X_sm)
+    Y_pred_class = (Y_pred_prob >= 0.5).astype(int)
 
-    imagem_base64 = None
-    if len(nomes_colunas_x) == 1:
-        nome_x = nomes_colunas_x[0]
-        x_plot = df_modelo[nome_x]
-        y_plot = y
+    # Pseudo R²
+    ll_null = sm.Logit(Y, np.ones((len(Y),1))).fit(disp=0).llf
+    ll_model = model.llf
+    r2_mcf = 1 - ll_model / ll_null
 
-        x_ord = np.linspace(x_plot.min(), x_plot.max(), 100)
-        X_pred = sm.add_constant(pd.DataFrame({nome_x: x_ord}))
-        y_pred = resultado.predict(X_pred)
+    # VIF
+    vif = []
+    for i in range(1, X_sm.shape[1]):  # ignora const
+        vif.append(variance_inflation_factor(X_sm.values, i))
 
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.scatter(x_plot, y_plot, alpha=0.7, color="black", label="Dados")
-        ax.plot(x_ord, y_pred, color="red", linewidth=2, label="Curva Ajustada")
-        ax.set_xlabel(nome_x)
-        ax.set_ylabel(f"Probabilidade de {nome_coluna_y}")
-        ax.set_title("Gráfico de Linha Ajustada - Regressão Logística")
+    # AUC
+    auc = roc_auc_score(Y, Y_pred_prob)
+
+    # Matriz de confusão
+    cm = confusion_matrix(Y, Y_pred_class)
+    acerto = (cm.diagonal().sum()) / cm.sum()
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6,4))
+    if len(x_cols_final) == 1 and xs_continuo:
+        X_plot = np.linspace(X_final.iloc[:,0].min(), X_final.iloc[:,0].max(), 100)
+        X_plot_sm = sm.add_constant(X_plot)
+        if X_plot_sm.ndim == 1:
+            X_plot_sm = X_plot_sm.reshape(-1,1)
+        coef = model.params.values
+        logit = coef[0] + coef[1] * X_plot
+        prob = 1 / (1 + np.exp(-logit))
+        ax.scatter(X_final.iloc[:,0], Y, color='black', alpha=0.5, label='Dados')
+        ax.plot(X_plot, prob, color='blue', label='Curva ajustada')
+        ax.set_xlabel(x_cols_final[0])
+        ax.set_ylabel('Probabilidade')
+        ax.set_title('Regressão Logística Binária')
         ax.legend()
-        plt.tight_layout()
+    else:
+        fpr, tpr, _ = roc_curve(Y, Y_pred_prob)
+        ax.plot(fpr, tpr, color='blue', label=f'ROC AUC = {auc:.2f}')
+        ax.plot([0,1], [0,1], color='grey', linestyle='--')
+        ax.set_xlabel('FPR')
+        ax.set_ylabel('TPR')
+        ax.set_title('Curva ROC')
+        ax.legend()
 
-        buffer = BytesIO()
-        plt.savefig(buffer, format="png")
-        plt.close(fig)
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    return interpretacao + "\n\n```\n" + resumo + "\n```", imagem_base64
+    # Texto
+    linhas = []
+    for name, coef, pval in zip(['Const'] + x_cols_final, model.params, model.pvalues):
+        linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
+    linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
+    linhas.append(f"AUC: {auc:.4f}")
+    linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
+    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c,v in zip(x_cols_final, vif)]))
+
+    conclusao = []
+    if r2_mcf > 0.2:
+        conclusao.append("✅ Modelo apresenta bom ajuste (R² de McFadden adequado).")
+    else:
+        conclusao.append("⚠ R² de McFadden baixo, modelo pode não ter bom ajuste.")
+
+    if auc > 0.7:
+        conclusao.append("✅ Capacidade discriminativa aceitável (AUC > 0.7).")
+    else:
+        conclusao.append("⚠ Capacidade discriminativa baixa (AUC <= 0.7).")
+
+    if all(v < 10 for v in vif):
+        conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
+    else:
+        conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
+
+    texto = f"""
+**Regressão Logística Binária**
+{chr(10).join(linhas)}
+
+**Conclusão**
+{chr(10).join(conclusao)}
+"""
+
+    return texto.strip(), grafico_base64
+
 
 
 def analise_regressao_logistica_nominal(df, colunas_usadas):
@@ -572,13 +635,14 @@ P-valor: {p:.4f}
 ANALISES = {
     "Tipo de modelo de regressão": analise_tipo_modelo_regressao,
     "Regressão linear simples": analise_regressao_linear_simples,
-    "Regressão linear múltipla": analise_regressao_linear_multipla
+    "Regressão linear múltipla": analise_regressao_linear_multipla,
+    "Regressão logística binária": analise_regressao_logistica_binaria
+
 
 
     
 
    
-    "Regressão logística binária": analise_regressao_logistica_binaria,
     "Regressão logística nominal": analise_regressao_logistica_nominal,
     "Regressão logística ordinal": analise_regressao_logistica_ordinal,
     "Qui- quadrado": analise_chi_quadrado
