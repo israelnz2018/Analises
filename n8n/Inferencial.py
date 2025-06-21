@@ -1180,7 +1180,8 @@ def analise_1_proporcao(df: pd.DataFrame, colunas_usadas: list, field=None):
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.bar(0, p_hat, color='skyblue', width=0.4, label='Proporção amostra')
     ax.errorbar(0, p_hat, yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
-    ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0
+    ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0')
+    
 def analise_2_proporcoes(df: pd.DataFrame, colunas_usadas: list, field=None):
     if len(colunas_usadas) != 2:
         return "❌ O teste 2 Proporções requer exatamente 2 colunas Y.", None
