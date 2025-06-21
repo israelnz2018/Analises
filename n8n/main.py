@@ -44,9 +44,13 @@ async def analisar(
         df = await ler_arquivo(arquivo)
         colunas_usadas = []
 
+        # ✅ Trata coluna_y corretamente (para 2 Sample T e similares)
+        colunas_y = []
         if coluna_y and coluna_y.strip():
-            colunas_usadas.append(coluna_y.strip())
+            colunas_y = [y.strip() for y in coluna_y.split(",") if y.strip()]
+            colunas_usadas.extend(colunas_y)
 
+        # ✅ Trata colunas_x
         if colunas_x:
             if isinstance(colunas_x, str):
                 colunas_usadas.extend([x.strip() for x in colunas_x.split(",") if x.strip()])
@@ -54,6 +58,7 @@ async def analisar(
                 for item in colunas_x:
                     colunas_usadas.extend([x.strip() for x in item.split(",") if x.strip()])
 
+        # ✅ Trata coluna_z
         if coluna_z and coluna_z.strip():
             colunas_usadas.append(coluna_z.strip())
 
@@ -61,18 +66,18 @@ async def analisar(
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
 
-        # Executa análise
+        # ✅ Executa análise
         if ferramenta and ferramenta.strip():
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
 
             if ferramenta.strip() in ANALISES_COM_FIELD:
-                resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas, field=field)
+                resultado_texto, imagem_analise_base64 = funcao(df, colunas_y, field=field)
             else:
-                resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
+                resultado_texto, imagem_analise_base64 = funcao(df, colunas_y or colunas_usadas)
 
-        # Executa gráfico
+        # ✅ Executa gráfico
         if grafico and grafico.strip():
             print(f"🎨 Gráfico solicitado: {grafico.strip()}")
             print(f"📊 Colunas usadas: {colunas_usadas}")
@@ -102,3 +107,4 @@ async def analisar(
             },
             status_code=500
         )
+
