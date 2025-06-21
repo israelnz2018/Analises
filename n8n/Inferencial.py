@@ -219,21 +219,20 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
 
     return texto.strip(), grafico_base64
 
-from suporte import *
 
 def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
     if len(colunas_usadas) != 2:
         return "❌ O One way ANOVA requer uma coluna Y e uma coluna X (categorias).", None
 
     col_y, col_x = colunas_usadas
-    y = df[col_y].dropna()
-    x = df[col_x].dropna()
-
     df_valid = df[[col_y, col_x]].dropna()
     y = df_valid[col_y]
     x = df_valid[col_x]
 
     grupos = [grupo[1].values for grupo in df_valid.groupby(col_x)[col_y]]
+
+    if len(grupos) < 2:
+        return "❌ O One way ANOVA requer pelo menos 2 grupos distintos na coluna X.", None
 
     f_stat, p_valor = stats.f_oneway(*grupos)
 
@@ -241,12 +240,16 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
     stats_por_grupo = df_valid.groupby(col_x)[col_y].agg(['mean', 'std', 'count']).reset_index()
 
     # Teste de normalidade dos resíduos
-    modelo = y - y.mean()
-    normalidade = stats.anderson(modelo)
+    residuos = y - y.groupby(x).transform('mean')
+    normalidade = stats.anderson(residuos)
     ad_stat = normalidade.statistic
     ad_crit = normalidade.critical_values
-    ad_sig = normalidade.significance_level
-    ad_aprovado = ad_stat < ad_crit[list(ad_sig).index(5)] if 5 in ad_sig else False
+    ad_sig = list(normalidade.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_aprovado = ad_stat < ad_crit[idx]
+    else:
+        ad_aprovado = False
 
     # Conclusão
     conclusao = "✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ Resíduos podem não ser normais (Anderson-Darling)."
@@ -292,54 +295,11 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
     return texto.strip(), grafico_base64
 
 
-def teste_variancias(df, colunas_usadas):
-    if len(colunas_usadas) != 2:
-        return "❌ Selecione exatamente duas colunas para comparar as variâncias.", None
-
-    col1, col2 = colunas_usadas
-    serie1 = pd.to_numeric(df[col1], errors="coerce").dropna()
-    serie2 = pd.to_numeric(df[col2], errors="coerce").dropna()
-
-    if len(serie1) < 3 or len(serie2) < 3:
-        return "❌ É necessário pelo menos 3 dados em cada grupo para realizar o teste de variâncias.", None
-
-    stat_f = np.var(serie1, ddof=1) / np.var(serie2, ddof=1)
-    df1, df2 = len(serie1)-1, len(serie2)-1
-    p_f = 2 * min(stats.f.cdf(stat_f, df1, df2), 1 - stats.f.cdf(stat_f, df1, df2))
-
-    interpretacao = f"""📊 **Teste de Igualdade de Variâncias (F-Teste)**  
-🔹 Grupos comparados: {col1} e {col2}  
-🔹 Estatística F: {stat_f:.4f}  
-🔹 Valor-p (bilateral): {p_f:.4f}  
-
-{"✅ As variâncias são significativamente diferentes." if p_f < 0.05 else "➖ Não há evidência de diferença entre as variâncias."}
-"""
-
-    try:
-        aplicar_estilo_minitab()
-        df_plot = pd.DataFrame({
-            "Valor": pd.concat([serie1, serie2]),
-            "Grupo": [col1] * len(serie1) + [col2] * len(serie2)
-        })
-        plt.figure(figsize=(8, 5))
-        sns.boxplot(x="Valor", y="Grupo", data=df_plot, orient="h", palette="pastel", showmeans=True,
-                    meanprops={"marker": "o", "markerfacecolor": "black", "markeredgecolor": "black"})
-        plt.title("Comparação das Variâncias (Boxplot)")
-
-        buffer = BytesIO()
-        plt.tight_layout()
-        plt.savefig(buffer, format="png")
-        plt.close()
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
-    except Exception as e:
-        print("Erro ao gerar gráfico:", str(e))
-        imagem_base64 = None
-
-    return interpretacao, imagem_base64
 
 
-from suporte import *
+
+
+
 
 
 
@@ -349,7 +309,7 @@ ANALISES = {
     "2 Paired Test": analise_paired_t,
     "One way ANOVA": analise_one_way_anova
     
-    "F/Levene Test": teste_variancias,
+
 }
 
 
