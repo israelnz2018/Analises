@@ -1259,6 +1259,60 @@ def analise_2_proporcoes(df: pd.DataFrame, colunas_usadas: list, field=None):
 """
 
     return texto.strip(), grafico_base64
+def analise_k_proporcoes(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) < 2:
+        return "❌ O teste K Proporções requer pelo menos 2 colunas Y (grupos).", None
+
+    # Prepara os dados
+    sucessos = []
+    totais = []
+    proporcoes = {}
+    for col in colunas_usadas:
+        dados = df[col].dropna()
+        if len(dados) < 5:
+            return f"❌ O grupo {col} requer ao menos 5 valores não nulos.", None
+        sucesso = np.sum(dados)
+        total = len(dados)
+        sucessos.append(sucesso)
+        totais.append(total)
+        proporcoes[col] = sucesso / total
+
+    # Monta tabela
+    table = np.array([sucessos, [t - s for s, t in zip(sucessos, totais)]])
+
+    # Teste Qui-quadrado
+    stat, p_valor, dof, expected = stats.chi2_contingency(table.T)
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar(range(len(colunas_usadas)), [proporcoes[c] for c in colunas_usadas],
+           color='skyblue')
+    ax.set_xticks(range(len(colunas_usadas)))
+    ax.set_xticklabels(colunas_usadas)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("Proporção")
+    ax.set_title("K Proporções - Proporção por Grupo")
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    proporcao_texto = "\n".join([f"- {col}: {proporcoes[col]:.4f}" for col in colunas_usadas])
+
+    texto = f"""
+**K Proporções - Teste de Homogeneidade**
+{proporcao_texto}
+- Estatística Qui-quadrado: {stat:.4f}
+- p-valor: {p_valor:.4f}
+- Graus de liberdade: {dof}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as proporções não são todas iguais." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as proporções dos grupos."}
+"""
+
+    return texto.strip(), grafico_base64
 
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
@@ -1277,7 +1331,9 @@ ANALISES = {
     "Brown-Forsythe": analise_brown_forsythe,
     "1 Intervalo de Confianca Variancia": analise_1_intervalo_confianca_variancia,
     "1 Proporcao": analise_1_proporcao,
-    "2 Proporcoes": analise_2_proporcoes
+    "2 Proporcoes": analise_2_proporcoes,
+    "K Proporcoes": analise_k_proporcoes
+
 
 
 
