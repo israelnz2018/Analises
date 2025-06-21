@@ -1,5 +1,77 @@
 from suporte import *
 
+def analise_teste_normalidade(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 1:
+        return "❌ O teste de normalidade requer 1 coluna Y.", None
+
+    y_col = colunas_usadas[0]
+    dados = df[y_col].dropna()
+    if len(dados) < 5:
+        return "❌ É necessário pelo menos 5 dados para o teste de normalidade.", None
+
+    from scipy import stats
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from io import BytesIO
+    import base64
+
+    # Anderson-Darling
+    ad_res = stats.anderson(dados)
+    ad_stat = ad_res.statistic
+    ad_crit = ad_res.critical_values
+    ad_sig = list(ad_res.significance_level)
+    ad_pseudo_p = None
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad_stat < ad_crit[idx]
+    else:
+        ad_normal = False
+
+    # Shapiro-Wilk (representando Ryan-Joiner no estilo Minitab)
+    sw_stat, sw_p = stats.shapiro(dados)
+    sw_normal = sw_p > 0.05
+
+    # Kolmogorov-Smirnov
+    ks_stat, ks_p = stats.kstest((dados - np.mean(dados)) / np.std(dados, ddof=1), 'norm')
+    ks_normal = ks_p > 0.05
+
+    # Texto
+    texto = f"""
+**Teste de Normalidade**
+- Anderson-Darling: estat={ad_stat:.4f}, normalidade={"Aprovada" if ad_normal else "Reprovada"}
+- Shapiro-Wilk: estat={sw_stat:.4f}, p-valor={sw_p:.4f}, normalidade={"Aprovada" if sw_normal else "Reprovada"}
+- Kolmogorov-Smirnov: estat={ks_stat:.4f}, p-valor={ks_p:.4f}, normalidade={"Aprovada" if ks_normal else "Reprovada"}
+"""
+
+    # Conclusão
+    if ad_normal or sw_normal or ks_normal:
+        normal_txt = "✅ Pelo menos um teste indica normalidade. Modelo pode prosseguir com métodos paramétricos."
+    else:
+        normal_txt = "⚠ Nenhum teste indicou normalidade. Recomenda-se coletar pelo menos 50 amostras e realizar teste de estabilidade."
+
+    texto += f"\n**Conclusão**\n{normal_txt}"
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6,4))
+    stats.probplot(dados, dist="norm", plot=ax)
+    if ad_normal:
+        ax.set_title("QQ-Plot (Anderson-Darling indicou normalidade)")
+    elif sw_normal:
+        ax.set_title("QQ-Plot (Shapiro-Wilk indicou normalidade)")
+    elif ks_normal:
+        ax.set_title("QQ-Plot (Kolmogorov-Smirnov indicou normalidade)")
+    else:
+        ax.set_title("QQ-Plot (Nenhum teste indicou normalidade)")
+
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    return texto.strip(), grafico_base64
+
+
 def analise_capabilidade_normal(df, colunas_usadas):
     nome_coluna_y = colunas_usadas[0]
     nome_coluna_x = colunas_usadas[1]
@@ -336,6 +408,8 @@ def aplicar_transformacao_johnson(df, colunas_usadas):
 
 
 ANALISES = {
+    "Teste de normalidade": analise_teste_normalidade,
+
     "Capabilidade para dados normais": analise_capabilidade_normal,
     "Capabilidade para outras distribuições": analise_capabilidade_nao_normal,
     "Capabilidade com dados transformados": aplicar_transformacao_johnson
