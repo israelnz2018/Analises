@@ -216,111 +216,124 @@ def analise_distribuicao_estatistica(df: pd.DataFrame, colunas_usadas: list, fie
 
     return texto.strip(), grafico_base64
 
+def analise_capabilidade_normal(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) < 1 or not field or not isinstance(field, dict):
+        return "❌ É necessário Y, LSL e USL.", None
 
-def analise_capabilidade_normal(df, colunas_usadas):
-    nome_coluna_y = colunas_usadas[0]
-    nome_coluna_x = colunas_usadas[1]
+    y_col = colunas_usadas[0]
+    dados = df[y_col].dropna()
+    if len(dados) < 30:
+        return "⚠ Recomenda-se pelo menos 30 dados para análise de capabilidade.", None
 
-    dados = df[nome_coluna_y].dropna().astype(float)
-    limites = df[nome_coluna_x].dropna().astype(float).unique()
+    LSL = float(field.get("Field_LSL", np.nan))
+    USL = float(field.get("Field_USL", np.nan))
+    if np.isnan(LSL) or np.isnan(USL):
+        return "❌ Limites LSL e USL são obrigatórios.", None
 
-    if len(limites) < 1 or len(limites) > 2:
-        raise ValueError("A coluna de limites deve conter um ou dois valores numéricos.")
+    from scipy import stats
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
 
-    LSL, USL = None, None
-    if len(limites) == 1:
-        if not pd.isna(df[nome_coluna_x].iloc[1]):
-            LSL = limites[0]
-        else:
-            USL = limites[0]
-    else:
-        LSL, USL = sorted(limites[:2])
-
-    media = np.mean(dados)
-    desvio_padrao = np.std(dados, ddof=1)
-    desvio_padrao_pop = np.std(dados, ddof=0)
-
+    # Normalidade
+    ad_res = stats.anderson(dados)
     sw_stat, sw_p = stats.shapiro(dados)
-    ad_result = stats.anderson(dados)
-    ad_stat = ad_result.statistic
-    ad_critico = ad_result.critical_values[2]
-    ks_stat, ks_p = stats.kstest(dados, 'norm', args=(media, desvio_padrao))
+    ks_stat, ks_p = stats.kstest((dados - np.mean(dados)) / np.std(dados, ddof=1), 'norm')
 
-    normal = False
-    if sw_p > 0.05 or ad_stat < ad_critico or ks_p > 0.05:
-        normal = True
+    ad_sig = list(ad_res.significance_level)
+    ad_normal = False
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad_res.statistic < ad_res.critical_values[idx]
 
-    if not normal:
-        return {
-            "analise": f"""❌ Os dados **não são normais** segundo os testes de normalidade.
-- Shapiro-Wilk: p = {sw_p:.4f}
-- Anderson-Darling: estatística = {ad_stat:.4f} | critério = {ad_critico:.4f}
-- Kolmogorov-Smirnov: p = {ks_p:.4f}
+    sw_normal = sw_p > 0.05
+    ks_normal = ks_p > 0.05
 
-Recomenda-se utilizar a **Análise de Capabilidade para Dados Não Normais**.""",
-            "graficos": [],
-            "colunas_utilizadas": colunas_usadas
-        }
+    if not (ad_normal or sw_normal or ks_normal):
+        texto = f"""
+**Capabilidade - dados normais**
+⚠ Nenhum teste indicou normalidade. Recomenda-se realizar análise de distribuição estatística e usar capabilidade para dados não normais.
+- Anderson-Darling: estat={ad_res.statistic:.4f}
+- Shapiro-Wilk: p-valor={sw_p:.4f}
+- Kolmogorov-Smirnov: p-valor={ks_p:.4f}
+"""
+        return texto.strip(), None
 
-    cp = ((USL - LSL) / (6 * desvio_padrao)) if (USL and LSL) else None
-    cpu = ((USL - media) / (3 * desvio_padrao)) if USL else None
-    cpl = ((media - LSL) / (3 * desvio_padrao)) if LSL else None
-    cpk = min(cpu or float('inf'), cpl or float('inf'))
+    # Estatísticas
+    mean = np.mean(dados)
+    std_within = np.std(dados, ddof=1)
+    std_overall = np.std(dados, ddof=0)
 
-    pp = ((USL - LSL) / (6 * desvio_padrao_pop)) if (USL and LSL) else None
-    ppu = ((USL - media) / (3 * desvio_padrao_pop)) if USL else None
-    ppl = ((media - LSL) / (3 * desvio_padrao_pop)) if LSL else None
-    ppk = min(ppu or float('inf'), ppl or float('inf'))
+    Cp = (USL - LSL) / (6 * std_within)
+    Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
 
-    sigma_nivel = 3 * cpk
+    Pp = (USL - LSL) / (6 * std_overall)
+    Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
 
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(8, 4))
-    counts, bins, patches = ax.hist(dados, bins=15, color="#A6CEE3", edgecolor='black', alpha=0.9, density=True)
+    z_bench_within = min((USL - mean) / std_within, (mean - LSL) / std_within)
+    z_bench_overall = min((USL - mean) / std_overall, (mean - LSL) / std_overall)
 
-    xmin, xmax = ax.get_xlim()
-    x = np.linspace(xmin, xmax, 500)
-    p = stats.norm.pdf(x, media, desvio_padrao)
-    ax.plot(x, p, 'darkred', linewidth=2)
+    ppm_within_lsl = 1e6 * stats.norm.cdf(LSL, loc=mean, scale=std_within)
+    ppm_within_usl = 1e6 * (1 - stats.norm.cdf(USL, loc=mean, scale=std_within))
+    ppm_within_total = ppm_within_lsl + ppm_within_usl
 
-    if LSL: ax.axvline(LSL, color='maroon', linestyle='--', linewidth=1.5, label='LSL')
-    if USL: ax.axvline(USL, color='maroon', linestyle='--', linewidth=1.5, label='USL')
-    ax.axvline(media, color='darkgreen', linestyle='-', linewidth=2, label='Média')
-    ax.text(media, max(p) * 1.05, "Alvo", ha='center', va='bottom', fontsize=10, color='darkgreen')
+    ppm_overall_lsl = 1e6 * stats.norm.cdf(LSL, loc=mean, scale=std_overall)
+    ppm_overall_usl = 1e6 * (1 - stats.norm.cdf(USL, loc=mean, scale=std_overall))
+    ppm_overall_total = ppm_overall_lsl + ppm_overall_usl
 
-    ax.set_title('Capabilidade do Processo (Normal)', fontsize=14, weight='bold')
-    ax.set_xlabel(nome_coluna_y)
-    ax.set_ylabel('Densidade')
-    ax.set_xlim(xmin, xmax)
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(8,5))
+    count, bins, ignored = ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
+    x = np.linspace(min(dados), max(dados), 100)
+    y_within = stats.norm.pdf(x, mean, std_within)
+    y_overall = stats.norm.pdf(x, mean, std_overall)
+
+    ax.plot(x, y_within, 'r-', label='Curto prazo')
+    ax.plot(x, y_overall, 'k--', label='Longo prazo')
+    ax.axvline(LSL, color='red', linestyle='dashed', label='LSL')
+    ax.axvline(USL, color='red', linestyle='dashed', label='USL')
+    ax.axvline(mean, color='green', linestyle='dashed', label='Média')
+    ax.set_title('Capabilidade - Dados Normais')
     ax.legend()
     plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format='png')
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode('utf-8')
-    plt.close()
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    texto = f"""📊 **Análise de Capabilidade (Distribuição Normal)**
+    texto = f"""
+**Capabilidade - dados normais**
+- Anderson-Darling: estat={ad_res.statistic:.4f}, normalidade={"Aprovada" if ad_normal else "Reprovada"}
+- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={"Aprovada" if sw_normal else "Reprovada"}
+- Kolmogorov-Smirnov: p-valor={ks_p:.4f}, normalidade={"Aprovada" if ks_normal else "Reprovada"}
 
-- Média: {media:.4f}
-- Desvio Padrão: {desvio_padrao:.4f}
+**Resultados**
+- Cp = {Cp:.2f}
+- Cpk = {Cpk:.2f}
+- Pp = {Pp:.2f}
+- Ppk = {Ppk:.2f}
+- Z.bench curto prazo = {z_bench_within:.2f}
+- Z.bench longo prazo = {z_bench_overall:.2f}
+
+**PPM Curto Prazo**
+- < LSL: {ppm_within_lsl:.2f}
+- > USL: {ppm_within_usl:.2f}
+- Total: {ppm_within_total:.2f}
+
+**PPM Longo Prazo**
+- < LSL: {ppm_overall_lsl:.2f}
+- > USL: {ppm_overall_usl:.2f}
+- Total: {ppm_overall_total:.2f}
+
+**Conclusão**
+✅ Capabilidade calculada com base nos dados normais. Avalie Cp/Cpk e ações de melhoria se Cpk < 1.33.
 """
 
-    if LSL: texto += f"- LSL: {LSL:.4f}\n"
-    if USL: texto += f"- USL: {USL:.4f}\n"
-    if cp: texto += f"- Cp: {cp:.4f}\n"
-    if cpk: texto += f"- Cpk: {cpk:.4f}\n"
-    if pp: texto += f"- Pp: {pp:.4f}\n"
-    if ppk: texto += f"- Ppk: {ppk:.4f}\n"
+    return texto.strip(), grafico_base64
 
-    texto += f"- Nível Sigma estimado: {sigma_nivel:.4f}"
 
-    return {
-        "analise": texto,
-        "graficos": [imagem_base64],
-        "colunas_utilizadas": colunas_usadas
-    }
 
 def analise_capabilidade_nao_normal(df, colunas_usadas):
     nome_coluna_y = colunas_usadas[0]
@@ -556,9 +569,10 @@ ANALISES = {
     "Teste de normalidade": analise_teste_normalidade,
     "Análise de estabilidade": analise_estabilidade,
     "Análise de distribuição estatística": analise_distribuicao_estatistica,
+    "Capabilidade - dados normais": analise_capabilidade_normal
 
 
-    "Capabilidade para dados normais": analise_capabilidade_normal,
+
     "Capabilidade para outras distribuições": analise_capabilidade_nao_normal,
     "Capabilidade com dados transformados": aplicar_transformacao_johnson
 }
