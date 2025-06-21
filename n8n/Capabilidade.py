@@ -648,6 +648,60 @@ Recomenda-se realizar capabilidade para dados discretizados ou usar métodos nã
 """
 
     return texto.strip(), grafico_base64
+def analise_capabilidade_discretizado(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) < 1 or not field or not isinstance(field, dict):
+        return "❌ É necessário Y, LSL e USL.", None
+
+    y_col = colunas_usadas[0]
+    dados = df[y_col].dropna()
+    if len(dados) < 10:
+        return "⚠ Recomenda-se pelo menos 10 dados para capabilidade.", None
+
+    LSL = float(field.get("Field_LSL", np.nan))
+    USL = float(field.get("Field_USL", np.nan))
+    if np.isnan(LSL) or np.isnan(USL):
+        return "❌ LSL e USL são obrigatórios.", None
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from io import BytesIO
+    import base64
+
+    # PPM observado
+    ppm_lsl = 1e6 * np.sum(dados < LSL) / len(dados)
+    ppm_usl = 1e6 * np.sum(dados > USL) / len(dados)
+    ppm_total = ppm_lsl + ppm_usl
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(8,5))
+    valores, contagens = np.unique(dados, return_counts=True)
+    ax.bar(valores, contagens / len(dados), width=0.8, color='gray', edgecolor='black', alpha=0.7)
+    ax.axvline(LSL, color='red', linestyle='--', label='LSL')
+    ax.axvline(USL, color='red', linestyle='--', label='USL')
+    ax.axvline(np.mean(dados), color='green', linestyle='--', label='Média')
+    ax.set_title('Capabilidade - Dados Discretizados')
+    ax.set_xlabel(y_col)
+    ax.set_ylabel('Frequência relativa')
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto
+    texto = f"""
+**Capabilidade - com dados discretizados**
+- PPM observado < LSL: {ppm_lsl:.2f}
+- PPM observado > USL: {ppm_usl:.2f}
+- PPM total: {ppm_total:.2f}
+
+⚠ Cp, Cpk, Pp e Ppk não são aplicáveis a dados discretizados.
+✅ Capabilidade calculada com base na frequência real dos dados. Avalie o gráfico para verificar a distribuição dos níveis em relação aos limites.
+"""
+
+    return texto.strip(), grafico_base64
 
 ANALISES = {
     "Teste de normalidade": analise_teste_normalidade,
@@ -655,8 +709,8 @@ ANALISES = {
     "Análise de distribuição estatística": analise_distribuicao_estatistica,
     "Capabilidade - dados normais": analise_capabilidade_normal,
     "Capabilidade - outras distribuições": analise_capabilidade_outros,
-    "Capabilidade - com dados transformados": analise_capabilidade_transformado
-
+    "Capabilidade - com dados transformados": analise_capabilidade_transformado,
+    "Capabilidade - com dados discretizados": analise_capabilidade_discretizado
 
 }
 
