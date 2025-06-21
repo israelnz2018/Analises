@@ -819,6 +819,94 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, colunas_usadas: list, 
 
     return texto.strip(), grafico_base64
 
+def analise_2_variancas(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 2:
+        return "❌ O teste 2 Variâncias requer exatamente 2 colunas Y.", None
+
+    col1, col2 = colunas_usadas
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
+
+    if len(dados1) < 5 or len(dados2) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
+
+    # Estatísticas
+    var1 = np.var(dados1, ddof=1)
+    var2 = np.var(dados2, ddof=1)
+
+    # F-teste
+    f_stat = var1 / var2 if var1 > var2 else var2 / var1
+    dfn = len(dados1) - 1
+    dfd = len(dados2) - 1
+    p_valor = 2 * min(stats.f.cdf(f_stat, dfn, dfd), 1 - stats.f.cdf(f_stat, dfn, dfd))
+
+    # Normalidade
+    def normalidade(dados):
+        ad = stats.anderson(dados)
+        sw_stat, sw_p = stats.shapiro(dados)
+        dp_stat, dp_p = stats.normaltest(dados)
+        ad_crit = ad.critical_values
+        ad_sig = list(ad.significance_level)
+        if 5 in ad_sig:
+            idx = ad_sig.index(5)
+            ad_normal = ad.statistic < ad_crit[idx]
+        else:
+            ad_normal = False
+        sw_normal = sw_p > 0.05
+        dp_normal = dp_p > 0.05
+        return ad, ad_normal, sw_p, sw_normal, dp_p, dp_normal
+
+    ad1, ad1_normal, sw1_p, sw1_normal, dp1_p, dp1_normal = normalidade(dados1)
+    ad2, ad2_normal, sw2_p, sw2_normal, dp2_p, dp2_normal = normalidade(dados2)
+
+    recomendacao = ""
+    if not (ad1_normal and ad2_normal and sw1_normal and sw2_normal and dp1_normal and dp2_normal):
+        recomendacao = "⚠ Os dados podem não ser normais. Considere o uso do teste de Levene ou Brown-Forsythe."
+
+    # Gráficos
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    # Boxplot
+    axes[0].boxplot([dados1, dados2], labels=[col1, col2])
+    axes[0].set_title("Boxplot por Grupo")
+    axes[0].set_ylabel("Valores")
+
+    # Barplot variâncias
+    axes[1].bar([col1, col2], [var1, var2], color=['skyblue', 'lightgreen'])
+    axes[1].set_title("Comparação das Variâncias")
+    axes[1].set_ylabel("Variância")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**2 Variâncias**
+- Variância {col1}: {var1:.4f}
+- Variância {col2}: {var2:.4f}
+- Estatística F: {f_stat:.4f}
+- p-valor: {p_valor:.4f}
+
+**Normalidade {col1}**
+- Anderson-Darling: estatística={ad1.statistic:.4f}, normalidade={'Aprovada' if ad1_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw1_p:.4f}, normalidade={'Aprovada' if sw1_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp1_p:.4f}, normalidade={'Aprovada' if dp1_normal else 'Reprovada'}
+
+**Normalidade {col2}**
+- Anderson-Darling: estatística={ad2.statistic:.4f}, normalidade={'Aprovada' if ad2_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw2_p:.4f}, normalidade={'Aprovada' if sw2_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp2_p:.4f}, normalidade={'Aprovada' if dp2_normal else 'Reprovada'}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
+"""
+
+    return texto.strip(), grafico_base64
 
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
@@ -830,7 +918,9 @@ ANALISES = {
     "Kruskal-Wallis": analise_kruskal_wallis,
     "Friedman Pareado": analise_friedman_pareado,
     "1 Intervalo de Confianca": analise_1_intervalo_confianca,
-    "1 Intervalo Interquartilico": analise_1_intervalo_interquartilico
+    "1 Intervalo Interquartilico": analise_1_intervalo_interquartilico,
+    "2 Variancas": analise_2_variancas
+
 
 
 
