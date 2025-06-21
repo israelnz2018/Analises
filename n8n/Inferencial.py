@@ -1058,6 +1058,85 @@ def analise_brown_forsythe(df: pd.DataFrame, colunas_usadas: list, field=None):
 
     return texto.strip(), grafico_base64
 
+def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 1:
+        return "❌ O intervalo de confiança da variância requer exatamente 1 coluna Y.", None
+
+    y_col = colunas_usadas[0]
+    y = df[y_col].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    # Nível de confiança
+    try:
+        nivel_conf = float(field) if field is not None else 95
+        if not (50 <= nivel_conf < 100):
+            return "❌ O nível de confiança deve ser entre 50 e 99.9.", None
+    except:
+        return "❌ Valor do nível de confiança inválido. Informe um número (ex.: 95).", None
+
+    alpha = 1 - (nivel_conf / 100)
+    n = len(y)
+    s2 = np.var(y, ddof=1)
+
+    chi2_lower = stats.chi2.ppf(alpha / 2, df=n-1)
+    chi2_upper = stats.chi2.ppf(1 - alpha / 2, df=n-1)
+
+    ic_lower = (n - 1) * s2 / chi2_upper
+    ic_upper = (n - 1) * s2 / chi2_lower
+
+    # Normalidade
+    ad = stats.anderson(y)
+    sw_stat, sw_p = stats.shapiro(y)
+    dp_stat, dp_p = stats.normaltest(y)
+
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad.statistic < ad_crit[idx]
+    else:
+        ad_normal = False
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    recomendacao = ""
+    if not (ad_normal or sw_normal or dp_normal):
+        recomendacao = "⚠ Os dados podem não ser normais. O intervalo de confiança da variância pode não ser confiável."
+
+    # Gráfico (barplot)
+    fig, ax = plt.subplots(figsize=(6, 2))
+    ax.bar(0, s2, color='skyblue', width=0.4, label='Variância amostra')
+    ax.errorbar(0, s2, yerr=[[s2 - ic_lower], [ic_upper - s2]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
+    ax.set_xticks([0])
+    ax.set_xticklabels([y_col])
+    ax.set_ylabel("Variância")
+    ax.set_title(f"Intervalo de Confiança da Variância ({nivel_conf:.1f}%)")
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**1 Intervalo de Confiança da Variância**
+- Variância amostra: {s2:.4f}
+- N: {n}
+- Nível de confiança: {nivel_conf:.1f}%
+- Intervalo: [{ic_lower:.4f}, {ic_upper:.4f}]
+
+**Normalidade dos dados**
+- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+{recomendacao}
+"""
+
+    return texto.strip(), grafico_base64
 
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
@@ -1073,7 +1152,9 @@ ANALISES = {
     "2 Variancas": analise_2_variancas,
     "2 Variancas Brown-Forsythe": analise_2_variancas_brown_forsythe,
     "Bartlett": analise_bartlett,
-    "Brown-Forsythe": analise_brown_forsythe
+    "Brown-Forsythe": analise_brown_forsythe,
+    "1 Intervalo de Confianca Variancia": analise_1_intervalo_confianca_variancia
+
 
 
 
