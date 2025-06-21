@@ -385,6 +385,92 @@ def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list, field=None):
 
     return texto.strip(), grafico_base64
 
+def analise_2_mann_whitney(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) != 2:
+        return "❌ O teste 2 Mann-Whitney requer exatamente 2 colunas Y.", None
+
+    col1, col2 = colunas_usadas
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
+
+    if len(dados1) < 5 or len(dados2) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
+
+    # Teste de normalidade dos dois grupos
+    # Anderson-Darling
+    ad1 = stats.anderson(dados1)
+    ad2 = stats.anderson(dados2)
+    ad1_stat = ad1.statistic
+    ad2_stat = ad2.statistic
+    ad1_crit = ad1.critical_values
+    ad2_crit = ad2.critical_values
+    ad_sig = list(ad1.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad1_normal = ad1_stat < ad1_crit[idx]
+        ad2_normal = ad2_stat < ad2_crit[idx]
+    else:
+        ad1_normal = ad2_normal = False
+
+    # Shapiro
+    sw1_stat, sw1_p = stats.shapiro(dados1)
+    sw2_stat, sw2_p = stats.shapiro(dados2)
+    sw1_normal = sw1_p > 0.05
+    sw2_normal = sw2_p > 0.05
+
+    # D'Agostino-Pearson
+    dp1_stat, dp1_p = stats.normaltest(dados1)
+    dp2_stat, dp2_p = stats.normaltest(dados2)
+    dp1_normal = dp1_p > 0.05
+    dp2_normal = dp2_p > 0.05
+
+    recomendacao = ""
+    if ad1_normal or sw1_normal or dp1_normal or ad2_normal or sw2_normal or dp2_normal:
+        recomendacao = "⚠ Pelo menos um grupo apresentou indícios de normalidade. Considere realizar o teste 2 Sample T."
+
+    # Mann-Whitney U
+    u_stat, p_valor = stats.mannwhitneyu(dados1, dados2, alternative='two-sided')
+
+    mediana1 = np.median(dados1)
+    mediana2 = np.median(dados2)
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.boxplot([dados1, dados2], labels=[col1, col2])
+    ax.set_title("2 Mann-Whitney - Boxplot por Grupo")
+    ax.set_ylabel("Valores")
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**2 Mann-Whitney - Wilcoxon Rank-Sum**
+- Mediana {col1}: {mediana1:.4f}
+- Mediana {col2}: {mediana2:.4f}
+- Estatística U: {u_stat:.4f}
+- p-valor: {p_valor:.4f}
+
+**Normalidade dos dados**
+{col1}:
+- Anderson-Darling: estatística={ad1_stat:.4f}, normalidade={'Aprovada' if ad1_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw1_p:.4f}, normalidade={'Aprovada' if sw1_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp1_p:.4f}, normalidade={'Aprovada' if dp1_normal else 'Reprovada'}
+
+{col2}:
+- Anderson-Darling: estatística={ad2_stat:.4f}, normalidade={'Aprovada' if ad2_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw2_p:.4f}, normalidade={'Aprovada' if sw2_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp2_p:.4f}, normalidade={'Aprovada' if dp2_normal else 'Reprovada'}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as distribuições são diferentes." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as distribuições."}
+"""
+
+    return texto.strip(), grafico_base64
 
 
 
@@ -393,7 +479,9 @@ ANALISES = {
     "2 Sample T": analise_2_sample_t,
     "2 Paired Test": analise_paired_t,
     "One way ANOVA": analise_one_way_anova,
-    "1 Wilcoxon": analise_1_wilcoxon
+    "1 Wilcoxon": analise_1_wilcoxon,
+    "2 Mann-Whitney": analise_2_mann_whitney
+
     
 
 }
