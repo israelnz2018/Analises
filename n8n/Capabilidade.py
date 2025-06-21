@@ -472,6 +472,7 @@ def aplicar_transformacao_johnson(df, colunas_usadas):
 
 ANALISES = {
     "Teste de normalidade": analise_teste_normalidade,
+    "Análise de estabilidade": analise_estabilidade,
 
     "Capabilidade para dados normais": analise_capabilidade_normal,
     "Capabilidade para outras distribuições": analise_capabilidade_nao_normal,
