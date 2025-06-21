@@ -306,13 +306,84 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
 """
 
     return texto.strip(), grafico_base64
+def analise_1_wilcoxon(df: pd.DataFrame, colunas_usadas: list):
+    if len(colunas_usadas) != 1:
+        return "❌ O teste 1 Wilcoxon requer exatamente 1 coluna Y.", None
+
+    y_col = colunas_usadas[0]
+    y = df[y_col].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    # Testes de normalidade
+    ad = stats.anderson(y)
+    sw_stat, sw_p = stats.shapiro(y)
+    dp_stat, dp_p = stats.normaltest(y)
+
+    ad_stat = ad.statistic
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad_stat < ad_crit[idx]
+    else:
+        ad_normal = False
+
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    recomendacao = ""
+    if ad_normal or sw_normal or dp_normal:
+        recomendacao = "⚠ Pelo menos um teste indicou normalidade dos dados. Considere realizar o teste 1 Sample T em vez do Wilcoxon."
+
+    # Wilcoxon Signed-Rank Test (mediana = 0)
+    w_stat, p_valor = stats.wilcoxon(y, zero_method='wilcox', correction=False)
+
+    mediana_amostra = np.median(y)
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.boxplot(y, vert=False)
+    ax.axvline(0, color='red', linestyle='--', label='Mediana H0 (0)')
+    ax.axvline(mediana_amostra, color='blue', linestyle='-', label=f'Mediana amostra: {mediana_amostra:.2f}')
+    ax.set_title("1 Wilcoxon - Boxplot com Mediana H0")
+    ax.set_xlabel(y_col)
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto
+    texto = f"""
+**1 Wilcoxon - Teste de Mediana**
+- Mediana amostra: {mediana_amostra:.4f}
+- Estatística W: {w_stat:.4f}
+- p-valor: {p_valor:.4f}
+
+**Normalidade dos dados**
+- Anderson-Darling: estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: mediana diferente de 0." if p_valor < 0.05 else "⚠ Não rejeitamos H0: mediana não difere significativamente de 0."}
+"""
+
+    return texto.strip(), grafico_base64
 
 
 ANALISES = {
     "1 Sample T": analise_1_sample_t,
     "2 Sample T": analise_2_sample_t,
     "2 Paired Test": analise_paired_t,
-    "One way ANOVA": analise_one_way_anova
+    "One way ANOVA": analise_one_way_anova,
+    "1 Wilcoxon": analise_1_wilcoxon
     
 
 }
