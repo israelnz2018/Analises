@@ -1008,6 +1008,55 @@ def analise_bartlett(df: pd.DataFrame, colunas_usadas: list, field=None):
 """
 
     return texto.strip(), grafico_base64
+def analise_brown_forsythe(df: pd.DataFrame, colunas_usadas: list, field=None):
+    if len(colunas_usadas) < 3:
+        return "❌ O teste Brown-Forsythe requer pelo menos 3 colunas Y (grupos).", None
+
+    grupos = []
+    variancias = {}
+    for col in colunas_usadas:
+        dados = df[col].dropna()
+        if len(dados) < 5:
+            return f"❌ O grupo {col} requer ao menos 5 valores não nulos.", None
+        grupos.append(dados)
+        variancias[col] = np.var(dados, ddof=1)
+
+    # Brown-Forsythe (Levene com center='median')
+    stat, p_valor = stats.levene(*grupos, center='median')
+
+    # Gráficos
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    # Boxplot
+    axes[0].boxplot(grupos, labels=colunas_usadas)
+    axes[0].set_title("Boxplot por Grupo")
+    axes[0].set_ylabel("Valores")
+
+    # Barplot variâncias
+    axes[1].bar(colunas_usadas, [variancias[col] for col in colunas_usadas], color='skyblue')
+    axes[1].set_title("Comparação das Variâncias")
+    axes[1].set_ylabel("Variância")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto
+    variancia_texto = "\n".join([f"- Variância {col}: {variancias[col]:.4f}" for col in colunas_usadas])
+    texto = f"""
+**Brown-Forsythe - Teste de Igualdade de Variâncias**
+{variancia_texto}
+- Estatística Brown-Forsythe: {stat:.4f}
+- p-valor: {p_valor:.4f}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
+"""
+
+    return texto.strip(), grafico_base64
 
 
 ANALISES = {
@@ -1023,7 +1072,9 @@ ANALISES = {
     "1 Intervalo Interquartilico": analise_1_intervalo_interquartilico,
     "2 Variancas": analise_2_variancas,
     "2 Variancas Brown-Forsythe": analise_2_variancas_brown_forsythe,
-    "Bartlett": analise_bartlett
+    "Bartlett": analise_bartlett,
+    "Brown-Forsythe": analise_brown_forsythe
+
 
 
 
