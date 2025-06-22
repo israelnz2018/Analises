@@ -59,13 +59,13 @@ def grafico_sumario(df, colunas_usadas):
 def analise_de_outliers(df, lista_x):
     resultado_texto = "📊 **Análise de Outliers**\n"
     aplicar_estilo_minitab()
-    fig, axs = plt.subplots(len(colunas_usadas), 1, figsize=(6, 4 * len(colunas_usadas)))
-    if len(colunas_usadas) == 1:
+    fig, axs = plt.subplots(len(lista_x), 1, figsize=(6, 4 * len(lista_x)))
+    if len(lista_x) == 1:
         axs = [axs]
 
     encontrou_outliers = False
 
-    for ax, coluna in zip(axs, colunas_usadas):
+    for ax, coluna in zip(axs, lista_x):
         if coluna not in df.columns:
             resultado_texto += f"- ❌ A coluna '{coluna}' não foi encontrada.\n"
             continue
@@ -101,14 +101,15 @@ def analise_de_outliers(df, lista_x):
 
     return resultado_texto, imagem_base64
 
+
 def analise_correlacao_person(df, colunas_y, lista_x):
     if not colunas_y or len(colunas_y) != 1:
         return "❌ É necessário exatamente uma variável Y.", None
-    if not colunas_x or len(colunas_x) < 1:
+    if not lista_x or len(lista_x) < 1:
         return "❌ É necessário ao menos uma variável X.", None
 
     nome_coluna_y = colunas_y[0]
-    nomes_colunas_x = colunas_x
+    nomes_colunas_x = lista_x
 
     if nome_coluna_y not in df.columns:
         return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada.", None
@@ -152,25 +153,28 @@ Resultados:
 
 
 
+
 def analise_matrix_correlacao(df, colunas_y, lista_x):
-    if len(colunas_usadas) < 2:
+    colunas = (colunas_y or []) + (lista_x or [])
+    
+    if len(colunas) < 2:
         return "❌ É necessário ao menos duas colunas para gerar a matriz de correlação.", None
 
-    for col in colunas_usadas:
+    for col in colunas:
         if col not in df.columns:
             return f"❌ Coluna '{col}' não encontrada no dataframe.", None
 
-    dados = df[colunas_usadas].dropna()
+    dados = df[colunas].dropna()
     if dados.empty:
         return "❌ Dados insuficientes após remoção de valores ausentes.", None
 
     matriz_cor = dados.corr(method='pearson')
 
     linhas_resumo = []
-    for i in range(len(colunas_usadas)):
-        for j in range(i + 1, len(colunas_usadas)):
-            col1 = colunas_usadas[i]
-            col2 = colunas_usadas[j]
+    for i in range(len(colunas)):
+        for j in range(i + 1, len(colunas)):
+            col1 = colunas[i]
+            col2 = colunas[j]
             r = matriz_cor.loc[col1, col2]
 
             if abs(r) < 0.3:
@@ -195,6 +199,7 @@ def analise_matrix_correlacao(df, colunas_y, lista_x):
     img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
     return resumo, img_base64
+
 
 def analise_estabilidade(df, colunas_usadas):
     if not colunas_usadas or colunas_usadas[0] not in df.columns:
