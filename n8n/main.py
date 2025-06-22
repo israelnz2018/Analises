@@ -108,6 +108,7 @@ async def analisar(
 ):
     try:
         df = await ler_arquivo(arquivo)
+
         colunas_y = [y.strip() for y in coluna_y.split(",")] if coluna_y else []
         lista_x = []
         if colunas_x:
@@ -118,28 +119,67 @@ async def analisar(
                     lista_x.extend([x.strip() for x in item.split(",")])
         lista_z = [coluna_z.strip()] if coluna_z else []
         subgrupo_val = subgrupo.strip() if subgrupo else None
+
         colunas_usadas = colunas_y + lista_x + lista_z
         if subgrupo_val:
             colunas_usadas.append(subgrupo_val)
+
+        # 🔍 Logs para debug
+        print("🔍 Colunas no arquivo recebido:", df.columns.tolist())
+        print("🔍 Colunas solicitadas pelo usuário (Y):", colunas_y)
+        print("🔍 Colunas solicitadas pelo usuário (X):", lista_x)
+        print("🔍 Colunas solicitadas pelo usuário (Z):", lista_z)
+        print("🔍 Subgrupo solicitado:", subgrupo_val)
+        print("🔍 Field recebido:", field)
+        print("🔍 Field distribuição recebido:", field_distribuicao)
+
         resultado_texto = ""
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
+
         if ferramenta:
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse({"erro": f"Análise {ferramenta} desconhecida."}, status_code=400)
-            disponiveis = {"df": df, "colunas_y": colunas_y, "lista_x": lista_x, "lista_z": lista_z, "subgrupo": subgrupo_val, "field": field, "field_distribuicao": field_distribuicao, "colunas_usadas": colunas_usadas}
+
+            disponiveis = {
+                "df": df,
+                "colunas_y": colunas_y,
+                "lista_x": lista_x,
+                "lista_z": lista_z,
+                "subgrupo": subgrupo_val,
+                "field": field,
+                "field_distribuicao": field_distribuicao,
+                "colunas_usadas": colunas_usadas
+            }
+
             permitidos = CONFIG_ANALISES.get(ferramenta.strip(), ["df", "colunas_y", "lista_x", "lista_z", "subgrupo", "field"])
             args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
+
             resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
+
         if grafico:
             funcao_grafico = GRAFICOS.get(grafico.strip())
             if not funcao_grafico:
                 return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
+
             imagem_grafico_isolado_base64 = funcao_grafico(df, colunas_usadas)
-        return {"analise": resultado_texto, "grafico_base64": imagem_analise_base64 or [], "grafico_isolado_base64": imagem_grafico_isolado_base64, "colunas_utilizadas": colunas_usadas}
+
+        return {
+            "analise": resultado_texto,
+            "grafico_base64": imagem_analise_base64 or [],
+            "grafico_isolado_base64": imagem_grafico_isolado_base64,
+            "colunas_utilizadas": colunas_usadas
+        }
+
     except ValueError as e:
         return JSONResponse({"erro": str(e)}, status_code=400)
+
     except Exception as e:
         tb = traceback.format_exc()
-        return JSONResponse({"erro": "Erro interno ao processar a análise.", "detalhe": str(e), "traceback": tb}, status_code=500)
+        return JSONResponse({
+            "erro": "Erro interno ao processar a análise.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
