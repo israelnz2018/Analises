@@ -199,7 +199,7 @@ def analise_matrix_correlacao(df, colunas_y, lista_x):
     return resumo, img_base64
 
 
-def analise_estabilidade(df, colunas_y, subgrupo):
+def analise_estabilidade(df, colunas_y, subgrupo=None):
     if not colunas_y or colunas_y[0] not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no dataframe.", None
 
