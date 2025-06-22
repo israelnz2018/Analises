@@ -118,16 +118,11 @@ def analise_correlacao_person(df, colunas_y, lista_x):
         if col not in df.columns:
             return f"❌ A coluna X '{col}' não foi encontrada.", None
 
-    serie_y = df[nome_coluna_y].dropna()
-    if serie_y.empty:
-        return f"❌ A coluna Y '{nome_coluna_y}' não contém dados válidos.", None
-
+    serie_y = df[nome_coluna_y]
     linhas = []
+
     for nome_x in nomes_colunas_x:
-        serie_x = df[nome_x].dropna()
-        if serie_x.empty:
-            linhas.append(f"- {nome_x}: ❌ Dados X inválidos.")
-            continue
+        serie_x = df[nome_x]
 
         data = pd.concat([serie_y, serie_x], axis=1).dropna()
         if data.empty or len(data) < 2:
