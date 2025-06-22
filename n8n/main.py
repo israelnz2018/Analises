@@ -75,10 +75,6 @@ ANALISES_COM_FIELD = {
     "Cálculo de Probabilidade"
 }
 
-@app.get("/healthz")
-def healthcheck():
-    return JSONResponse({"status": "ok"})
-
 @app.post("/analise")
 async def analisar(
     request: Request,
@@ -113,7 +109,6 @@ async def analisar(
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
 
-        # Análise com gráfico associado
         if ferramenta:
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
@@ -123,7 +118,6 @@ async def analisar(
                 df, colunas_y, lista_x, lista_z, subgrupo_val, field=field
             )
 
-        # Gráfico isolado
         if grafico:
             funcao_grafico = GRAFICOS.get(grafico.strip())
             if not funcao_grafico:
@@ -147,4 +141,3 @@ async def analisar(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
-
