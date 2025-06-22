@@ -107,6 +107,8 @@ async def analisar(
     field_distribuicao: str = Form(None)
 ):
     try:
+        print("🚀 Nome do arquivo recebido:", arquivo.filename)
+
         df = await ler_arquivo(arquivo)
 
         colunas_y = [y.strip() for y in coluna_y.split(",")] if coluna_y else []
@@ -182,4 +184,3 @@ async def analisar(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
-
