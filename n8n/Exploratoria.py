@@ -101,7 +101,7 @@ def analise_de_outliers(df, colunas_usadas):
 
     return resultado_texto, imagem_base64
 
-def analise_correlacao_person(df, colunas_y, colunas_x=None, field=None):
+def analise_correlacao_person(df, colunas_y, colunas_x, field=None):
     if not colunas_y or len(colunas_y) != 1:
         return "❌ É necessário exatamente uma variável Y.", None
     if not colunas_x or len(colunas_x) < 1:
@@ -135,13 +135,7 @@ def analise_correlacao_person(df, colunas_y, colunas_x=None, field=None):
 
         r, p = stats.pearsonr(data.iloc[:, 0], data.iloc[:, 1])
 
-        if abs(r) < 0.3:
-            forca = "fraca"
-        elif abs(r) < 0.7:
-            forca = "moderada"
-        else:
-            forca = "forte"
-
+        forca = "fraca" if abs(r) < 0.3 else "moderada" if abs(r) < 0.7 else "forte"
         dependencia = "existe dependência estatística" if p < 0.05 else "não há dependência estatística"
 
         linhas.append(
@@ -154,6 +148,7 @@ Resultados:
 """ + "\n".join(linhas)
 
     return resumo, None
+
 
 
 
