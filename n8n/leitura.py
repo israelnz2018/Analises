@@ -4,14 +4,12 @@ import os
 
 from fastapi.responses import JSONResponse
 
-async def ler_arquivo(arquivo):
+async def ler_arquivo(arquivo, aba=None):
     if arquivo and arquivo.filename.endswith(".xlsx"):
-        await arquivo.seek(0)  # Garante que a leitura começa do início
+        await arquivo.seek(0)
         file_bytes = await arquivo.read()
-        df = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl")
+        df = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl", sheet_name=aba)
         df.columns = df.columns.map(str).map(str.strip)
-        print("🚀 Nome do arquivo recebido:", arquivo.filename)
-        print("🚀 Colunas realmente lidas no arquivo:", df.columns.tolist())
         return df
     else:
         raise ValueError("Envie um arquivo Excel (.xlsx) válido.")
