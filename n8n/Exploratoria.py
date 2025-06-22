@@ -103,14 +103,16 @@ def analise_de_outliers(df, lista_x):
 
 
 def analise_correlacao_person(df, colunas_y, lista_x):
+    # Confirma nomes reais no DataFrame
+    nomes_df = df.columns.tolist()
+
     if not colunas_y or len(colunas_y) != 1:
         return "❌ É necessário exatamente uma variável Y.", None
     if not lista_x or len(lista_x) < 1:
         return "❌ É necessário ao menos uma variável X.", None
 
     nome_coluna_y = colunas_y[0]
-
-    if nome_coluna_y not in df.columns:
+    if nome_coluna_y not in nomes_df:
         return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada no arquivo.", None
 
     serie_y = df[nome_coluna_y].dropna()
@@ -118,10 +120,9 @@ def analise_correlacao_person(df, colunas_y, lista_x):
         return f"❌ A coluna Y '{nome_coluna_y}' não contém dados válidos.", None
 
     linhas = []
-
     for nome_x in lista_x:
-        if nome_x not in df.columns:
-            linhas.append(f"- {nome_x}: ❌ A coluna X não foi encontrada.")
+        if nome_x not in nomes_df:
+            linhas.append(f"- {nome_x}: ❌ A coluna X não foi encontrada no arquivo.")
             continue
 
         serie_x = df[nome_x].dropna()
@@ -129,7 +130,6 @@ def analise_correlacao_person(df, colunas_y, lista_x):
             linhas.append(f"- {nome_x}: ❌ Dados X inválidos.")
             continue
 
-        # Faz merge das séries para alinhar os índices
         data = pd.concat([serie_y, serie_x], axis=1).dropna()
         if data.empty or len(data) < 2:
             linhas.append(f"- {nome_x}: ❌ Sem dados pareados suficientes.")
@@ -147,7 +147,6 @@ Resultados:
 """ + "\n".join(linhas)
 
     return resumo, None
-
 
 
 
