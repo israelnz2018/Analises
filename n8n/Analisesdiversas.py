@@ -132,6 +132,9 @@ def analise_calculo_probabilidade(df: pd.DataFrame, colunas_usadas: list, field=
 
 ANALISES = {
     "Cálculo de Probabilidade": analise_calculo_probabilidade,
+
     
+
+}
 
 
