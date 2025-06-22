@@ -36,7 +36,7 @@ CONFIG_ANALISES = {
     "Análise de outliers": ["df", "colunas_y"],
     "Correlação de person": ["df", "colunas_y", "lista_x"],
     "Matrix de dispersão": ["df", "colunas_y", "lista_x"],
-    "Análise de estabilidade": ["df", "colunas_y",],
+    "Análise de estabilidade": ["df", "colunas_y", "subgrupo"],
     "Análise de limpeza dos dados": ["df"],
     "Histograma": ["df", "lista_x", "subgrupo"],
     "Pareto": ["df", "lista_x", "subgrupo", "colunas_y"],
