@@ -69,7 +69,8 @@ async def analisar(
     grafico: str = Form(None),
     coluna_y: str = Form(None),
     colunas_x: str | list[str] = Form(None),
-    coluna_z: str = Form(None)
+    coluna_z: str = Form(None),
+    subgrupo: str = Form(None)
 ):
     try:
         form = await request.form()
@@ -78,25 +79,33 @@ async def analisar(
             field = None
 
         df = await ler_arquivo(arquivo)
-        colunas_usadas = []
 
-        # ✅ Trata coluna_y
+        # ✅ Trata colunas_y
         colunas_y = []
         if coluna_y and coluna_y.strip():
             colunas_y = [y.strip() for y in coluna_y.split(",") if y.strip()]
-            colunas_usadas.extend(colunas_y)
 
         # ✅ Trata colunas_x
+        lista_x = []
         if colunas_x:
             if isinstance(colunas_x, str):
-                colunas_usadas.extend([x.strip() for x in colunas_x.split(",") if x.strip()])
+                lista_x = [x.strip() for x in colunas_x.split(",") if x.strip()]
             else:
                 for item in colunas_x:
-                    colunas_usadas.extend([x.strip() for x in item.split(",") if x.strip()])
+                    lista_x.extend([x.strip() for x in item.split(",") if x.strip()])
 
         # ✅ Trata coluna_z
+        lista_z = []
         if coluna_z and coluna_z.strip():
-            colunas_usadas.append(coluna_z.strip())
+            lista_z = [coluna_z.strip()]
+
+        # ✅ Trata subgrupo
+        subgrupo_val = subgrupo.strip() if subgrupo and subgrupo.strip() else None
+
+        # ✅ Monta lista geral para rastreamento
+        colunas_usadas = colunas_y + lista_x + lista_z
+        if subgrupo_val:
+            colunas_usadas.append(subgrupo_val)
 
         resultado_texto = None
         imagem_analise_base64 = None
@@ -109,9 +118,13 @@ async def analisar(
                 return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
 
             if ferramenta.strip() in ANALISES_COM_FIELD:
-                resultado_texto, imagem_analise_base64 = funcao(df, colunas_y, field=field)
+                resultado_texto, imagem_analise_base64 = funcao(
+                    df, colunas_y, lista_x, lista_z, subgrupo_val, field=field
+                )
             else:
-                resultado_texto, imagem_analise_base64 = funcao(df, colunas_y or colunas_usadas)
+                resultado_texto, imagem_analise_base64 = funcao(
+                    df, colunas_y, lista_x, lista_z, subgrupo_val
+                )
 
         # ✅ Executa gráfico
         if grafico and grafico.strip():
@@ -143,4 +156,3 @@ async def analisar(
             },
             status_code=500
         )
-
