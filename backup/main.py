@@ -30,64 +30,62 @@ async def analisar(
     ferramenta: str = Form(None),
     grafico: str = Form(None),
     coluna_y: str = Form(None),
-    colunas_x: str | list[str] = Form(None)
+    colunas_x: str | list[str] = Form(None),
+    coluna_z: str = Form(None),
+    subgrupo: str = Form(None),
+    field: str = Form(None)
 ):
     try:
         df = await ler_arquivo(arquivo)
-        colunas_usadas = []
 
-        if coluna_y and coluna_y.strip():
-            colunas_usadas.append(coluna_y.strip())
-
+        colunas_y = [y.strip() for y in coluna_y.split(",")] if coluna_y else []
+        lista_x = []
         if colunas_x:
             if isinstance(colunas_x, str):
-                colunas_usadas.extend([x.strip() for x in colunas_x.split(",") if x.strip()])
+                lista_x = [x.strip() for x in colunas_x.split(",")]
             else:
                 for item in colunas_x:
-                    colunas_usadas.extend([x.strip() for x in item.split(",") if x.strip()])
+                    lista_x.extend([x.strip() for x in item.split(",")])
+        lista_z = [coluna_z.strip()] if coluna_z else []
+        subgrupo_val = subgrupo.strip() if subgrupo else None
 
-        resultado_texto = None
+        colunas_usadas = colunas_y + lista_x + lista_z
+        if subgrupo_val:
+            colunas_usadas.append(subgrupo_val)
+
+        resultado_texto = ""
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
 
-        # Executa análise
-        if ferramenta and ferramenta.strip():
+        if ferramenta:
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
-                return JSONResponse(content={"erro": "Análise estatística desconhecida."}, status_code=400)
-            resultado_texto, imagem_analise_base64 = funcao(df, colunas_usadas)
+                return JSONResponse({"erro": f"Análise {ferramenta} desconhecida."}, status_code=400)
 
-        # Executa gráfico (tudo do graficos.py vai para o lado direito)
-        if grafico and grafico.strip():
-            print(f"🎨 Gráfico solicitado: {grafico.strip()}")
-            print(f"📊 Colunas usadas: {colunas_usadas}")
-            funcao = GRAFICOS.get(grafico.strip())
-            if not funcao:
-                print(f"❌ Gráfico {grafico.strip()} não encontrado no GRAFICOS.")
-                return JSONResponse(content={"erro": f"Gráfico {grafico.strip()} não encontrado."}, status_code=400)
-            imagem_grafico_isolado_base64 = funcao(
-                df,
-                colunas_usadas,
-                coluna_y=coluna_y.strip() if coluna_y else None
+            resultado_texto, imagem_analise_base64 = funcao(
+                df, colunas_y, lista_x, lista_z, subgrupo_val, field=field
             )
 
+        if grafico:
+            funcao_grafico = GRAFICOS.get(grafico.strip())
+            if not funcao_grafico:
+                return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
+
+            imagem_grafico_isolado_base64 = funcao_grafico(df, colunas_usadas)
+
         return {
-            "analise": resultado_texto or "",
+            "analise": resultado_texto,
             "grafico_base64": imagem_analise_base64 or [],
             "grafico_isolado_base64": imagem_grafico_isolado_base64,
             "colunas_utilizadas": colunas_usadas
         }
 
     except ValueError as e:
-        return JSONResponse(content={"erro": str(e)}, status_code=400)
-
+        return JSONResponse({"erro": str(e)}, status_code=400)
     except Exception as e:
         tb = traceback.format_exc()
-        return JSONResponse(
-            content={
-                "erro": "Erro interno ao processar a análise.",
-                "detalhe": str(e),
-                "traceback": tb
-            },
-            status_code=500
-        )
+        return JSONResponse({
+            "erro": "Erro interno ao processar a análise.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
