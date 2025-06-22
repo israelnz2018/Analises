@@ -201,15 +201,15 @@ def analise_matrix_correlacao(df, colunas_y, lista_x):
     return resumo, img_base64
 
 
-def analise_estabilidade(df, colunas_usadas):
-    if not colunas_usadas or colunas_usadas[0] not in df.columns:
+def analise_estabilidade(df, colunas_y, subgrupo):
+    if not colunas_y or colunas_y[0] not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no dataframe.", None
 
-    nome_coluna_y = colunas_usadas[0]
-    nome_coluna_subgrupo = colunas_usadas[1] if len(colunas_usadas) > 1 else None
+    nome_coluna_y = colunas_y[0]
+    nome_coluna_subgrupo = subgrupo if subgrupo and subgrupo in df.columns else None
 
     dados = df[[nome_coluna_y]].copy()
-    if nome_coluna_subgrupo and nome_coluna_subgrupo in df.columns:
+    if nome_coluna_subgrupo:
         dados['Subgrupo'] = df[nome_coluna_subgrupo]
     else:
         dados['Subgrupo'] = range(1, len(dados) + 1)
@@ -220,7 +220,7 @@ def analise_estabilidade(df, colunas_usadas):
     aplicar_estilo_minitab()
     texto_resumo = f"📊 **Análise de Estabilidade da coluna '{nome_coluna_y}'**\n"
 
-    if nome_coluna_subgrupo and nome_coluna_subgrupo in df.columns:
+    if nome_coluna_subgrupo:
         fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
         sns.lineplot(x="Subgrupo", y=nome_coluna_y, data=dados, ax=axs[0], marker="o")
         axs[0].set_title("Carta X-Barra")
@@ -265,6 +265,7 @@ def analise_estabilidade(df, colunas_usadas):
 
     return texto_resumo, img_base64
 
+
 def analise_limpeza_dados(df):
     linhas_total = len(df)
     colunas_total = df.shape[1]
@@ -289,6 +290,7 @@ def analise_limpeza_dados(df):
 
     texto_final = "<br>".join(resultado)
     return texto_final, None
+
 
 ANALISES = {
     "Gráfico Sumario": grafico_sumario,
