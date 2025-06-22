@@ -1,10 +1,10 @@
 from suporte import *
 
-def analise_1_sample_t(df, colunas_usadas, field=None):
-    if len(colunas_usadas) < 1 or not field:
+def analise_1_sample_t(df, colunas_y, field=None):
+    if not colunas_y or not field:
         return "⚠ É obrigatório informar a coluna Y e o valor de referência.", []
 
-    col_y = colunas_usadas[0]
+    col_y = colunas_y[0]
     if col_y not in df.columns:
         return f"⚠ Coluna {col_y} não encontrada no arquivo.", []
 
@@ -65,6 +65,7 @@ def analise_1_sample_t(df, colunas_usadas, field=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return resultado, [imagem_base64]
+
 
 
 from suporte import *
