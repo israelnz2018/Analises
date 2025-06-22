@@ -263,29 +263,21 @@ def gerar_boxplot(df, colunas_usadas, coluna_y=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
     
-def gerar_dispersao(df, colunas_usadas, coluna_y=None):
-    if not coluna_y or coluna_y not in df.columns:
+def gerar_dispersao(df, colunas_y, lista_x, subgrupo):
+    if not colunas_y or colunas_y[0] not in df.columns:
         return None  # Y obrigatório
 
-    if len(colunas_usadas) < 1:
+    if not lista_x or lista_x[0] not in df.columns:
         return None  # Pelo menos um X obrigatório
 
-    col_xs = colunas_usadas
-    col_sub = None
-
-    if "Subgrupo" in colunas_usadas:
-        col_xs = [c for c in colunas_usadas if c != "Subgrupo"]
-        col_sub = "Subgrupo"
-
-    x_col = col_xs[0]
-    if x_col not in df.columns:
-        return None
+    coluna_y = colunas_y[0]
+    x_col = lista_x[0]
 
     plt.figure(figsize=(10, 6))
 
-    if col_sub and col_sub in df.columns:
-        sns.scatterplot(x=x_col, y=coluna_y, hue=col_sub, data=df)
-        plt.title(f"Dispersão de {coluna_y} por {x_col} (Subgrupo: {col_sub})")
+    if subgrupo and subgrupo in df.columns:
+        sns.scatterplot(x=x_col, y=coluna_y, hue=subgrupo, data=df)
+        plt.title(f"Dispersão de {coluna_y} por {x_col} (Subgrupo: {subgrupo})")
     else:
         sns.scatterplot(x=x_col, y=coluna_y, data=df)
         plt.title(f"Dispersão de {coluna_y} por {x_col}")
@@ -298,27 +290,22 @@ def gerar_dispersao(df, colunas_usadas, coluna_y=None):
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
+
     
-def gerar_tendencia(df, colunas_usadas, coluna_y=None):
-    if not coluna_y or coluna_y not in df.columns:
+def gerar_tendencia(df, colunas_y, lista_x, subgrupo):
+    if not colunas_y or colunas_y[0] not in df.columns:
         return None  # Y obrigatório
 
-    col_sub = None
-    col_x = None
-
-    if len(colunas_usadas) > 0:
-        # Verifica se o primeiro é X
-        if colunas_usadas[0] != "Subgrupo":
-            col_x = colunas_usadas[0]
-    if len(colunas_usadas) > 1:
-        col_sub = colunas_usadas[1]
+    coluna_y = colunas_y[0]
+    col_x = lista_x[0] if lista_x and lista_x[0] in df.columns else None
+    col_sub = subgrupo if subgrupo and subgrupo in df.columns else None
 
     plt.figure(figsize=(10, 6))
 
     df = df.dropna(subset=[coluna_y]).reset_index(drop=True)
     df['sequencia'] = df.index + 1  # Sequência temporal
 
-    if col_sub and col_sub in df.columns:
+    if col_sub:
         sns.lineplot(x='sequencia', y=coluna_y, hue=col_sub, data=df, marker='o')
         plt.title(f"Tendência temporal de {coluna_y} por sequência (Subgrupo: {col_sub})")
     else:
@@ -335,6 +322,7 @@ def gerar_tendencia(df, colunas_usadas, coluna_y=None):
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     return imagem_base64
+
 
 def gerar_bolhas_3d(df, colunas_usadas, coluna_y=None):
     if len(colunas_usadas) < 3:
