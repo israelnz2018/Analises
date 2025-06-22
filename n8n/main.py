@@ -38,7 +38,22 @@ ANALISES.update(ANALISES_PROC)
 ANALISES.update(ANALISES_DIVERSAS)
 print("✅ ANALISES carregados com sucesso")
 
-ANALISES_COM_FIELD = {"1 Sample T", "1 Wilcoxon", "1 Teste de Sinal", "1 Proporcao", "Intervalo de Confianca"}
+ANALISES_COM_FIELD = {
+    "1 Sample T",
+    "1 Wilcoxon",
+    "1 Intervalo de Confianca",
+    "1 Intervalo de Confianca Variancia",
+    "1 Proporcao",
+    "2 Proporcoes",
+    "ARIMA",
+    "Holt-Winters",
+    "Capabilidade - dados normais",
+    "Capabilidade - outras distribuições",
+    "Capabilidade - com dados transformados",
+    "Capabilidade - com dados discretizados",
+    "Cálculo de Probabilidade"
+}
+
 
 
 @app.get("/healthz")
