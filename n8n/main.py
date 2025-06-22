@@ -25,7 +25,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 print("✅ CORS configurado com domínio: https://educacaopelotrabalho-production.up.railway.app")
-
 print("🚩 main.py carregado com PROJECT=", os.getenv("PROJECT"))
 
 # Junta os ANALISES
@@ -57,23 +56,6 @@ ANALISES_COM_FIELD = {
 @app.get("/healthz")
 def healthcheck():
     return JSONResponse({"status": "ok"})
-
-
-ANALISES_COM_FIELD = {
-    "1 Sample T",
-    "1 Wilcoxon",
-    "1 Intervalo de Confianca",
-    "1 Intervalo de Confianca Variancia",
-    "1 Proporcao",
-    "2 Proporcoes",
-    "ARIMA",
-    "Holt-Winters",
-    "Capabilidade - dados normais",
-    "Capabilidade - outras distribuições",
-    "Capabilidade - com dados transformados",
-    "Capabilidade - com dados discretizados",
-    "Cálculo de Probabilidade"
-}
 
 @app.post("/analise")
 async def analisar(
@@ -114,9 +96,14 @@ async def analisar(
             if not funcao:
                 return JSONResponse({"erro": f"Análise {ferramenta} desconhecida."}, status_code=400)
 
-            resultado_texto, imagem_analise_base64 = funcao(
-                df, colunas_y, lista_x, lista_z, subgrupo_val, field=field
-            )
+            if ferramenta.strip() in ANALISES_COM_FIELD:
+                resultado_texto, imagem_analise_base64 = funcao(
+                    df, colunas_y, lista_x, lista_z, subgrupo_val, field=field
+                )
+            else:
+                resultado_texto, imagem_analise_base64 = funcao(
+                    df, colunas_y, lista_x, lista_z, subgrupo_val
+                )
 
         if grafico:
             funcao_grafico = GRAFICOS.get(grafico.strip())
