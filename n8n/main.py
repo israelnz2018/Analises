@@ -80,29 +80,19 @@ async def analisar(
 
         df = await ler_arquivo(arquivo)
 
-        # ✅ Separa colunas_y
-        colunas_y = []
-        if coluna_y and coluna_y.strip():
-            colunas_y = [y.strip() for y in coluna_y.split(",") if y.strip()]
-
-        # ✅ Separa colunas_x
+        # ✅ Organiza os campos recebidos
+        colunas_y = [y.strip() for y in coluna_y.split(",")] if coluna_y else []
         lista_x = []
         if colunas_x:
             if isinstance(colunas_x, str):
-                lista_x = [x.strip() for x in colunas_x.split(",") if x.strip()]
+                lista_x = [x.strip() for x in colunas_x.split(",")]
             else:
                 for item in colunas_x:
-                    lista_x.extend([x.strip() for x in item.split(",") if x.strip()])
+                    lista_x.extend([x.strip() for x in item.split(",")])
 
-        # ✅ Separa colunas_z
-        lista_z = []
-        if coluna_z and coluna_z.strip():
-            lista_z = [coluna_z.strip()]
+        lista_z = [coluna_z.strip()] if coluna_z else []
+        subgrupo_val = subgrupo.strip() if subgrupo else None
 
-        # ✅ Separa subgrupo
-        subgrupo_val = subgrupo.strip() if subgrupo and subgrupo.strip() else None
-
-        # ✅ Para rastrear
         colunas_usadas = colunas_y + lista_x + lista_z
         if subgrupo_val:
             colunas_usadas.append(subgrupo_val)
@@ -111,30 +101,23 @@ async def analisar(
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
 
-        # ✅ Se for análise
+        # ✅ Chamada para análise
         if ferramenta and ferramenta.strip():
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse(content={"erro": f"Análise {ferramenta.strip()} desconhecida."}, status_code=400)
 
-            # Sempre passa tudo, a função usa o que precisa
-            if ferramenta.strip() in ANALISES_COM_FIELD:
-                resultado_texto, imagem_analise_base64 = funcao(
-                    df, colunas_y, lista_x, lista_z, subgrupo_val, field=field
-                )
-            else:
-                resultado_texto, imagem_analise_base64 = funcao(
-                    df, colunas_y, lista_x, lista_z, subgrupo_val
-                )
+            # Passa tudo: a função decide o que usar
+            resultado_texto, imagem_analise_base64 = funcao(
+                df, colunas_y, lista_x, lista_z, subgrupo_val, field=field
+            )
 
-        # ✅ Se for gráfico
+        # ✅ Chamada para gráfico
         if grafico and grafico.strip():
             funcao = GRAFICOS.get(grafico.strip())
             if not funcao:
                 return JSONResponse(content={"erro": f"Gráfico {grafico.strip()} não encontrado."}, status_code=400)
 
-            print(f"🎨 Gráfico solicitado: {grafico.strip()}")
-            print(f"📊 Colunas usadas: {colunas_usadas}")
             imagem_grafico_isolado_base64 = funcao(df, colunas_usadas)
 
         return {
@@ -157,3 +140,4 @@ async def analisar(
             },
             status_code=500
         )
+
