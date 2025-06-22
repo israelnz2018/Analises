@@ -56,16 +56,16 @@ def grafico_sumario(df, colunas_usadas):
 
     return resumo, imagem_base64
 
-def analise_de_outliers(df, lista_x):
+def analise_de_outliers(df, colunas_y):
     resultado_texto = "📊 **Análise de Outliers**\n"
     aplicar_estilo_minitab()
-    fig, axs = plt.subplots(len(lista_x), 1, figsize=(6, 4 * len(lista_x)))
-    if len(lista_x) == 1:
+    fig, axs = plt.subplots(len(colunas_y), 1, figsize=(6, 4 * len(colunas_y)))
+    if len(colunas_y) == 1:
         axs = [axs]
 
     encontrou_outliers = False
 
-    for ax, coluna in zip(axs, lista_x):
+    for ax, coluna in zip(axs, colunas_y):
         if coluna not in df.columns:
             resultado_texto += f"- ❌ A coluna '{coluna}' não foi encontrada.\n"
             continue
@@ -100,6 +100,7 @@ def analise_de_outliers(df, lista_x):
     imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
     return resultado_texto, imagem_base64
+
 
 
 def analise_correlacao_person(df, colunas_y, lista_x):
