@@ -59,13 +59,11 @@ def grafico_sumario(df, colunas_usadas):
 def analise_de_outliers(df, colunas_y):
     resultado_texto = "📊 **Análise de Outliers**\n"
     aplicar_estilo_minitab()
-    fig, axs = plt.subplots(len(colunas_y), 1, figsize=(6, 4 * len(colunas_y)))
-    if len(colunas_y) == 1:
-        axs = [axs]
 
+    dados_plot = {}
     encontrou_outliers = False
 
-    for ax, coluna in zip(axs, colunas_y):
+    for coluna in colunas_y:
         if coluna not in df.columns:
             resultado_texto += f"- ❌ A coluna '{coluna}' não foi encontrada.\n"
             continue
@@ -82,15 +80,22 @@ def analise_de_outliers(df, colunas_y):
         limite_superior = q3 + 1.5 * iqr
         outliers = serie[(serie < limite_inferior) | (serie > limite_superior)]
 
-        sns.boxplot(x=serie, orient="h", ax=ax, flierprops=dict(marker='*', markersize=8, markerfacecolor='red'))
-        ax.set_title(f"Boxplot - {coluna}")
-        ax.set_xlabel(coluna)
+        dados_plot[coluna] = serie
 
         if not outliers.empty:
             encontrou_outliers = True
             resultado_texto += f"- ⚠ A coluna '{coluna}' possui {len(outliers)} outlier(s): {list(outliers.values)}\n"
         else:
             resultado_texto += f"- ✅ A coluna '{coluna}' não possui outliers detectados.\n"
+
+    # Prepara DataFrame para boxplot
+    df_plot = pd.DataFrame(dados_plot)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.boxplot(data=df_plot, ax=ax, orient="v", flierprops=dict(marker='*', markersize=8, markerfacecolor='red'))
+    ax.set_title("Boxplot - Outliers nas colunas analisadas")
+    ax.set_ylabel("Valores")
+    ax.set_xlabel("Colunas")
 
     buffer = BytesIO()
     plt.tight_layout()
@@ -100,6 +105,7 @@ def analise_de_outliers(df, colunas_y):
     imagem_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
     return resultado_texto, imagem_base64
+
 
 
 
