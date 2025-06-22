@@ -130,3 +130,8 @@ def analise_calculo_probabilidade(df: pd.DataFrame, colunas_usadas: list, field=
 
     return texto.strip(), grafico_base64
 
+ANALISES = {
+    "Cálculo de Probabilidade": analise_calculo_probabilidade,
+    
+
+
