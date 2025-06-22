@@ -40,16 +40,16 @@ CONFIG_ANALISES = {
     "Análise de limpeza dos dados": ["df"],
     "Histograma": ["df", "lista_x", "subgrupo"],
     "Pareto": ["df", "lista_x", "subgrupo", "colunas_y"],
-    "Setores (Pizza)": ["df", "lista_x", "colunas_y"],
-    "Barras": ["df", "lista_x", "colunas_y", "subgrupo"],
+    "Setores (Pizza)": ["df", "colunas_y", "subgrupo"],
+    "Barras": ["df", "lista_x", "colunas_y", "lista_x"],
     "BoxPlot": ["df", "lista_x", "subgrupo"],
     "Dispersão": ["df", "colunas_y", "lista_x", "subgrupo"],
     "Tendência": ["df", "colunas_y", "lista_x", "subgrupo"],
     "Bolhas - 3D": ["df", "lista_x", "colunas_y", "lista_z"],
     "Superfície - 3D": ["df", "lista_x", "colunas_y", "lista_z"],
-    "1 Sample T": ["df", "colunas_y", "field"],
-    "2 Sample T": ["df", "colunas_y"],
-    "2 Paired Test": ["df", "colunas_y"],
+    "1 Sample T": ["df", "colunas_y", "field", "field"],
+    "2 Sample T": ["df", "colunas_y", "field"],
+    "2 Paired Test": ["df", "colunas_y", "field"],
     "One way ANOVA": ["df", "colunas_y", "subgrupo"],
     "1 Wilcoxon": ["df", "colunas_y", "field"],
     "2 Mann-Whitney": ["df", "colunas_y"],
@@ -99,19 +99,20 @@ async def analisar(
     arquivo: UploadFile = File(None),
     ferramenta: str = Form(None),
     grafico: str = Form(None),
-    aba: str = Form(None),  # ✅ Adicionado campo para receber a aba
+    aba: str = Form(None),
     coluna_y: str = Form(None),
     colunas_x: str | list[str] = Form(None),
     coluna_z: str = Form(None),
     subgrupo: str = Form(None),
     field: str = Form(None),
+    field_conf: str = Form(None),  # ✅ Adicionado field_conf
     field_distribuicao: str = Form(None)
 ):
     try:
         print("🚀 Nome do arquivo recebido:", arquivo.filename)
         print("🚀 Aba solicitada:", aba)
 
-        df = await ler_arquivo(arquivo, aba)  # ✅ Passando aba para ler_arquivo
+        df = await ler_arquivo(arquivo, aba)
 
         colunas_y = [y.strip() for y in coluna_y.split(",")] if coluna_y else []
         lista_x = []
@@ -135,6 +136,7 @@ async def analisar(
         print("🔍 Colunas solicitadas pelo usuário (Z):", lista_z)
         print("🔍 Subgrupo solicitado:", subgrupo_val)
         print("🔍 Field recebido:", field)
+        print("🔍 Field_conf recebido:", field_conf)
         print("🔍 Field distribuição recebido:", field_distribuicao)
 
         resultado_texto = ""
@@ -153,11 +155,15 @@ async def analisar(
                 "lista_z": lista_z,
                 "subgrupo": subgrupo_val,
                 "field": field,
+                "field_conf": field_conf,
                 "field_distribuicao": field_distribuicao,
                 "colunas_usadas": colunas_usadas
             }
 
-            permitidos = CONFIG_ANALISES.get(ferramenta.strip(), ["df", "colunas_y", "lista_x", "lista_z", "subgrupo", "field"])
+            permitidos = CONFIG_ANALISES.get(
+                ferramenta.strip(),
+                ["df", "colunas_y", "lista_x", "lista_z", "subgrupo", "field", "field_conf"]
+            )
             args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
 
             resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
@@ -186,3 +192,4 @@ async def analisar(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
