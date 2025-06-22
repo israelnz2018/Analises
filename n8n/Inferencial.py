@@ -1172,9 +1172,18 @@ def analise_1_proporcao(df: pd.DataFrame, colunas_usadas: list, field=None):
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar(0, p_hat, color='skyblue', width=0.4, label='Proporção amostra')
-    ax.errorbar(0, p_hat, yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
-    ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0}
+    ax.bar([0], [p_hat], color='skyblue', width=0.4, label='Proporção amostra')
+    ax.errorbar([0], [p_hat], yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
+    ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0:.4f}')
+    ax.set_xticks([0])
+    ax.set_xticklabels(['Amostra'])
+    ax.set_ylim(0, max(ic_upper * 1.2, p_hat * 1.2))
+    ax.set_ylabel('Proporção')
+    ax.legend()
+    ax.set_title('Proporção com Intervalo de Confiança')
+
+    plt.tight_layout()
+
     
 def analise_2_proporcoes(df: pd.DataFrame, colunas_usadas: list, field=None):
     if len(colunas_usadas) != 2:
