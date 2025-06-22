@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import traceback
 import os
+import inspect
 
 from leitura import ler_arquivo 
 from Capabilidade import ANALISES as ANALISES_CAP
@@ -36,22 +37,6 @@ ANALISES.update(ANALISES_PRED)
 ANALISES.update(ANALISES_PROC)
 ANALISES.update(ANALISES_DIVERSAS)
 print("✅ ANALISES carregados com sucesso")
-
-ANALISES_COM_FIELD = {
-    "1 Sample T",
-    "1 Wilcoxon",
-    "1 Intervalo de Confianca",
-    "1 Intervalo de Confianca Variancia",
-    "1 Proporcao",
-    "2 Proporcoes",
-    "ARIMA",
-    "Holt-Winters",
-    "Capabilidade - dados normais",
-    "Capabilidade - outras distribuições",
-    "Capabilidade - com dados transformados",
-    "Capabilidade - com dados discretizados",
-    "Cálculo de Probabilidade"
-}
 
 @app.get("/healthz")
 def healthcheck():
@@ -96,21 +81,32 @@ async def analisar(
             if not funcao:
                 return JSONResponse({"erro": f"Análise {ferramenta} desconhecida."}, status_code=400)
 
-            if ferramenta.strip() in ANALISES_COM_FIELD:
-                resultado_texto, imagem_analise_base64 = funcao(
-                    df, colunas_y, lista_x, lista_z, subgrupo_val, field=field
-                )
-            else:
-                resultado_texto, imagem_analise_base64 = funcao(
-                    df, colunas_y, lista_x, lista_z, subgrupo_val
-                )
+            sig = inspect.signature(funcao)
+            all_args = {
+                "df": df,
+                "colunas_y": colunas_y,
+                "lista_x": lista_x,
+                "lista_z": lista_z,
+                "subgrupo": subgrupo_val,
+                "field": field
+            }
+            args_to_pass = {k: v for k, v in all_args.items() if k in sig.parameters}
+
+            resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
 
         if grafico:
             funcao_grafico = GRAFICOS.get(grafico.strip())
             if not funcao_grafico:
                 return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
 
-            imagem_grafico_isolado_base64 = funcao_grafico(df, colunas_usadas)
+            sig_g = inspect.signature(funcao_grafico)
+            args_grafico = {
+                "df": df,
+                "colunas_usadas": colunas_usadas
+            }
+            args_grafico_to_pass = {k: v for k, v in args_grafico.items() if k in sig_g.parameters}
+
+            imagem_grafico_isolado_base64 = funcao_grafico(**args_grafico_to_pass)
 
         return {
             "analise": resultado_texto,
@@ -128,3 +124,4 @@ async def analisar(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
