@@ -32,7 +32,7 @@ ANALISES.update(ANALISES_PROC)
 ANALISES.update(ANALISES_DIVERSAS)
 
 CONFIG_ANALISES = {
-    "Gráfico Sumario": ["df", "colunas_y"],
+    "Gráfico Sumario": ["df", "colunas_usadas"],
     "Análise de outliers": ["df", "lista_x"],
     "Correlação de person": ["df", "colunas_y", "lista_x"],
     "Matrix de dispersão": ["df", "colunas_y", "lista_x"],
