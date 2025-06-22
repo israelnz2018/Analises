@@ -49,4 +49,17 @@ def aplicar_estilo_minitab():
     })
     plt.grid(True)
 
-# 🔹 Você pode colocar outras funções de suporte aqui se quiser no futuro
+# ✅ Função para interpretar colunas (A, B, etc → nome real)
+def interpretar_coluna(df, letra_ou_nome):
+    if not letra_ou_nome:
+        return None
+    if letra_ou_nome in df.columns:
+        return letra_ou_nome
+    try:
+        idx = ord(letra_ou_nome.upper()) - 65  # A=0, B=1, etc
+        if 0 <= idx < len(df.columns):
+            return df.columns[idx]
+    except:
+        pass
+    return letra_ou_nome
+
