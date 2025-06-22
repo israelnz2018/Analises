@@ -1,8 +1,8 @@
 from suporte import *
 
-def analise_1_sample_t(df, colunas_y, field=None):
-    if not colunas_y or not field:
-        return "⚠ É obrigatório informar a coluna Y e o valor de referência.", []
+def analise_1_sample_t(df, colunas_y, field, field_conf=None):
+    if not colunas_y:
+        return "⚠ É obrigatório informar a coluna Y.", []
 
     col_y = colunas_y[0]
     if col_y not in df.columns:
@@ -18,11 +18,18 @@ def analise_1_sample_t(df, colunas_y, field=None):
     except ValueError:
         return "⚠ O valor de referência informado não é numérico.", []
 
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+    except ValueError:
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
     n = len(dados)
     media = dados.mean()
     desvio = dados.std(ddof=1)
     erro_media = desvio / (n ** 0.5)
-    ic_low, ic_up = stats.t.interval(0.95, n-1, loc=media, scale=erro_media)
+    ic_low, ic_up = stats.t.interval(1 - alpha, n-1, loc=media, scale=erro_media)
 
     t_stat, p_value = stats.ttest_1samp(dados, ref)
 
@@ -32,7 +39,7 @@ def analise_1_sample_t(df, colunas_y, field=None):
         f"Média: {media:.2f}\n"
         f"Desvio Padrão: {desvio:.2f}\n"
         f"Erro Padrão da Média: {erro_media:.2f}\n"
-        f"IC 95% para μ: ({ic_low:.2f}, {ic_up:.2f})\n\n"
+        f"IC {confidence:.1f}% para μ: ({ic_low:.2f}, {ic_up:.2f})\n\n"
         f"**Teste t para uma amostra (1 Sample T)**\n"
         f"H₀: μ = {ref}\n"
         f"H₁: μ ≠ {ref}\n"
@@ -40,7 +47,7 @@ def analise_1_sample_t(df, colunas_y, field=None):
         f"P-Valor: {p_value:.3f}\n"
     )
 
-    if p_value < 0.05:
+    if p_value < alpha:
         resultado += "➡ Resultado: Rejeita H0 (diferença significativa)."
     else:
         resultado += "➡ Resultado: Não rejeita H0 (sem diferença significativa)."
@@ -49,13 +56,14 @@ def analise_1_sample_t(df, colunas_y, field=None):
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
 
-    ax.plot(media, 1, 'kx', markersize=12)
-    ax.hlines(1, ic_low, ic_up, colors='blue', lw=3)
-    ax.plot(ref, 1, 'ro')
+    ax.plot(media, 1, 'kx', markersize=12, label="Média")
+    ax.hlines(1, ic_low, ic_up, colors='blue', lw=3, label=f"IC {confidence:.1f}%")
+    ax.plot(ref, 1, 'ro', label="H0")
     ax.text(ref, 1.05, 'H0', color='red')
 
-    ax.set_title(f"Boxplot de {col_y}\n(com H0 e intervalo de confiança de 95% para a média)")
+    ax.set_title(f"Boxplot de {col_y}\n(com H0 e intervalo de confiança de {confidence:.1f}% para a média)")
     ax.set_xlabel(col_y)
+    ax.legend()
 
     plt.tight_layout()
     buf = BytesIO()
@@ -68,18 +76,27 @@ def analise_1_sample_t(df, colunas_y, field=None):
 
 
 
+
+
 from suporte import *
 
-def analise_2_sample_t(df, colunas_usadas, **kwargs):
-    if len(colunas_usadas) != 2:
+def analise_2_sample_t(df, colunas_y, field=None):
+    if len(colunas_y) != 2:
         return "❌ É necessário selecionar exatamente duas colunas Y numéricas para o Teste 2 Sample T.", None
 
-    col1, col2 = colunas_usadas
+    col1, col2 = colunas_y
     serie1 = pd.to_numeric(df[col1], errors="coerce").dropna()
     serie2 = pd.to_numeric(df[col2], errors="coerce").dropna()
 
     if len(serie1) < 2 or len(serie2) < 2:
         return "❌ As colunas selecionadas não possuem dados suficientes para o teste.", None
+
+    try:
+        confidence = float(field) if field else 95.0
+    except ValueError:
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
 
     ad1 = anderson(serie1)
     ad2 = anderson(serie2)
@@ -91,12 +108,13 @@ def analise_2_sample_t(df, colunas_usadas, **kwargs):
     stat_f = np.var(serie1, ddof=1) / np.var(serie2, ddof=1)
     df1, df2 = len(serie1)-1, len(serie2)-1
     p_f = 2 * min(stats.f.cdf(stat_f, df1, df2), 1 - stats.f.cdf(stat_f, df1, df2))
-    equal_var = p_f > 0.05
+    equal_var = p_f > alpha
 
     t_stat, p_valor = stats.ttest_ind(serie1, serie2, equal_var=equal_var)
 
     texto = f"""📊 **Teste T para 2 Amostras Independentes**
 
+🔹 Nível de confiança: {confidence:.1f}%  
 🔹 Coluna 1: {col1}  
 🔹 Coluna 2: {col2}  
 
@@ -109,7 +127,7 @@ def analise_2_sample_t(df, colunas_usadas, **kwargs):
 
 🔹 Resultado do Teste T:  
 - Estatística t = {t_stat:.4f}, p = {p_valor:.4f}  
-- {"✅ Não há diferença significativa" if p_valor > 0.05 else "❌ Diferença estatisticamente significativa entre as médias"}"""
+- {"✅ Não há diferença significativa" if p_valor > alpha else "❌ Diferença estatisticamente significativa entre as médias"}"""
 
     try:
         aplicar_estilo_minitab()
@@ -142,13 +160,14 @@ def analise_2_sample_t(df, colunas_usadas, **kwargs):
     return texto, imagem_base64
 
 
+
 from suporte import *
 
-def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
-    if len(colunas_usadas) != 2:
+def analise_paired_t(df: pd.DataFrame, colunas_y: list, field=None):
+    if len(colunas_y) != 2:
         return "❌ O teste t pareado requer exatamente 2 colunas Y.", None
 
-    col1, col2 = colunas_usadas
+    col1, col2 = colunas_y
     dados1 = df[col1].dropna()
     dados2 = df[col2].dropna()
 
@@ -158,6 +177,13 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
     dados2 = dados2.iloc[:min_len]
 
     diferencas = dados1 - dados2
+
+    # Nível de confiança
+    try:
+        confidence = float(field) if field else 95.0
+    except ValueError:
+        confidence = 95.0
+    alpha = 1 - (confidence / 100)
 
     # Teste de normalidade (Anderson-Darling)
     normalidade = stats.anderson(diferencas)
@@ -172,19 +198,20 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
     desvio_diff = np.std(diferencas, ddof=1)
     n = len(diferencas)
     se_diff = desvio_diff / np.sqrt(n)
-    intervalo = stats.t.interval(0.95, n-1, loc=media_diff, scale=se_diff)
+    intervalo = stats.t.interval(1 - alpha, n-1, loc=media_diff, scale=se_diff)
 
     # Conclusão
     conclusao = "✅ As diferenças seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ As diferenças podem não ser normais (Anderson-Darling)."
-    if p_valor < 0.05:
+    if p_valor < alpha:
         conclusao += f" ✅ Rejeitamos H0 (p = {p_valor:.4f}). Existe diferença significativa entre as médias."
     else:
         conclusao += f" ⚠ Não rejeitamos H0 (p = {p_valor:.4f}). Não há diferença significativa entre as médias."
 
     # Gráfico
+    aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.hist(diferencas, bins=8, color='skyblue', edgecolor='black')
-    ax.set_title("Histogram of Differences\n(with Ho and 95% t-confidence interval for the mean)")
+    ax.set_title(f"Histogram of Differences\n(with Ho and {confidence:.1f}% t-confidence interval for the mean)")
     ax.set_xlabel("Differences")
     ax.set_ylabel("Frequency")
 
@@ -192,10 +219,10 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
     ax.axvline(0, color='red', linestyle='--', label='H0')
 
     # Adiciona intervalo de confiança
-    ax.hlines(-0.5, intervalo[0], intervalo[1], color='blue', lw=4)
+    ax.hlines(-0.5, intervalo[0], intervalo[1], color='blue', lw=4, label=f"IC {confidence:.1f}%")
     ax.text(media_diff, -1, "X̄", color='blue', ha='center')
 
-    plt.legend()
+    ax.legend()
     plt.tight_layout()
 
     buf = BytesIO()
@@ -209,7 +236,7 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
 - Média das diferenças: {media_diff:.4f}
 - Desvio padrão das diferenças: {desvio_diff:.4f}
 - N: {n}
-- Intervalo 95%: [{intervalo[0]:.4f}, {intervalo[1]:.4f}]
+- Intervalo {confidence:.1f}%: [{intervalo[0]:.4f}, {intervalo[1]:.4f}]
 - Estatística t: {t_stat:.4f}
 - p-valor: {p_valor:.4f}
 - Anderson-Darling: estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_aprovado else 'Reprovada'}
@@ -219,23 +246,27 @@ def analise_paired_t(df: pd.DataFrame, colunas_usadas: list):
 """
 
     return texto.strip(), grafico_base64
-
-def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
-    ys = [c for c in colunas_usadas if c not in ["", "Subgrupo"]]
-    x = "Subgrupo" if "Subgrupo" in colunas_usadas else None
+def analise_one_way_anova(df: pd.DataFrame, colunas_y: list, subgrupo, field_conf):
+    ys = [c for c in colunas_y if c not in ["", "Subgrupo"]]
+    x = subgrupo if subgrupo and subgrupo in df.columns else None
 
     if len(ys) == 0:
         return "❌ O One way ANOVA requer pelo menos 1 coluna Y.", None
 
-    if x and x in df.columns:
-        # ANOVA com Y consolidado e Subgrupo como fator
+    try:
+        confidence = float(field_conf)
+    except (TypeError, ValueError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    if x:
         y_col = ys[0]
         df_valid = df[[y_col, x]].dropna()
         if df_valid[x].nunique() < 2:
             return "❌ O One way ANOVA requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
         grupos = [grupo[1].values for grupo in df_valid.groupby(x)[y_col]]
     else:
-        # ANOVA com colunas Ys como grupos
         grupos = []
         for y_col in ys:
             grupo = df[y_col].dropna().values
@@ -244,10 +275,8 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
         if len(grupos) < 2:
             return "❌ O One way ANOVA requer pelo menos 2 colunas Y com dados.", None
 
-    # Teste ANOVA
     f_stat, p_valor = stats.f_oneway(*grupos)
 
-    # Normalidade dos resíduos
     concatenado = np.concatenate(grupos)
     residuos = concatenado - np.mean(concatenado)
     normalidade = stats.anderson(residuos)
@@ -261,14 +290,14 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
         ad_aprovado = False
 
     conclusao = "✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ Resíduos podem não ser normais (Anderson-Darling)."
-    if p_valor < 0.05:
+    if p_valor < alpha:
         conclusao += f" ✅ Rejeitamos H0 (p = {p_valor:.4f}). Existem diferenças significativas entre as médias dos grupos."
     else:
         conclusao += f" ⚠ Não rejeitamos H0 (p = {p_valor:.4f}). Não há diferenças significativas entre as médias dos grupos."
 
-    # Gráfico
+    aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
-    if x and x in df.columns:
+    if x:
         df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
         medias = df_valid.groupby(x)[y_col].mean()
         ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
@@ -277,7 +306,7 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
         medias = [np.mean(g) for g in grupos]
         ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
 
-    ax.set_title("One Way ANOVA - Boxplot por Grupo")
+    ax.set_title(f"One Way ANOVA - Boxplot por Grupo (IC {confidence:.1f}%)")
     ax.set_xlabel("Grupo")
     ax.set_ylabel("Valor")
     plt.suptitle("")
@@ -293,6 +322,7 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
 **One Way ANOVA**
 - Estatística F: {f_stat:.4f}
 - p-valor: {p_valor:.4f}
+- Nível de confiança: {confidence:.1f}%
 - Anderson-Darling (resíduos): estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_aprovado else 'Reprovada'}
 
 **Conclusão**
@@ -300,6 +330,8 @@ def analise_one_way_anova(df: pd.DataFrame, colunas_usadas: list):
 """
 
     return texto.strip(), grafico_base64
+
+
 
 
 
