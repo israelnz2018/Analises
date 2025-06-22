@@ -109,34 +109,37 @@ def analise_correlacao_person(df, colunas_y, lista_x):
         return "❌ É necessário ao menos uma variável X.", None
 
     nome_coluna_y = colunas_y[0]
-    nomes_colunas_x = lista_x
 
     if nome_coluna_y not in df.columns:
-        return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada.", None
+        return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada no arquivo.", None
 
-    for col in nomes_colunas_x:
-        if col not in df.columns:
-            return f"❌ A coluna X '{col}' não foi encontrada.", None
+    serie_y = df[nome_coluna_y].dropna()
+    if serie_y.empty:
+        return f"❌ A coluna Y '{nome_coluna_y}' não contém dados válidos.", None
 
-    serie_y = df[nome_coluna_y]
     linhas = []
 
-    for nome_x in nomes_colunas_x:
-        serie_x = df[nome_x]
+    for nome_x in lista_x:
+        if nome_x not in df.columns:
+            linhas.append(f"- {nome_x}: ❌ A coluna X não foi encontrada.")
+            continue
 
+        serie_x = df[nome_x].dropna()
+        if serie_x.empty:
+            linhas.append(f"- {nome_x}: ❌ Dados X inválidos.")
+            continue
+
+        # Faz merge das séries para alinhar os índices
         data = pd.concat([serie_y, serie_x], axis=1).dropna()
         if data.empty or len(data) < 2:
             linhas.append(f"- {nome_x}: ❌ Sem dados pareados suficientes.")
             continue
 
         r, p = stats.pearsonr(data.iloc[:, 0], data.iloc[:, 1])
-
         forca = "fraca" if abs(r) < 0.3 else "moderada" if abs(r) < 0.7 else "forte"
         dependencia = "existe dependência estatística" if p < 0.05 else "não há dependência estatística"
 
-        linhas.append(
-            f"- {nome_x}: Coeficiente de Pearson = {r:.2f}, p-valor = {p:.4f} → Correlação {forca}, {dependencia}."
-        )
+        linhas.append(f"- {nome_x}: Coeficiente de Pearson = {r:.2f}, p-valor = {p:.4f} → Correlação {forca}, {dependencia}.")
 
     resumo = f"""📊 **Análise de Correlação de Pearson**
 Coluna Y: **{nome_coluna_y}**
@@ -144,6 +147,7 @@ Resultados:
 """ + "\n".join(linhas)
 
     return resumo, None
+
 
 
 
