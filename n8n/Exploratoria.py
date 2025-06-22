@@ -101,12 +101,14 @@ def analise_de_outliers(df, colunas_usadas):
 
     return resultado_texto, imagem_base64
 
-def analise_correlacao_person(df, colunas_usadas):
-    if len(colunas_usadas) < 2:
-        return "❌ É necessário ao menos uma variável Y e uma variável X.", None
+def analise_correlacao_person(df, colunas_y, colunas_x=None, field=None):
+    if not colunas_y or len(colunas_y) != 1:
+        return "❌ É necessário exatamente uma variável Y.", None
+    if not colunas_x or len(colunas_x) < 1:
+        return "❌ É necessário ao menos uma variável X.", None
 
-    nome_coluna_y = colunas_usadas[0]
-    nomes_colunas_x = colunas_usadas[1:]
+    nome_coluna_y = colunas_y[0]
+    nomes_colunas_x = colunas_x
 
     if nome_coluna_y not in df.columns:
         return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada.", None
@@ -127,7 +129,7 @@ def analise_correlacao_person(df, colunas_usadas):
             continue
 
         data = pd.concat([serie_y, serie_x], axis=1).dropna()
-        if data.empty:
+        if data.empty or len(data) < 2:
             linhas.append(f"- {nome_x}: ❌ Sem dados pareados suficientes.")
             continue
 
@@ -152,6 +154,7 @@ Resultados:
 """ + "\n".join(linhas)
 
     return resumo, None
+
 
 
 def analise_matrix_correlacao(df, colunas_usadas):
