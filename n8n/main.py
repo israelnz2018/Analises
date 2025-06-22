@@ -10,6 +10,7 @@ from Exploratoria import ANALISES as ANALISES_EXP
 from Inferencial import ANALISES as ANALISES_INF
 from Preditiva import ANALISES as ANALISES_PRED
 from Controledeprocesso import ANALISES as ANALISES_PROC
+from Analisesdiversas import ANALISES as ANALISES_DIVERSAS
 from graficos import GRAFICOS
 
 # Inicializa app
@@ -34,9 +35,11 @@ ANALISES.update(ANALISES_EXP)
 ANALISES.update(ANALISES_INF)
 ANALISES.update(ANALISES_PRED)
 ANALISES.update(ANALISES_PROC)
+ANALISES.update(ANALISES_DIVERSAS)
 print("✅ ANALISES carregados com sucesso")
 
 ANALISES_COM_FIELD = {"1 Sample T", "1 Wilcoxon", "1 Teste de Sinal", "1 Proporcao", "Intervalo de Confianca"}
+
 
 @app.get("/healthz")
 def healthcheck():
