@@ -56,7 +56,7 @@ def grafico_sumario(df, colunas_usadas):
 
     return resumo, imagem_base64
 
-def analise_de_outliers(df, colunas_usadas):
+def analise_de_outliers(df, lista_x):
     resultado_texto = "📊 **Análise de Outliers**\n"
     aplicar_estilo_minitab()
     fig, axs = plt.subplots(len(colunas_usadas), 1, figsize=(6, 4 * len(colunas_usadas)))
@@ -101,7 +101,7 @@ def analise_de_outliers(df, colunas_usadas):
 
     return resultado_texto, imagem_base64
 
-def analise_correlacao_person(df, colunas_y, colunas_x, field=None):
+def analise_correlacao_person(df, colunas_y, lista_x):
     if not colunas_y or len(colunas_y) != 1:
         return "❌ É necessário exatamente uma variável Y.", None
     if not colunas_x or len(colunas_x) < 1:
@@ -152,7 +152,7 @@ Resultados:
 
 
 
-def analise_matrix_correlacao(df, colunas_usadas):
+def analise_matrix_correlacao(df, colunas_y, lista_x):
     if len(colunas_usadas) < 2:
         return "❌ É necessário ao menos duas colunas para gerar a matriz de correlação.", None
 
@@ -260,7 +260,7 @@ def analise_estabilidade(df, colunas_usadas):
 
     return texto_resumo, img_base64
 
-def analise_limpeza_dados(df, colunas_usadas):
+def analise_limpeza_dados(df):
     linhas_total = len(df)
     colunas_total = df.shape[1]
     linhas_duplicadas = df.duplicated().sum()
