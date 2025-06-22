@@ -99,6 +99,7 @@ async def analisar(
     arquivo: UploadFile = File(None),
     ferramenta: str = Form(None),
     grafico: str = Form(None),
+    aba: str = Form(None),  # ✅ Adicionado campo para receber a aba
     coluna_y: str = Form(None),
     colunas_x: str | list[str] = Form(None),
     coluna_z: str = Form(None),
@@ -108,8 +109,9 @@ async def analisar(
 ):
     try:
         print("🚀 Nome do arquivo recebido:", arquivo.filename)
+        print("🚀 Aba solicitada:", aba)
 
-        df = await ler_arquivo(arquivo)
+        df = await ler_arquivo(arquivo, aba)  # ✅ Passando aba para ler_arquivo
 
         colunas_y = [y.strip() for y in coluna_y.split(",")] if coluna_y else []
         lista_x = []
