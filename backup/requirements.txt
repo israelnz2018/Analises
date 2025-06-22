@@ -10,3 +10,4 @@ python-multipart
 openai
 jinja2
 fitter
+requests
