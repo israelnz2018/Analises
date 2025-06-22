@@ -113,28 +113,22 @@ async def analisar(
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
 
-        # Análise
+        # Análise com gráfico associado
         if ferramenta:
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
                 return JSONResponse({"erro": f"Análise {ferramenta} desconhecida."}, status_code=400)
 
-            # Ajusta os argumentos dinamicamente
-            args = [df, colunas_y, lista_x, lista_z, subgrupo_val]
-            kwargs = {}
+            resultado_texto, imagem_analise_base64 = funcao(
+                df, colunas_y, lista_x, lista_z, subgrupo_val, field=field
+            )
 
-            if ferramenta.strip() in ANALISES_COM_FIELD:
-                kwargs['field'] = field
-
-            resultado_texto, imagem_analise_base64 = funcao(*args, **kwargs)
-
-        # Gráfico
+        # Gráfico isolado
         if grafico:
             funcao_grafico = GRAFICOS.get(grafico.strip())
             if not funcao_grafico:
                 return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
 
-            # Só passa o que o gráfico espera: df e colunas_usadas
             imagem_grafico_isolado_base64 = funcao_grafico(df, colunas_usadas)
 
         return {
