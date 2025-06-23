@@ -122,7 +122,10 @@ async def analisar(
     subgrupo: str = Form(None),
     field: str = Form(None),
     field_conf: str = Form(None),
-    field_distribuicao: str = Form(None)
+    field_distribuicao: str = Form(None),
+    field_LSE: str = Form(None),
+    field_LIE: str = Form(None),
+    Data: str = Form(None)
 ):
     try:
         print("🚀 Nome do arquivo recebido:", arquivo.filename)
@@ -177,7 +180,8 @@ async def analisar(
                 "field_conf": field_conf,
                 "field_dist": field_distribuicao,
                 "field_LSE": field_LSE,
-                "field_LIE": field_LIE
+                "field_LIE": field_LIE,
+                "Data": Data
             }
 
 
