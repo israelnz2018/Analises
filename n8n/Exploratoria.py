@@ -201,10 +201,10 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
 
 
 def analise_estabilidade(df, coluna_y, subgrupo=None):
-    if not coluna_y or coluna_y[0] not in df.columns:
+    nome_coluna_y = coluna_y if isinstance(coluna_y, str) else (coluna_y[0] if coluna_y else None)
+    if not nome_coluna_y or nome_coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    nome_coluna_y = coluna_y[0]
     nome_coluna_subgrupo = subgrupo if subgrupo and subgrupo in df.columns else None
 
     dados = df[[nome_coluna_y]].copy()
@@ -266,6 +266,7 @@ def analise_estabilidade(df, coluna_y, subgrupo=None):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
+
 
 
 def analise_limpeza_dados(df):
