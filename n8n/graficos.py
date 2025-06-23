@@ -64,7 +64,7 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close()
 
-    return "", imagem_base64
+    return "", imagem_base64 
 
 
 
