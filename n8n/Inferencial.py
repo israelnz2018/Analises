@@ -9,18 +9,17 @@ def analise_1_sample_t(df, colunas_y, field, field_conf=None):
         return f"⚠ Coluna {col_y} não encontrada no arquivo.", []
 
     dados = df[col_y].dropna().astype(float)
-
     if dados.empty:
         return "⚠ Não há dados válidos na coluna Y.", []
 
     try:
         ref = float(field)
-    except ValueError:
+    except (ValueError, TypeError):
         return "⚠ O valor de referência informado não é numérico.", []
 
     try:
         confidence = float(field_conf) if field_conf else 95.0
-    except ValueError:
+    except (ValueError, TypeError):
         confidence = 95.0
 
     alpha = 1 - (confidence / 100)
@@ -29,7 +28,7 @@ def analise_1_sample_t(df, colunas_y, field, field_conf=None):
     media = dados.mean()
     desvio = dados.std(ddof=1)
     erro_media = desvio / (n ** 0.5)
-    ic_low, ic_up = stats.t.interval(1 - alpha, n-1, loc=media, scale=erro_media)
+    ic_low, ic_up = stats.t.interval(1 - alpha, n - 1, loc=media, scale=erro_media)
 
     t_stat, p_value = stats.ttest_1samp(dados, ref)
 
