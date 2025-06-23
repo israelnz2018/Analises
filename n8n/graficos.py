@@ -68,6 +68,8 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
 
 
 
+
+
 def gerar_pareto(df, coluna_y, subgrupo=None, subgrupo2=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
@@ -122,7 +124,10 @@ def gerar_pareto(df, coluna_y, subgrupo=None, subgrupo2=None):
     plt.close()
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
     return "", imagem_base64
+
+
 
 
 def gerar_pizza(df, coluna_y, subgrupo):
