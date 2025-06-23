@@ -1,8 +1,7 @@
 from suporte import *
 
-def grafico_sumario(df, colunas_usadas):
-    coluna_y = colunas_usadas[0]
-    if coluna_y not in df.columns:
+def grafico_sumario(df, coluna_y):
+    if not coluna_y or coluna_y not in df.columns:
         return (
             "❌ A coluna selecionada para o Gráfico Sumario não foi encontrada.",
             None
@@ -56,14 +55,15 @@ def grafico_sumario(df, colunas_usadas):
 
     return resumo, imagem_base64
 
-def analise_de_outliers(df, colunas_y):
+
+def analise_de_outliers(df, lista_y):
     resultado_texto = "📊 **Análise de Outliers**\n"
     aplicar_estilo_minitab()
 
     dados_plot = {}
     encontrou_outliers = False
 
-    for coluna in colunas_y:
+    for coluna in lista_y:
         if coluna not in df.columns:
             resultado_texto += f"- ❌ A coluna '{coluna}' não foi encontrada.\n"
             continue
@@ -88,7 +88,9 @@ def analise_de_outliers(df, colunas_y):
         else:
             resultado_texto += f"- ✅ A coluna '{coluna}' não possui outliers detectados.\n"
 
-    # Prepara DataFrame para boxplot
+    if not dados_plot:
+        return resultado_texto, None
+
     df_plot = pd.DataFrame(dados_plot)
 
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -109,16 +111,16 @@ def analise_de_outliers(df, colunas_y):
 
 
 
-def analise_correlacao_person(df, colunas_y, lista_x):
-    # Confirma nomes reais no DataFrame
+
+def analise_correlacao_person(df, coluna_y, lista_x):
     nomes_df = df.columns.tolist()
 
-    if not colunas_y or len(colunas_y) != 1:
-        return "❌ É necessário exatamente uma variável Y.", None
+    if not coluna_y or len(coluna_y) != 1:
+        return "❌ É necessário exatamente uma coluna Y.", None
     if not lista_x or len(lista_x) < 1:
-        return "❌ É necessário ao menos uma variável X.", None
+        return "❌ É necessário ao menos uma coluna X.", None
 
-    nome_coluna_y = colunas_y[0]
+    nome_coluna_y = coluna_y[0]
     if nome_coluna_y not in nomes_df:
         return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada no arquivo.", None
 
@@ -158,16 +160,15 @@ Resultados:
 
 
 
-
-def analise_matrix_correlacao(df, colunas_y, lista_x):
-    colunas = (colunas_y or []) + (lista_x or [])
+def analise_matrix_correlacao(df, coluna_y, lista_x):
+    colunas = (coluna_y or []) + (lista_x or [])
     
     if len(colunas) < 2:
         return "❌ É necessário ao menos duas colunas para gerar a matriz de correlação.", None
 
     for col in colunas:
         if col not in df.columns:
-            return f"❌ Coluna '{col}' não encontrada no dataframe.", None
+            return f"❌ A coluna '{col}' não foi encontrada no arquivo.", None
 
     dados = df[colunas].dropna()
     if dados.empty:
@@ -189,7 +190,7 @@ def analise_matrix_correlacao(df, colunas_y, lista_x):
             else:
                 forca = "forte"
 
-            linhas_resumo.append(f"- {col1} vs {col2}: correlação {forca} (r={r:.2f})")
+            linhas_resumo.append(f"- {col1} vs {col2}: correlação {forca} (r = {r:.2f})")
 
     resumo = "📊 **Matriz de Correlação (Pearson)**\n" + "\n".join(linhas_resumo)
 
@@ -206,18 +207,18 @@ def analise_matrix_correlacao(df, colunas_y, lista_x):
     return resumo, img_base64
 
 
-def analise_estabilidade(df, colunas_y, subgrupo=None):
-    if not colunas_y or colunas_y[0] not in df.columns:
-        return "❌ A coluna Y informada não foi encontrada no dataframe.", None
+def analise_estabilidade(df, coluna_y, subgrupo=None):
+    if not coluna_y or coluna_y[0] not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    nome_coluna_y = colunas_y[0]
+    nome_coluna_y = coluna_y[0]
     nome_coluna_subgrupo = subgrupo if subgrupo and subgrupo in df.columns else None
 
     dados = df[[nome_coluna_y]].copy()
     if nome_coluna_subgrupo:
-        dados['Subgrupo'] = df[nome_coluna_subgrupo]
+        dados["Subgrupo"] = df[nome_coluna_subgrupo]
     else:
-        dados['Subgrupo'] = range(1, len(dados) + 1)
+        dados["Subgrupo"] = range(1, len(dados) + 1)
 
     if dados.empty or dados[nome_coluna_y].dropna().empty:
         return "❌ Dados insuficientes para análise.", None
@@ -231,8 +232,8 @@ def analise_estabilidade(df, colunas_y, subgrupo=None):
         axs[0].set_title("Carta X-Barra")
         axs[0].set_ylabel("Média")
 
-        grupo_stats = dados.groupby('Subgrupo')[nome_coluna_y].agg(['mean', 'std'])
-        r_values = grupo_stats['std'] * (2 ** 0.5)
+        grupo_stats = dados.groupby("Subgrupo")[nome_coluna_y].agg(["mean", "std"])
+        r_values = grupo_stats["std"] * (2 ** 0.5)
 
         axs[1].plot(grupo_stats.index, r_values, marker="o")
         axs[1].set_title("Carta R")
@@ -246,7 +247,7 @@ def analise_estabilidade(df, colunas_y, subgrupo=None):
         axs[0].set_ylabel("Valor")
 
         mr = dados[nome_coluna_y].diff().abs()
-        axs[1].plot(dados['Subgrupo'][1:], mr[1:], marker="o")
+        axs[1].plot(dados["Subgrupo"][1:], mr[1:], marker="o")
         axs[1].set_title("Carta MR")
         axs[1].set_ylabel("Movimento Range")
 
@@ -254,19 +255,22 @@ def analise_estabilidade(df, colunas_y, subgrupo=None):
 
     media = dados[nome_coluna_y].mean()
     sigma = dados[nome_coluna_y].std()
-    outliers = dados[(dados[nome_coluna_y] > media + 3 * sigma) | (dados[nome_coluna_y] < media - 3 * sigma)]
+    outliers = dados[
+        (dados[nome_coluna_y] > media + 3 * sigma) |
+        (dados[nome_coluna_y] < media - 3 * sigma)
+    ]
 
     if not outliers.empty:
-        texto_resumo += f"- ⚠ Detectados {len(outliers)} pontos fora dos limites (3 sigma). Processo potencialmente instável.\n"
+        texto_resumo += f"- ⚠ Detectados {len(outliers)} ponto(s) fora dos limites (3 sigma). Processo potencialmente instável.\n"
     else:
         texto_resumo += "- ✅ Nenhum ponto fora dos limites (3 sigma). Processo aparentemente estável.\n"
 
     buffer = BytesIO()
     plt.tight_layout()
-    plt.savefig(buffer, format='png')
+    plt.savefig(buffer, format="png")
     plt.close(fig)
     buffer.seek(0)
-    img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
 
