@@ -200,20 +200,20 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
 
 
 
-def analise_regressao_linear_multipla(df: pd.DataFrame, coluna_y, colunas_x, field=None):
-    if not coluna_y or not colunas_x:
+def analise_regressao_linear_multipla(df, coluna_y, lista_x):
+    if not coluna_y or not lista_x:
         return "❌ A regressão linear múltipla requer 1 Y e pelo menos 1 X.", None
 
-    for col in [coluna_y] + colunas_x:
+    for col in [coluna_y] + lista_x:
         if col not in df.columns:
             return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    df_valid = df[[coluna_y] + colunas_x].dropna()
-    if len(df_valid) < len(colunas_x) + 3:
+    df_valid = df[[coluna_y] + lista_x].dropna()
+    if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y].values
-    X_final = df_valid[colunas_x].values
+    X_final = df_valid[lista_x].values
     n, p_full = X_final.shape
 
     from sklearn.linear_model import LinearRegression
@@ -221,6 +221,9 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, coluna_y, colunas_x, fie
     from statsmodels.stats.outliers_influence import variance_inflation_factor
     import statsmodels.api as sm
     from itertools import combinations
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
 
     def calcular_modelo(X_sub, cols_sub):
         model = LinearRegression().fit(X_sub, Y)
@@ -265,12 +268,12 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, coluna_y, colunas_x, fie
         }
 
     resultados = []
-    if len(colunas_x) > 5:
-        colunas_x = colunas_x[:5]
+    if len(lista_x) > 5:
+        lista_x = lista_x[:5]
 
-    for k in range(1, len(colunas_x) + 1):
-        for subset in combinations(range(len(colunas_x)), k):
-            cols_sub = [colunas_x[i] for i in subset]
+    for k in range(1, len(lista_x) + 1):
+        for subset in combinations(range(len(lista_x)), k):
+            cols_sub = [lista_x[i] for i in subset]
             X_sub = df_valid[cols_sub].values
             resultados.append(calcular_modelo(X_sub, cols_sub))
 
@@ -282,7 +285,7 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, coluna_y, colunas_x, fie
             modelo_recomendado = m
             break
 
-    fig, ax = plt.subplots(figsize=(6,4))
+    fig, ax = plt.subplots(figsize=(6, 4))
     ax.scatter(modelo_recomendado["Y_pred"], Y - modelo_recomendado["Y_pred"], color='black')
     ax.axhline(0, color='red', linestyle='--')
     ax.set_xlabel("Valores preditos")
@@ -327,35 +330,40 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, coluna_y, colunas_x, fie
 
 
 
-def analise_regressao_logistica_binaria(df: pd.DataFrame, coluna_y, colunas_x, field=None):
-    if not coluna_y or not colunas_x:
+
+def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
+    if not coluna_y or not lista_x:
         return "❌ A regressão logística binária requer 1 Y e pelo menos 1 X.", None
 
-    for col in [coluna_y] + colunas_x:
+    for col in [coluna_y] + lista_x:
         if col not in df.columns:
             return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    df_valid = df[[coluna_y] + colunas_x].dropna()
-    if len(df_valid) < len(colunas_x) + 3:
+    df_valid = df[[coluna_y] + lista_x].dropna()
+    if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y].values
     if len(set(Y)) != 2:
         return "❌ A variável Y deve ser binária (duas categorias).", None
 
-    X_final = df_valid[colunas_x]
+    X_final = df_valid[lista_x]
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
     from sklearn.metrics import roc_auc_score, roc_curve, confusion_matrix
     from statsmodels.stats.outliers_influence import variance_inflation_factor
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
+    import numpy as np
 
     X_sm = sm.add_constant(X_final)
     model = sm.Logit(Y, X_sm).fit(disp=0)
     Y_pred_prob = model.predict(X_sm)
     Y_pred_class = (Y_pred_prob >= 0.5).astype(int)
 
-    ll_null = sm.Logit(Y, np.ones((len(Y),1))).fit(disp=0).llf
+    ll_null = sm.Logit(Y, np.ones((len(Y), 1))).fit(disp=0).llf
     ll_model = model.llf
     r2_mcf = 1 - ll_model / ll_null
 
@@ -367,13 +375,13 @@ def analise_regressao_logistica_binaria(df: pd.DataFrame, coluna_y, colunas_x, f
     cm = confusion_matrix(Y, Y_pred_class)
     acerto = (cm.diagonal().sum()) / cm.sum()
 
-    fig, ax = plt.subplots(figsize=(6,4))
+    fig, ax = plt.subplots(figsize=(6, 4))
     if len(x_cols_final) == 1:
-        X_plot = np.linspace(X_final.iloc[:,0].min(), X_final.iloc[:,0].max(), 100)
+        X_plot = np.linspace(X_final.iloc[:, 0].min(), X_final.iloc[:, 0].max(), 100)
         coef = model.params.values
         logit = coef[0] + coef[1] * X_plot
         prob = 1 / (1 + np.exp(-logit))
-        ax.scatter(X_final.iloc[:,0], Y, color='black', alpha=0.5, label='Dados')
+        ax.scatter(X_final.iloc[:, 0], Y, color='black', alpha=0.5, label='Dados')
         ax.plot(X_plot, prob, color='blue', label='Curva ajustada')
         ax.set_xlabel(x_cols_final[0])
         ax.set_ylabel('Probabilidade')
@@ -382,7 +390,7 @@ def analise_regressao_logistica_binaria(df: pd.DataFrame, coluna_y, colunas_x, f
     else:
         fpr, tpr, _ = roc_curve(Y, Y_pred_prob)
         ax.plot(fpr, tpr, color='blue', label=f'ROC AUC = {auc:.2f}')
-        ax.plot([0,1], [0,1], color='grey', linestyle='--')
+        ax.plot([0, 1], [0, 1], color='grey', linestyle='--')
         ax.set_xlabel('FPR')
         ax.set_ylabel('TPR')
         ax.set_title('Curva ROC')
@@ -400,7 +408,7 @@ def analise_regressao_logistica_binaria(df: pd.DataFrame, coluna_y, colunas_x, f
     linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
     linhas.append(f"AUC: {auc:.4f}")
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c,v in zip(x_cols_final, vif)]))
+    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
     conclusao = []
     if r2_mcf > 0.2:
@@ -430,33 +438,37 @@ def analise_regressao_logistica_binaria(df: pd.DataFrame, coluna_y, colunas_x, f
 
 
 
-def analise_regressao_logistica_ordinal(df: pd.DataFrame, coluna_y, colunas_x, field=None):
-    if not coluna_y or not colunas_x:
+def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
+    if not coluna_y or not lista_x:
         return "❌ A regressão logística ordinal requer 1 Y e pelo menos 1 X.", None
 
-    for col in [coluna_y] + colunas_x:
+    for col in [coluna_y] + lista_x:
         if col not in df.columns:
             return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    df_valid = df[[coluna_y] + colunas_x].dropna()
-    if len(df_valid) < len(colunas_x) + 3:
+    df_valid = df[[coluna_y] + lista_x].dropna()
+    if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
     if not pd.api.types.is_integer_dtype(Y) and not pd.api.types.is_categorical_dtype(Y):
         return "❌ Y deve ser ordinal (numérica inteira ou categórica ordenada).", None
 
-    X_final = df_valid[colunas_x]
+    X_final = df_valid[lista_x]
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
     from statsmodels.miscmodels.ordinal_model import OrderedModel
     from statsmodels.stats.outliers_influence import variance_inflation_factor
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
+    import numpy as np
 
     model = OrderedModel(Y, X_final, distr='logit')
     res = model.fit(method='bfgs', disp=0)
 
-    ll_null = OrderedModel(Y, np.ones((len(Y),1)), distr='logit').fit(method='bfgs', disp=0).llf
+    ll_null = OrderedModel(Y, np.ones((len(Y), 1)), distr='logit').fit(method='bfgs', disp=0).llf
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
@@ -473,9 +485,9 @@ def analise_regressao_logistica_ordinal(df: pd.DataFrame, coluna_y, colunas_x, f
 
     comentario_odds = "⚠ Teste de proporcionalidade dos odds não implementado diretamente no Python. Avalie graficamente ou com software complementar (ex: Stata, R)."
 
-    fig, ax = plt.subplots(figsize=(6,4))
+    fig, ax = plt.subplots(figsize=(6, 4))
     if len(x_cols_final) == 1:
-        X_plot = np.linspace(X_final.iloc[:,0].min(), X_final.iloc[:,0].max(), 100)
+        X_plot = np.linspace(X_final.iloc[:, 0].min(), X_final.iloc[:, 0].max(), 100)
         probas = res.model.predict(res.params, exog=pd.DataFrame({x_cols_final[0]: X_plot}))
         for cat in probas.columns:
             ax.plot(X_plot, probas[cat], label=f'Prob(Y={cat})')
@@ -498,7 +510,7 @@ def analise_regressao_logistica_ordinal(df: pd.DataFrame, coluna_y, colunas_x, f
         linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
     linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c,v in zip(x_cols_final, vif)]))
+    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
     conclusao = []
     if r2_mcf > 0.2:
@@ -522,33 +534,37 @@ def analise_regressao_logistica_ordinal(df: pd.DataFrame, coluna_y, colunas_x, f
     return texto.strip(), grafico_base64
 
 
-def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, colunas_x, field=None):
-    if not coluna_y or not colunas_x:
+
+def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x,):
+    if not coluna_y or not lista_x:
         return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
 
-    for col in [coluna_y] + colunas_x:
+    for col in [coluna_y] + lista_x:
         if col not in df.columns:
             return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    df_valid = df[[coluna_y] + colunas_x].dropna()
-    if len(df_valid) < len(colunas_x) + 3:
+    df_valid = df[[coluna_y] + lista_x].dropna()
+    if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
     if len(Y.unique()) < 3:
         return "❌ Y deve ter pelo menos 3 categorias para regressão logística nominal.", None
 
-    X_final = df_valid[colunas_x]
+    X_final = df_valid[lista_x]
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
     from statsmodels.stats.outliers_influence import variance_inflation_factor
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
 
     model = sm.MNLogit(Y, sm.add_constant(X_final))
     res = model.fit(disp=0)
 
-    ll_null = sm.MNLogit(Y, np.ones((len(Y),1))).fit(disp=0).llf
+    ll_null = sm.MNLogit(Y, np.ones((len(Y), 1))).fit(disp=0).llf
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
@@ -582,7 +598,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, colunas_x, f
         linhas.append(f"- {cat}: coef=[{coef_str}], p-valor=[{pval_str}]")
     linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c,v in zip(x_cols_final, vif)]))
+    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
     conclusao = []
     if r2_mcf > 0.2:
@@ -608,7 +624,8 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, colunas_x, f
     return texto.strip(), grafico_base64
 
 
-def analise_arvore_decisao(df: pd.DataFrame, coluna_y: str, lista_x: list, field=None):
+
+def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
         return "❌ A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
 
@@ -666,7 +683,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y: str, lista_x: list, field
     return texto.strip(), grafico_base64
 
 
-def analise_random_forest(df: pd.DataFrame, coluna_y: str, lista_x: list, field=None):
+def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
         return "❌ O Random Forest requer 1 coluna Y e pelo menos 1 X.", None
 
@@ -775,13 +792,15 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
     return texto.strip(), grafico_base64
 
 
-def analise_holt_winters(df: pd.DataFrame, coluna_y: list, field=None):
-    if len(coluna_y) != 1:
+def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
+    if not coluna_y or len(coluna_y) != 1:
         return "❌ O Holt-Winters requer exatamente 1 coluna Y (série temporal).", None
 
     y_col = coluna_y[0]
-    df_valid = df[[y_col]].dropna()
+    if y_col not in df.columns:
+        return f"❌ Coluna {y_col} não encontrada no arquivo.", None
 
+    df_valid = df[[y_col]].dropna()
     if len(df_valid) < 10:
         return "❌ A série temporal requer pelo menos 10 observações.", None
 
@@ -792,14 +811,10 @@ def analise_holt_winters(df: pd.DataFrame, coluna_y: list, field=None):
     except ImportError:
         return "❌ O pacote statsmodels não está disponível neste ambiente.", None
 
-    # Previsão
     horizonte = int(field) if field and str(field).isdigit() else 5
-
-    # Ajusta o modelo
     modelo = ExponentialSmoothing(Y, trend="add", seasonal=None, damped_trend=True).fit()
     previsao = modelo.forecast(horizonte)
 
-    # Gráfico
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
@@ -816,7 +831,6 @@ def analise_holt_winters(df: pd.DataFrame, coluna_y: list, field=None):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-    # Texto
     texto = f"""
 **Holt-Winters (Suavização Exponencial)**
 - Tendência: aditiva (com amortecimento)
@@ -828,6 +842,7 @@ def analise_holt_winters(df: pd.DataFrame, coluna_y: list, field=None):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 ANALISES = {
