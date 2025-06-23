@@ -458,16 +458,12 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         return "❌ O modelo requer mais dados válidos.", None
 
     Y_raw = df_valid[coluna_y]
-    if pd.api.types.is_numeric_dtype(Y_raw):
-        Y = Y_raw
-    else:
-        # Cria mapeamento ordinal automaticamente
-        categorias = sorted(Y_raw.unique())
-        mapeamento = {cat: i for i, cat in enumerate(categorias)}
-        Y = Y_raw.map(mapeamento)
 
-        if Y.isnull().any():
-            return f"❌ Y contém valores não mapeados.", None
+    # Transforma Y em categórico ordenado se ainda não for
+    if not pd.api.types.is_categorical_dtype(Y_raw) or not Y_raw.cat.ordered:
+        Y = pd.Categorical(Y_raw, categories=sorted(Y_raw.unique()), ordered=True)
+    else:
+        Y = Y_raw
 
     X_final = df_valid[lista_x]
     x_cols_final = X_final.columns.tolist()
@@ -489,16 +485,13 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 
     vif = []
     if X_final.shape[1] > 1:
-        X_sm = sm.add_constant(X_final)
-        for i in range(1, X_sm.shape[1]):
-            vif.append(variance_inflation_factor(X_sm.values, i))
+        for i in range(X_final.shape[1]):
+            vif.append(variance_inflation_factor(X_final.values, i))
     else:
         vif.append(1.0)
 
     Y_pred = res.model.predict(res.params, exog=X_final).idxmax(axis=1)
     acerto = (Y_pred == Y).mean()
-
-    comentario_odds = "⚠ Teste de proporcionalidade dos odds não implementado diretamente no Python. Avalie graficamente ou com software complementar (ex: Stata, R)."
 
     fig, ax = plt.subplots(figsize=(6, 4))
     if len(x_cols_final) == 1:
@@ -536,7 +529,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
     else:
         conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
-    conclusao.append(comentario_odds)
+    conclusao.append("⚠ Verificação formal da proporcionalidade dos odds não implementada; avalie graficamente ou em software complementar.")
 
     texto = f"""
 **Regressão Logística Ordinal**
@@ -550,22 +543,19 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 
 
 
-
-def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
+def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
 
-    if coluna_y not in df.columns:
-        return f"❌ Coluna Y '{coluna_y}' não encontrada no arquivo.", None
-    for col in lista_x:
+    for col in [coluna_y] + lista_x:
         if col not in df.columns:
-            return f"❌ Coluna X '{col}' não encontrada no arquivo.", None
+            return f"❌ Coluna {col} não encontrada no arquivo.", None
 
     df_valid = df[[coluna_y] + lista_x].dropna()
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[coluna_y].astype(str)  # Garante que Y seja categórico (nominal)
+    Y = df_valid[coluna_y]
     if len(Y.unique()) < 3:
         return "❌ Y deve ter pelo menos 3 categorias para regressão logística nominal.", None
 
@@ -579,7 +569,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     from io import BytesIO
     import base64
 
-    model = sm.MNLogit(Y, sm.add_constant(X_final))
+    model = sm.MNLogit(Y, X_final)
     res = model.fit(disp=0)
 
     ll_null = sm.MNLogit(Y, np.ones((len(Y), 1))).fit(disp=0).llf
@@ -594,12 +584,16 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     else:
         vif.append(1.0)
 
-    Y_pred = res.predict().idxmax(axis=1)
-    cm = confusion_matrix(Y, Y_pred, labels=Y.unique())
+    pred_probs = res.predict()
+    Y_pred_idx = pred_probs.argmax(axis=1)
+    categories = res.model.endog.unique()
+    Y_pred_labels = [categories[i] for i in Y_pred_idx]
+
+    cm = confusion_matrix(Y, Y_pred_labels, labels=categories)
     acerto = (cm.diagonal().sum()) / cm.sum()
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=Y.unique())
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=categories)
     disp.plot(ax=ax, cmap="Blues", colorbar=False)
     ax.set_title("Matriz de Confusão - Regressão Logística Nominal")
     plt.tight_layout()
@@ -640,6 +634,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
