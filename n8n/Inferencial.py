@@ -1519,7 +1519,6 @@ ANALISES = {
     "One way ANOVA": analise_one_way_anova,
     "1 Wilcoxon": analise_1_wilcoxon,
     "2 Mann-Whitney": analise_2_mann_whitney,
-    "2 Wilcoxon Paired": analise_2_wilcoxon_paired,
     "Kruskal-Wallis": analise_kruskal_wallis,
     "Friedman Pareado": analise_friedman_pareado,
     "1 Intervalo de Confianca": analise_1_intervalo_confianca,
