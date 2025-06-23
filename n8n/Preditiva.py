@@ -213,8 +213,12 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y].values
-    X_final = df_valid[lista_x].values
-    n, p_full = X_final.shape
+
+    # Trata X misto: numéricos ficam como estão, categóricos viram dummies
+    X_final = pd.get_dummies(df_valid[lista_x], drop_first=True)
+    x_cols_final = X_final.columns.tolist()
+    X_values = X_final.values
+    n, p_full = X_values.shape
 
     from sklearn.linear_model import LinearRegression
     from sklearn.metrics import r2_score
@@ -224,6 +228,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
+    import numpy as np
 
     def calcular_modelo(X_sub, cols_sub):
         model = LinearRegression().fit(X_sub, Y)
@@ -251,7 +256,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
             vif.append(1.0)
 
         resid = Y - Y_pred
-        mse_full = np.sum((Y - LinearRegression().fit(X_final, Y).predict(X_final)) ** 2) / (n - p_full - 1)
+        mse_full = np.sum((Y - LinearRegression().fit(X_values, Y).predict(X_values)) ** 2) / (n - p_full - 1)
         cp = (np.sum(resid ** 2) / mse_full) - (n - 2 * (X_sub.shape[1] + 1))
 
         dw = sm.stats.stattools.durbin_watson(resid)
@@ -268,13 +273,13 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         }
 
     resultados = []
-    if len(lista_x) > 5:
-        lista_x = lista_x[:5]
+    if len(x_cols_final) > 5:
+        x_cols_final = x_cols_final[:5]
 
-    for k in range(1, len(lista_x) + 1):
-        for subset in combinations(range(len(lista_x)), k):
-            cols_sub = [lista_x[i] for i in subset]
-            X_sub = df_valid[cols_sub].values
+    for k in range(1, len(x_cols_final) + 1):
+        for subset in combinations(range(len(x_cols_final)), k):
+            cols_sub = [x_cols_final[i] for i in subset]
+            X_sub = X_final[cols_sub].values
             resultados.append(calcular_modelo(X_sub, cols_sub))
 
     melhor = max(resultados, key=lambda r: r["r2_pred"])
@@ -343,10 +348,12 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[coluna_y].values
-    if len(set(Y)) != 2:
-        return "❌ A variável Y deve ser binária (duas categorias).", None
+    # Mapeamento automático do Y categórico
+    classes = sorted(df_valid[coluna_y].unique())
+    if len(classes) != 2:
+        return "❌ A variável Y deve conter exatamente 2 categorias distintas para regressão logística binária.", None
 
+    Y = df_valid[coluna_y].map({classes[0]: 0, classes[1]: 1}).values
     X_final = df_valid[lista_x]
     x_cols_final = X_final.columns.tolist()
 
@@ -435,6 +442,7 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
