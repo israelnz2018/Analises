@@ -444,7 +444,6 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     return texto.strip(), grafico_base64
 
 
-
 def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística ordinal requer 1 Y e pelo menos 1 X.", None
@@ -453,35 +452,33 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         if col not in df.columns:
             return f"❌ Coluna {col} não encontrada no arquivo.", None
 
+    # ✅ Conversão do Y para categórico ordenado
+    df[coluna_y] = pd.Categorical(
+        df[coluna_y],
+        categories=["Insatisfatorio", "Neutro", "Satisfatorio"],  # ajuste a ordem conforme seu caso
+        ordered=True
+    )
+
     df_valid = df[[coluna_y] + lista_x].dropna()
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
-    if not pd.api.types.is_categorical_dtype(Y):
-        return "❌ Y deve ser categórico ordenado (pandas.CategoricalDtype com ordem).", None
+    X_final = df_valid[lista_x]
+    x_cols_final = X_final.columns.tolist()
 
-    if not Y.cat.ordered:
-        return "❌ Y deve ser categórico ordenado. Verifique o tipo de Y.", None
-
-    # Converta Y para códigos numéricos
-    Y_codes = Y.cat.codes
-
-    # Crie X_final com dummies (aceita numérico e categórico)
-    X_final = pd.get_dummies(df_valid[lista_x], drop_first=True)
-
+    import statsmodels.api as sm
     from statsmodels.miscmodels.ordinal_model import OrderedModel
     from statsmodels.stats.outliers_influence import variance_inflation_factor
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
-    import statsmodels.api as sm
     import numpy as np
 
-    model = OrderedModel(Y_codes, X_final, distr='logit')
+    model = OrderedModel(Y, X_final, distr='logit')
     res = model.fit(method='bfgs', disp=0)
 
-    ll_null = OrderedModel(Y_codes, np.ones((len(Y_codes), 1)), distr='logit').fit(method='bfgs', disp=0).llf
+    ll_null = OrderedModel(Y, np.ones((len(Y), 1)), distr='logit').fit(method='bfgs', disp=0).llf
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
@@ -494,24 +491,36 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         vif.append(1.0)
 
     Y_pred = res.model.predict(res.params, exog=X_final).idxmax(axis=1)
-    acerto = (Y_pred == Y_codes).mean()
+    acerto = (Y_pred == Y).mean()
+
+    comentario_odds = "⚠ Teste de proporcionalidade dos odds não implementado diretamente no Python. Avalie graficamente ou com software complementar (ex: Stata, R)."
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.text(0.5, 0.5, 'Gráfico indisponível para múltiplas X ou ordinal.', ha='center', va='center')
-    ax.axis('off')
-    plt.tight_layout()
+    if len(x_cols_final) == 1:
+        X_plot = np.linspace(X_final.iloc[:, 0].min(), X_final.iloc[:, 0].max(), 100)
+        probas = res.model.predict(res.params, exog=pd.DataFrame({x_cols_final[0]: X_plot}))
+        for cat in probas.columns:
+            ax.plot(X_plot, probas[cat], label=f'Prob(Y={cat})')
+        ax.set_xlabel(x_cols_final[0])
+        ax.set_ylabel('Probabilidade')
+        ax.set_title('Regressão Logística Ordinal')
+        ax.legend()
+    else:
+        ax.text(0.5, 0.5, 'Gráfico indisponível para múltiplas X.', ha='center', va='center')
+        ax.axis('off')
 
+    plt.tight_layout()
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     linhas = []
-    for name, coef, pval in zip(res.model.exog_names, res.params[:len(res.model.exog_names)], res.pvalues[:len(res.model.exog_names)]):
+    for name, coef, pval in zip(res.model.exog_names, res.params, res.pvalues):
         linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
     linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(X_final.columns.tolist(), vif)]))
+    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
     conclusao = []
     if r2_mcf > 0.2:
@@ -522,6 +531,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
     else:
         conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
+    conclusao.append(comentario_odds)
 
     texto = f"""
 **Regressão Logística Ordinal**
@@ -561,7 +571,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     import base64
     import numpy as np
 
-    model = sm.MNLogit(Y, X_final)  # Não adicionar constante no MNLogit
+    model = sm.MNLogit(Y, X_final)
     res = model.fit(disp=0)
 
     ll_null = sm.MNLogit(Y, np.ones((len(Y), 1))).fit(disp=0).llf
@@ -576,16 +586,12 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     else:
         vif.append(1.0)
 
-    Y_pred_probs = res.predict()
-    Y_pred = Y_pred_probs.argmax(axis=1)
-    categories = np.unique(res.model.endog)
-    Y_true_num = pd.Categorical(Y, categories=categories).codes
-
-    cm = confusion_matrix(Y_true_num, Y_pred, labels=range(len(categories)))
-    acerto = (cm.diagonal().sum()) / cm.sum()
+    Y_pred = res.predict().argmax(axis=1)
+    Y_true_idx = pd.factorize(Y)[0]
+    cm = confusion_matrix(Y_true_idx, Y_pred)
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=categories)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     disp.plot(ax=ax, cmap="Blues", colorbar=False)
     ax.set_title("Matriz de Confusão - Regressão Logística Nominal")
     plt.tight_layout()
@@ -596,11 +602,12 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     linhas = []
-    for (cat, coef_row, pval_row) in zip(res.params.index, res.params.values, res.pvalues.values):
-        coef_str = ", ".join([f"{c:.4f}" for c in coef_row])
-        pval_str = ", ".join([f"{p:.4f}" for p in pval_row])
+    for (cat, coef, pval) in zip(res.params.index, res.params.values, res.pvalues.values):
+        coef_str = ", ".join([f"{c:.4f}" for c in coef])
+        pval_str = ", ".join([f"{p:.4f}" for p in pval])
         linhas.append(f"- {cat}: coef=[{coef_str}], p-valor=[{pval_str}]")
     linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
+    acerto = (cm.diagonal().sum()) / cm.sum()
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
     linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
@@ -618,14 +625,12 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 **Regressão Logística Nominal**
 {chr(10).join(linhas)}
 
-**Matriz de Confusão**
-{cm}
-
 **Conclusão**
 {chr(10).join(conclusao)}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
