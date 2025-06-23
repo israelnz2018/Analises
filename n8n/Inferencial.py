@@ -1,14 +1,13 @@
 from suporte import *
 
-def analise_1_sample_t(df, colunas_y, field, field_conf=None):
-    if not colunas_y:
+def analise_1_sample_t(df, coluna_y, field, field_conf=None):
+    if not coluna_y:
         return "⚠ É obrigatório informar a coluna Y.", []
 
-    col_y = colunas_y[0]
-    if col_y not in df.columns:
-        return f"⚠ Coluna {col_y} não encontrada no arquivo.", []
+    if coluna_y not in df.columns:
+        return f"⚠ Coluna {coluna_y} não encontrada no arquivo.", []
 
-    dados = df[col_y].dropna().astype(float)
+    dados = df[coluna_y].dropna().astype(float)
     if dados.empty:
         return "⚠ Não há dados válidos na coluna Y.", []
 
@@ -19,6 +18,8 @@ def analise_1_sample_t(df, colunas_y, field, field_conf=None):
 
     try:
         confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
     except (ValueError, TypeError):
         confidence = 95.0
 
@@ -60,8 +61,8 @@ def analise_1_sample_t(df, colunas_y, field, field_conf=None):
     ax.plot(ref, 1, 'ro', label="H0")
     ax.text(ref, 1.05, 'H0', color='red')
 
-    ax.set_title(f"Boxplot de {col_y}\n(com H0 e intervalo de confiança de {confidence:.1f}% para a média)")
-    ax.set_xlabel(col_y)
+    ax.set_title(f"Boxplot de {coluna_y}\n(com H0 e intervalo de confiança de {confidence:.1f}% para a média)")
+    ax.set_xlabel(coluna_y)
     ax.legend()
 
     plt.tight_layout()
@@ -72,6 +73,7 @@ def analise_1_sample_t(df, colunas_y, field, field_conf=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return resultado, [imagem_base64]
+
 
 
 
