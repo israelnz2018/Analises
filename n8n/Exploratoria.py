@@ -111,18 +111,17 @@ def analise_de_outliers(df, lista_y):
 def analise_correlacao_person(df, coluna_y, lista_x):
     nomes_df = df.columns.tolist()
 
-    if not coluna_y or len(coluna_y) != 1:
-        return "❌ É necessário exatamente uma coluna Y.", None
+    if not coluna_y:
+        return "❌ É necessário informar uma coluna Y.", None
     if not lista_x or len(lista_x) < 1:
         return "❌ É necessário ao menos uma coluna X.", None
 
-    nome_coluna_y = coluna_y[0]
-    if nome_coluna_y not in nomes_df:
-        return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada no arquivo.", None
+    if coluna_y not in nomes_df:
+        return f"❌ A coluna Y '{coluna_y}' não foi encontrada no arquivo.", None
 
-    serie_y = df[nome_coluna_y].dropna()
+    serie_y = df[coluna_y].dropna()
     if serie_y.empty:
-        return f"❌ A coluna Y '{nome_coluna_y}' não contém dados válidos.", None
+        return f"❌ A coluna Y '{coluna_y}' não contém dados válidos.", None
 
     linhas = []
     for nome_x in lista_x:
@@ -147,13 +146,11 @@ def analise_correlacao_person(df, coluna_y, lista_x):
         linhas.append(f"- {nome_x}: Coeficiente de Pearson = {r:.2f}, p-valor = {p:.4f} → Correlação {forca}, {dependencia}.")
 
     resumo = f"""📊 **Análise de Correlação de Pearson**
-Coluna Y: **{nome_coluna_y}**
+Coluna Y: **{coluna_y}**
 Resultados:
 """ + "\n".join(linhas)
 
     return resumo, None
-
-
 
 
 def analise_matrix_correlacao(df, coluna_y, lista_x):
