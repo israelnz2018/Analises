@@ -154,7 +154,7 @@ Resultados:
 
 
 def analise_matrix_correlacao(df, coluna_y, lista_x):
-    colunas = (coluna_y or []) + (lista_x or [])
+    colunas = ([coluna_y] if coluna_y else []) + (lista_x or [])
     
     if len(colunas) < 2:
         return "❌ É necessário ao menos duas colunas para gerar a matriz de correlação.", None
