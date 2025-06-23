@@ -338,14 +338,12 @@ def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
 
     return "", imagem_base64
 
-
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from io import BytesIO
 from scipy.interpolate import griddata
 import base64
 import pandas as pd
-
 
 def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
     if not coluna_x or coluna_x not in df.columns:
@@ -368,9 +366,34 @@ def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
         Y = dados[coluna_y].values
         Z = dados[coluna_z].values
 
-     
+        xi = np.linspace(X.min(), X.max(), 50)
+        yi = np.linspace(Y.min(), Y.max(), 50)
+        xi, yi = np.meshgrid(xi, yi)
 
+        zi = griddata((X, Y), Z, (xi, yi), method='linear')
 
+        fig = plt.figure(figsize=(10, 6))
+        ax = fig.add_subplot(111, projection='3d')
+
+        ax.plot_surface(xi, yi, zi, cmap='viridis', edgecolor='none', alpha=0.8)
+
+        ax.set_xlabel(coluna_x)
+        ax.set_ylabel(coluna_y)
+        ax.set_zlabel(coluna_z)
+        ax.set_title(f"Superfície 3D: {coluna_x} x {coluna_y} x {coluna_z}")
+
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close()
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+        return "", imagem_base64
+
+    except Exception as e:
+        return f"❌ Erro ao gerar superfície 3D: {str(e)}", None
 
 
 GRAFICOS = {
