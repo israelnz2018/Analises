@@ -19,7 +19,14 @@ def salvar_grafico():
     os.remove(caminho)
     return img_base64
 
+
+
+
 def gerar_histograma(df, coluna_y, subgrupo=None):
+    # Garante que coluna_y seja string e não lista
+    if isinstance(coluna_y, list):
+        coluna_y = coluna_y[0] if coluna_y else None
+
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
@@ -64,7 +71,8 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close()
 
-    return "", imagem_base64 
+    return "", imagem_base64
+
 
 
 
