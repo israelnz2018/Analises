@@ -255,7 +255,7 @@ def analise_paired_t(df: pd.DataFrame, lista_y: list, field_conf=None):
 
 
 
-def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo, field_conf):
+def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo, field_conf=None):
     ys = [c for c in lista_y if c not in ["", "Subgrupo"]]
     x = subgrupo if subgrupo and subgrupo in df.columns else None
 
@@ -347,7 +347,7 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo, field_conf)
 
 
 
-def analise_1_wilcoxon(df: pd.DataFrame, coluna_y, field=None, field_conf=None):
+def analise_1_wilcoxon(df: pd.DataFrame, coluna_y, field, field_conf=None):
     if not coluna_y:
         return "❌ O teste 1 Wilcoxon requer exatamente 1 coluna Y.", None
 
@@ -885,7 +885,7 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     return texto.strip(), grafico_base64
 
 
-def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
+def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf):
     if len(lista_y) != 2:
         return "❌ O teste 2 Variâncias requer exatamente 2 colunas Y.", None
 
@@ -1519,11 +1519,12 @@ ANALISES = {
     "One way ANOVA": analise_one_way_anova,
     "1 Wilcoxon": analise_1_wilcoxon,
     "2 Mann-Whitney": analise_2_mann_whitney,
+    "2 Wilcoxon Paired": analise_2_wilcoxon_paired,
     "Kruskal-Wallis": analise_kruskal_wallis,
     "Friedman Pareado": analise_friedman_pareado,
     "1 Intervalo de Confianca": analise_1_intervalo_confianca,
     "1 Intervalo Interquartilico": analise_1_intervalo_interquartilico,
-    "2 Variancas": analise_2_variancas,
+    "2 Variancas": analise_2_variancas
     "2 Variancas Brown-Forsythe": analise_2_variancas_brown_forsythe,
     "Bartlett": analise_bartlett,
     "Brown-Forsythe": analise_brown_forsythe,
