@@ -109,7 +109,6 @@ DICIONARIO_TERMOS = {
     "field_LIE": "Valor do limite inferior de engenharia"
 }
 
-
 @app.post("/analise")
 async def analisar(
     request: Request,
@@ -122,7 +121,7 @@ async def analisar(
     coluna_z: str = Form(None),
     subgrupo: str = Form(None),
     field: str = Form(None),
-    field_conf: str = Form(None),  # ✅ Adicionado field_conf
+    field_conf: str = Form(None),
     field_distribuicao: str = Form(None)
 ):
     try:
@@ -146,15 +145,14 @@ async def analisar(
         if subgrupo_val:
             colunas_usadas.append(subgrupo_val)
 
-        # 🔍 Logs para debug
         print("🔍 Colunas no arquivo recebido:", df.columns.tolist())
-        print("🔍 Colunas solicitadas pelo usuário (Y):", colunas_y)
-        print("🔍 Colunas solicitadas pelo usuário (X):", lista_x)
-        print("🔍 Colunas solicitadas pelo usuário (Z):", lista_z)
-        print("🔍 Subgrupo solicitado:", subgrupo_val)
-        print("🔍 Field recebido:", field)
-        print("🔍 Field_conf recebido:", field_conf)
-        print("🔍 Field distribuição recebido:", field_distribuicao)
+        print("🔍 Colunas Y:", colunas_y)
+        print("🔍 Colunas X:", lista_x)
+        print("🔍 Colunas Z:", lista_z)
+        print("🔍 Subgrupo:", subgrupo_val)
+        print("🔍 Field:", field)
+        print("🔍 Field_conf:", field_conf)
+        print("🔍 Field distribuição:", field_distribuicao)
 
         resultado_texto = ""
         imagem_analise_base64 = None
@@ -167,20 +165,23 @@ async def analisar(
 
             disponiveis = {
                 "df": df,
-                "colunas_y": colunas_y,
+                "coluna_y": colunas_y[0] if colunas_y else None,  # pega uma coluna se existir
+                "coluna_x": lista_x[0] if lista_x else None,      # pega uma coluna se existir
+                "coluna_z": lista_z[0] if lista_z else None,      # pega uma coluna se existir
+                "Data": None,                                     # só preencher se for usado
+                "lista_y": colunas_y,
                 "lista_x": lista_x,
                 "lista_z": lista_z,
                 "subgrupo": subgrupo_val,
                 "field": field,
                 "field_conf": field_conf,
-                "field_distribuicao": field_distribuicao,
-                "colunas_usadas": colunas_usadas
+                "field_dist": field_distribuicao,
+                "field_LSE": field_LSE,
+                "field_LIE": field_LIE
             }
 
-            permitidos = CONFIG_ANALISES.get(
-                ferramenta.strip(),
-                ["df", "colunas_y", "lista_x", "lista_z", "subgrupo", "field", "field_conf"]
-            )
+
+            permitidos = CONFIG_ANALISES.get(ferramenta.strip(), ["df"])
             args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
 
             resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
