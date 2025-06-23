@@ -1,20 +1,25 @@
 from suporte import *
 
-def analise_tipo_modelo_regressao(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) != 2:
-        return "❌ O Tipo de modelo de regressão requer 1 Y e 1 X.", None
+def analise_tipo_modelo_regressao(df: pd.DataFrame, coluna_y):
+    if not coluna_y:
+        return "❌ O Tipo de modelo de regressão requer 1 coluna Y.", None
 
-    y_col, x_col = colunas_usadas
-    df_valid = df[[x_col, y_col]].dropna()
+    if coluna_y not in df.columns:
+        return f"❌ Coluna {coluna_y} não encontrada no arquivo.", None
+
+    # Busca uma coluna X numérica automaticamente
+    colunas_x = [col for col in df.columns if col != coluna_y and pd.api.types.is_numeric_dtype(df[col])]
+    if not colunas_x:
+        return "❌ Nenhuma coluna X numérica encontrada automaticamente no arquivo.", None
+
+    coluna_x = colunas_x[0]
+    df_valid = df[[coluna_x, coluna_y]].dropna()
     if len(df_valid) < 5:
-        return "❌ O teste requer ao menos 5 valores não nulos.", None
+        return "❌ São necessários pelo menos 5 pares válidos para análise.", None
 
-    X_raw = df_valid[x_col].values
-    Y = df_valid[y_col].values
+    X_raw = df_valid[coluna_x].values
+    Y = df_valid[coluna_y].values
 
-    resultados = {}
-
-    # Define os modelos
     modelos = {
         "Linear": np.polyfit(X_raw, Y, 1),
         "Quadrático": np.polyfit(X_raw, Y, 2),
@@ -22,134 +27,100 @@ def analise_tipo_modelo_regressao(df: pd.DataFrame, colunas_usadas: list, field=
     }
 
     # Logarítmico
-    X_log = np.log(X_raw[X_raw > 0])
+    X_log = X_raw[X_raw > 0]
     Y_log = Y[X_raw > 0]
     if len(X_log) >= 5:
-        modelos["Logarítmico"] = np.polyfit(X_log, Y_log, 1)
+        modelos["Logarítmico"] = np.polyfit(np.log(X_log), Y_log, 1)
 
-    # Exponencial (lineariza com log Y)
+    # Exponencial
     Y_exp = Y[Y > 0]
     X_exp = X_raw[Y > 0]
     if len(Y_exp) >= 5:
         modelos["Exponencial"] = np.polyfit(X_exp, np.log(Y_exp), 1)
 
-    # Calcula métricas
+    resultados = {}
     for nome, coef in modelos.items():
         if nome == "Logarítmico":
-            y_pred = np.polyval(coef, np.log(X_raw))
+            y_pred = np.polyval(coef, np.log(X_raw[X_raw > 0]))
+            y_pred_full = np.full_like(Y, np.nan)
+            y_pred_full[X_raw > 0] = y_pred
+            y_pred = y_pred_full
         elif nome == "Exponencial":
             y_pred = np.exp(np.polyval(coef, X_raw))
         else:
             y_pred = np.polyval(coef, X_raw)
 
-        ss_res = np.sum((Y - y_pred) ** 2)
-        ss_tot = np.sum((Y - np.mean(Y)) ** 2)
+        ss_res = np.nansum((Y - y_pred) ** 2)
+        ss_tot = np.nansum((Y - np.nanmean(Y)) ** 2)
         r2 = 1 - ss_res / ss_tot
         adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - len(coef) - 1)
-
-        # R2 preditivo leave-one-out
-        erros = []
-        for i in range(len(Y)):
-            X_train = np.delete(X_raw, i)
-            Y_train = np.delete(Y, i)
-            if nome == "Logarítmico":
-                X_train_t = np.log(X_train[X_train > 0])
-                Y_train_t = Y_train[X_train > 0]
-                if len(X_train_t) < 2:
-                    continue
-                coef_lo = np.polyfit(X_train_t, Y_train_t, 1)
-                y_pred_lo = np.polyval(coef_lo, np.log(X_raw[i]))
-            elif nome == "Exponencial":
-                Y_train_t = Y_train[Y_train > 0]
-                X_train_t = X_train[Y_train > 0]
-                if len(Y_train_t) < 2:
-                    continue
-                coef_lo = np.polyfit(X_train_t, np.log(Y_train_t), 1)
-                y_pred_lo = np.exp(np.polyval(coef_lo, X_raw[i]))
-            else:
-                coef_lo = np.polyfit(X_train, Y_train, len(coef) - 1)
-                y_pred_lo = np.polyval(coef_lo, X_raw[i])
-            erros.append((Y[i] - y_pred_lo) ** 2)
-
-        if len(erros) > 0:
-            ss_pred = np.sum(erros)
-            r2_pred = 1 - ss_pred / ss_tot
-        else:
-            r2_pred = float('nan')
 
         resultados[nome] = {
             "coef": coef,
             "r2": r2,
-            "r2_adj": adj,
-            "r2_pred": r2_pred
+            "r2_adj": adj
         }
 
-    # Escolher o modelo
-    melhor = max(resultados.items(), key=lambda x: x[1]["r2_pred"] if not np.isnan(x[1]["r2_pred"]) else -np.inf)
+    melhor = max(resultados.items(), key=lambda x: x[1]["r2_adj"])
     nome_vencedor, res_vencedor = melhor
 
-    # Verificar simplicidade
-    simples = ["Linear", "Quadrático", "Cúbico", "Logarítmico", "Exponencial"]
-    mais_simples = [m for m in simples if m in resultados][:simples.index(nome_vencedor)+1]
-    modelo_recomendado = nome_vencedor
-    for m in mais_simples:
-        if (resultados[nome_vencedor]["r2_pred"] - resultados[m]["r2_pred"]) < 0.01:
-            modelo_recomendado = m
-            break
-
-    # Gráfico
-    fig, ax = plt.subplots(figsize=(6,4))
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
     ax.scatter(X_raw, Y, color='black', label='Dados')
-    if modelo_recomendado == "Logarítmico":
-        X_plot = X_raw[X_raw > 0]
-        y_fit = np.polyval(resultados["Logarítmico"]["coef"], np.log(X_plot))
-    elif modelo_recomendado == "Exponencial":
-        y_fit = np.exp(np.polyval(resultados["Exponencial"]["coef"], X_raw))
-    else:
-        y_fit = np.polyval(resultados[modelo_recomendado]["coef"], X_raw)
 
-    ax.plot(X_raw, y_fit, color='blue', label=f'Modelo: {modelo_recomendado}')
+    if nome_vencedor == "Logarítmico":
+        X_plot = X_raw[X_raw > 0]
+        y_fit = np.polyval(res_vencedor["coef"], np.log(X_plot))
+        ax.plot(X_plot, y_fit, color='blue', label=f'Modelo: {nome_vencedor}')
+    elif nome_vencedor == "Exponencial":
+        y_fit = np.exp(np.polyval(res_vencedor["coef"], X_raw))
+        ax.plot(X_raw, y_fit, color='blue', label=f'Modelo: {nome_vencedor}')
+    else:
+        y_fit = np.polyval(res_vencedor["coef"], X_raw)
+        ax.plot(X_raw, y_fit, color='blue', label=f'Modelo: {nome_vencedor}')
+
+    ax.set_xlabel(coluna_x)
+    ax.set_ylabel(coluna_y)
     ax.set_title("Tipo de Modelo de Regressão")
-    ax.set_xlabel(x_col)
-    ax.set_ylabel(y_col)
     ax.legend()
     plt.tight_layout()
 
     buf = BytesIO()
-    plt.savefig(buf, format='png')
+    plt.savefig(buf, format="png")
     plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-    # Texto
     linhas = []
     for nome, r in resultados.items():
         coef_txt = " + ".join([f"{c:.4f}*X^{i}" for i, c in enumerate(r["coef"][::-1])])
-        linhas.append(f"- {nome}: R²={r['r2']:.4f}, R² ajustado={r['r2_adj']:.4f}, R² preditivo={r['r2_pred']:.4f}\n  Equação: {coef_txt}")
+        linhas.append(f"- {nome}: R²={r['r2']:.4f}, R² ajustado={r['r2_adj']:.4f}\n  Equação: {coef_txt}")
 
     texto = f"""
 **Tipo de Modelo de Regressão**
 {chr(10).join(linhas)}
 
 **Conclusão**
-Modelo recomendado: {modelo_recomendado}
+Modelo recomendado: {nome_vencedor}
 """
 
     return texto.strip(), grafico_base64
 
-def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) != 2:
-        return "❌ A regressão linear simples requer 1 Y e 1 X.", None
 
-    y_col, x_col = colunas_usadas
-    df_valid = df[[x_col, y_col]].dropna()
+def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
+    if not coluna_y or not coluna_x:
+        return "❌ A regressão linear simples requer 1 coluna Y e 1 coluna X.", None
+
+    if coluna_y not in df.columns or coluna_x not in df.columns:
+        return f"❌ Coluna {coluna_y} ou {coluna_x} não encontrada no arquivo.", None
+
+    df_valid = df[[coluna_x, coluna_y]].dropna()
 
     if len(df_valid) < 5:
         return "❌ O modelo requer ao menos 5 observações válidas.", None
 
-    X = df_valid[x_col].values
-    Y = df_valid[y_col].values
+    X = df_valid[coluna_x].values
+    Y = df_valid[coluna_y].values
 
-    # Ajuste do modelo
     coef = np.polyfit(X, Y, 1)
     y_pred = np.polyval(coef, X)
     intercepto, angular = coef[1], coef[0]
@@ -159,7 +130,6 @@ def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, fie
     r2 = 1 - ss_res / ss_tot
     r2_adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - 2)
 
-    # p-valor do coeficiente
     X_mat = np.vstack([np.ones_like(X), X]).T
     beta, residuals, rank, s = np.linalg.lstsq(X_mat, Y, rcond=None)
     mse = ss_res / (len(Y) - 2)
@@ -168,7 +138,6 @@ def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, fie
     t_stat = beta[1] / se_beta1
     p_valor_beta1 = 2 * (1 - stats.t.cdf(abs(t_stat), df=len(Y)-2))
 
-    # R2 preditivo leave-one-out
     erros = []
     for i in range(len(Y)):
         X_train = np.delete(X, i)
@@ -179,7 +148,6 @@ def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, fie
     ss_pred = np.sum(erros)
     r2_pred = 1 - ss_pred / ss_tot
 
-    # Normalidade dos resíduos
     residuos = Y - y_pred
     ad = stats.anderson(residuos)
     ad_crit = ad.critical_values
@@ -190,7 +158,6 @@ def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, fie
     else:
         ad_normal = False
 
-    # Conclusão
     conclusao = []
     conclusao.append("✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_normal else "⚠ Resíduos podem não ser normais (Anderson-Darling).")
     conclusao.append(f"✅ Coeficiente angular significativo (p = {p_valor_beta1:.4f})." if p_valor_beta1 < 0.05 else f"⚠ Coeficiente angular não significativo (p = {p_valor_beta1:.4f}).")
@@ -199,13 +166,13 @@ def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, fie
     else:
         conclusao.append("⚠ Modelo pode não ser adequado. Verifique os indicadores acima.")
 
-    # Gráfico
+    aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6,4))
     ax.scatter(X, Y, color='black', label='Dados')
     ax.plot(X, y_pred, color='blue', label='Reta ajustada')
     ax.set_title("Regressão Linear Simples")
-    ax.set_xlabel(x_col)
-    ax.set_ylabel(y_col)
+    ax.set_xlabel(coluna_x)
+    ax.set_ylabel(coluna_y)
     ax.legend()
     plt.tight_layout()
 
@@ -214,7 +181,6 @@ def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, fie
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto
     texto = f"""
 **Regressão Linear Simples**
 - Equação: Y = {intercepto:.4f} + {angular:.4f} * X
@@ -233,28 +199,21 @@ def analise_regressao_linear_simples(df: pd.DataFrame, colunas_usadas: list, fie
 
 
 
-def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) < 2:
+
+def analise_regressao_linear_multipla(df: pd.DataFrame, coluna_y, colunas_x, field=None):
+    if not coluna_y or not colunas_x:
         return "❌ A regressão linear múltipla requer 1 Y e pelo menos 1 X.", None
 
-    y_col = colunas_usadas[0]
-    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
-    xs_discreto = []
-    if "Xs_discreto" in colunas_usadas:
-        idx = colunas_usadas.index("Xs_discreto")
-        xs_discreto = colunas_usadas[idx+1:]
+    for col in [coluna_y] + colunas_x:
+        if col not in df.columns:
+            return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    # Validação
-    cols_todas = [y_col] + xs_continuo + xs_discreto
-    df_valid = df[cols_todas].dropna()
-    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 3:
+    df_valid = df[[coluna_y] + colunas_x].dropna()
+    if len(df_valid) < len(colunas_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[y_col].values
-    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
-    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
-    X_final = pd.concat([X_cont, X_disc], axis=1)
-    x_cols_final = X_final.columns.tolist()
+    Y = df_valid[coluna_y].values
+    X_final = df_valid[colunas_x].values
     n, p_full = X_final.shape
 
     from sklearn.linear_model import LinearRegression
@@ -269,7 +228,6 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
         r2 = r2_score(Y, Y_pred)
         r2_adj = 1 - (1 - r2) * (n - 1) / (n - X_sub.shape[1] - 1)
 
-        # R² preditivo leave-one-out
         erros = []
         for i in range(n):
             Xi = np.delete(X_sub, i, axis=0)
@@ -281,25 +239,21 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
         ss_tot = np.sum((Y - np.mean(Y)) ** 2)
         r2_pred = 1 - ss_res_pred / ss_tot
 
-        # VIF
         vif = []
         if X_sub.shape[1] > 1:
             X_sm = sm.add_constant(X_sub)
-            for i in range(1, X_sm.shape[1]):  # ignora const
+            for i in range(1, X_sm.shape[1]):
                 vif.append(variance_inflation_factor(X_sm, i))
         else:
             vif.append(1.0)
 
-        # Mallows Cp
         resid = Y - Y_pred
         mse_full = np.sum((Y - LinearRegression().fit(X_final, Y).predict(X_final)) ** 2) / (n - p_full - 1)
         cp = (np.sum(resid ** 2) / mse_full) - (n - 2 * (X_sub.shape[1] + 1))
 
-        # Durbin-Watson
         dw = sm.stats.stattools.durbin_watson(resid)
 
         return {
-            "modelo": model,
             "cols": cols_sub,
             "r2": r2,
             "r2_adj": r2_adj,
@@ -310,15 +264,14 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
             "Y_pred": Y_pred
         }
 
-    # Subset selection (limite de 5 para praticidade)
     resultados = []
-    if len(x_cols_final) > 5:
-        x_cols_final = x_cols_final[:5]  # limita para evitar sobrecarga
+    if len(colunas_x) > 5:
+        colunas_x = colunas_x[:5]
 
-    for k in range(1, len(x_cols_final) + 1):
-        for subset in combinations(range(len(x_cols_final)), k):
-            cols_sub = [x_cols_final[i] for i in subset]
-            X_sub = X_final[cols_sub].values
+    for k in range(1, len(colunas_x) + 1):
+        for subset in combinations(range(len(colunas_x)), k):
+            cols_sub = [colunas_x[i] for i in subset]
+            X_sub = df_valid[cols_sub].values
             resultados.append(calcular_modelo(X_sub, cols_sub))
 
     melhor = max(resultados, key=lambda r: r["r2_pred"])
@@ -329,7 +282,6 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
             modelo_recomendado = m
             break
 
-    # Gráfico resíduos vs preditos
     fig, ax = plt.subplots(figsize=(6,4))
     ax.scatter(modelo_recomendado["Y_pred"], Y - modelo_recomendado["Y_pred"], color='black')
     ax.axhline(0, color='red', linestyle='--')
@@ -343,14 +295,15 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto
-    linhas = [f"Modelo recomendado: {', '.join(modelo_recomendado['cols'])}"]
-    linhas.append(f"R²: {modelo_recomendado['r2']:.4f}")
-    linhas.append(f"R² ajustado: {modelo_recomendado['r2_adj']:.4f}")
-    linhas.append(f"R² preditivo: {modelo_recomendado['r2_pred']:.4f}")
-    linhas.append(f"Mallows Cp: {modelo_recomendado['cp']:.4f}")
-    linhas.append(f"Durbin-Watson: {modelo_recomendado['dw']:.4f}")
-    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(modelo_recomendado['cols'], modelo_recomendado['vif'])]))
+    linhas = [
+        f"Modelo recomendado: {', '.join(modelo_recomendado['cols'])}",
+        f"R²: {modelo_recomendado['r2']:.4f}",
+        f"R² ajustado: {modelo_recomendado['r2_adj']:.4f}",
+        f"R² preditivo: {modelo_recomendado['r2_pred']:.4f}",
+        f"Mallows Cp: {modelo_recomendado['cp']:.4f}",
+        f"Durbin-Watson: {modelo_recomendado['dw']:.4f}",
+        "VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(modelo_recomendado['cols'], modelo_recomendado['vif'])])
+    ]
 
     conclusao = []
     if modelo_recomendado['r2_pred'] > 0.5:
@@ -373,30 +326,24 @@ def analise_regressao_linear_multipla(df: pd.DataFrame, colunas_usadas: list, fi
     return texto.strip(), grafico_base64
 
 
-def analise_regressao_logistica_binaria(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) < 2:
+
+def analise_regressao_logistica_binaria(df: pd.DataFrame, coluna_y, colunas_x, field=None):
+    if not coluna_y or not colunas_x:
         return "❌ A regressão logística binária requer 1 Y e pelo menos 1 X.", None
 
-    y_col = colunas_usadas[0]
-    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
-    xs_discreto = []
-    if "Xs_discreto" in colunas_usadas:
-        idx = colunas_usadas.index("Xs_discreto")
-        xs_discreto = colunas_usadas[idx+1:]
+    for col in [coluna_y] + colunas_x:
+        if col not in df.columns:
+            return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    # Validação
-    cols_todas = [y_col] + xs_continuo + xs_discreto
-    df_valid = df[cols_todas].dropna()
-    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 3:
+    df_valid = df[[coluna_y] + colunas_x].dropna()
+    if len(df_valid) < len(colunas_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[y_col].values
+    Y = df_valid[coluna_y].values
     if len(set(Y)) != 2:
         return "❌ A variável Y deve ser binária (duas categorias).", None
 
-    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
-    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
-    X_final = pd.concat([X_cont, X_disc], axis=1)
+    X_final = df_valid[colunas_x]
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
@@ -408,30 +355,21 @@ def analise_regressao_logistica_binaria(df: pd.DataFrame, colunas_usadas: list, 
     Y_pred_prob = model.predict(X_sm)
     Y_pred_class = (Y_pred_prob >= 0.5).astype(int)
 
-    # Pseudo R²
     ll_null = sm.Logit(Y, np.ones((len(Y),1))).fit(disp=0).llf
     ll_model = model.llf
     r2_mcf = 1 - ll_model / ll_null
 
-    # VIF
     vif = []
-    for i in range(1, X_sm.shape[1]):  # ignora const
+    for i in range(1, X_sm.shape[1]):
         vif.append(variance_inflation_factor(X_sm.values, i))
 
-    # AUC
     auc = roc_auc_score(Y, Y_pred_prob)
-
-    # Matriz de confusão
     cm = confusion_matrix(Y, Y_pred_class)
     acerto = (cm.diagonal().sum()) / cm.sum()
 
-    # Gráfico
     fig, ax = plt.subplots(figsize=(6,4))
-    if len(x_cols_final) == 1 and xs_continuo:
+    if len(x_cols_final) == 1:
         X_plot = np.linspace(X_final.iloc[:,0].min(), X_final.iloc[:,0].max(), 100)
-        X_plot_sm = sm.add_constant(X_plot)
-        if X_plot_sm.ndim == 1:
-            X_plot_sm = X_plot_sm.reshape(-1,1)
         coef = model.params.values
         logit = coef[0] + coef[1] * X_plot
         prob = 1 / (1 + np.exp(-logit))
@@ -456,7 +394,6 @@ def analise_regressao_logistica_binaria(df: pd.DataFrame, colunas_usadas: list, 
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto
     linhas = []
     for name, coef, pval in zip(['Const'] + x_cols_final, model.params, model.pvalues):
         linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
@@ -493,29 +430,23 @@ def analise_regressao_logistica_binaria(df: pd.DataFrame, colunas_usadas: list, 
 
 
 
-def analise_regressao_logistica_ordinal(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) < 2:
+def analise_regressao_logistica_ordinal(df: pd.DataFrame, coluna_y, colunas_x, field=None):
+    if not coluna_y or not colunas_x:
         return "❌ A regressão logística ordinal requer 1 Y e pelo menos 1 X.", None
 
-    y_col = colunas_usadas[0]
-    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
-    xs_discreto = []
-    if "Xs_discreto" in colunas_usadas:
-        idx = colunas_usadas.index("Xs_discreto")
-        xs_discreto = colunas_usadas[idx+1:]
+    for col in [coluna_y] + colunas_x:
+        if col not in df.columns:
+            return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    cols_todas = [y_col] + xs_continuo + xs_discreto
-    df_valid = df[cols_todas].dropna()
-    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 3:
+    df_valid = df[[coluna_y] + colunas_x].dropna()
+    if len(df_valid) < len(colunas_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[y_col]
+    Y = df_valid[coluna_y]
     if not pd.api.types.is_integer_dtype(Y) and not pd.api.types.is_categorical_dtype(Y):
         return "❌ Y deve ser ordinal (numérica inteira ou categórica ordenada).", None
 
-    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
-    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
-    X_final = pd.concat([X_cont, X_disc], axis=1)
+    X_final = df_valid[colunas_x]
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
@@ -525,12 +456,10 @@ def analise_regressao_logistica_ordinal(df: pd.DataFrame, colunas_usadas: list, 
     model = OrderedModel(Y, X_final, distr='logit')
     res = model.fit(method='bfgs', disp=0)
 
-    # Pseudo R²
     ll_null = OrderedModel(Y, np.ones((len(Y),1)), distr='logit').fit(method='bfgs', disp=0).llf
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
-    # VIF
     vif = []
     if X_final.shape[1] > 1:
         X_sm = sm.add_constant(X_final)
@@ -539,17 +468,13 @@ def analise_regressao_logistica_ordinal(df: pd.DataFrame, colunas_usadas: list, 
     else:
         vif.append(1.0)
 
-    # Predição e acurácia
     Y_pred = res.model.predict(res.params, exog=X_final).idxmax(axis=1)
     acerto = (Y_pred == Y).mean()
 
-    # Teste de proporcionalidade dos odds (Brant test simplificado: compara coeficientes por nível)
-    # Como o Brant original não existe no Python, comentamos no texto
     comentario_odds = "⚠ Teste de proporcionalidade dos odds não implementado diretamente no Python. Avalie graficamente ou com software complementar (ex: Stata, R)."
 
-    # Gráfico
     fig, ax = plt.subplots(figsize=(6,4))
-    if len(x_cols_final) == 1 and xs_continuo:
+    if len(x_cols_final) == 1:
         X_plot = np.linspace(X_final.iloc[:,0].min(), X_final.iloc[:,0].max(), 100)
         probas = res.model.predict(res.params, exog=pd.DataFrame({x_cols_final[0]: X_plot}))
         for cat in probas.columns:
@@ -568,7 +493,6 @@ def analise_regressao_logistica_ordinal(df: pd.DataFrame, colunas_usadas: list, 
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto
     linhas = []
     for name, coef, pval in zip(res.model.exog_names, res.params, res.pvalues):
         linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
@@ -598,29 +522,23 @@ def analise_regressao_logistica_ordinal(df: pd.DataFrame, colunas_usadas: list, 
     return texto.strip(), grafico_base64
 
 
-def analise_regressao_logistica_nominal(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) < 2:
+def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, colunas_x, field=None):
+    if not coluna_y or not colunas_x:
         return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
 
-    y_col = colunas_usadas[0]
-    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
-    xs_discreto = []
-    if "Xs_discreto" in colunas_usadas:
-        idx = colunas_usadas.index("Xs_discreto")
-        xs_discreto = colunas_usadas[idx+1:]
+    for col in [coluna_y] + colunas_x:
+        if col not in df.columns:
+            return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    cols_todas = [y_col] + xs_continuo + xs_discreto
-    df_valid = df[cols_todas].dropna()
-    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 3:
+    df_valid = df[[coluna_y] + colunas_x].dropna()
+    if len(df_valid) < len(colunas_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[y_col]
+    Y = df_valid[coluna_y]
     if len(Y.unique()) < 3:
         return "❌ Y deve ter pelo menos 3 categorias para regressão logística nominal.", None
 
-    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
-    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
-    X_final = pd.concat([X_cont, X_disc], axis=1)
+    X_final = df_valid[colunas_x]
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
@@ -630,12 +548,10 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, colunas_usadas: list, 
     model = sm.MNLogit(Y, sm.add_constant(X_final))
     res = model.fit(disp=0)
 
-    # R² de McFadden
     ll_null = sm.MNLogit(Y, np.ones((len(Y),1))).fit(disp=0).llf
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
-    # VIF
     vif = []
     if X_final.shape[1] > 1:
         X_sm = sm.add_constant(X_final)
@@ -644,12 +560,10 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, colunas_usadas: list, 
     else:
         vif.append(1.0)
 
-    # Predição e acurácia
     Y_pred = res.predict().idxmax(axis=1)
     cm = confusion_matrix(Y, Y_pred, labels=Y.unique())
     acerto = (cm.diagonal().sum()) / cm.sum()
 
-    # Gráfico matriz de confusão
     fig, ax = plt.subplots(figsize=(6, 4))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=Y.unique())
     disp.plot(ax=ax, cmap="Blues", colorbar=False)
@@ -661,7 +575,6 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, colunas_usadas: list, 
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto
     linhas = []
     for (cat, coef, pval) in zip(res.params.index, res.params.values, res.pvalues.values):
         coef_str = ", ".join([f"{c:.4f}" for c in coef])
@@ -695,61 +608,45 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, colunas_usadas: list, 
     return texto.strip(), grafico_base64
 
 
-def analise_arvore_decisao(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) < 2:
-        return "❌ A árvore de decisão requer 1 Y e pelo menos 1 X.", None
+def analise_arvore_decisao(df: pd.DataFrame, coluna_y: str, lista_x: list, field=None):
+    if not coluna_y or not lista_x or len(lista_x) == 0:
+        return "❌ A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
 
-    y_col = colunas_usadas[0]
-    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
-    xs_discreto = []
-    if "Xs_discreto" in colunas_usadas:
-        idx = colunas_usadas.index("Xs_discreto")
-        xs_discreto = colunas_usadas[idx+1:]
-
-    cols_todas = [y_col] + xs_continuo + xs_discreto
-    df_valid = df[cols_todas].dropna()
-    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 5:
+    cols = [coluna_y] + lista_x
+    df_valid = df[cols].dropna()
+    if len(df_valid) < len(lista_x) + 5:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[y_col]
-    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
-    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
-    X_final = pd.concat([X_cont, X_disc], axis=1)
-    x_cols_final = X_final.columns.tolist()
+    Y = df_valid[coluna_y]
+    X = df_valid[lista_x]
 
     from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, export_text, plot_tree
     from sklearn.metrics import accuracy_score, r2_score
+    from io import BytesIO
+    import base64
     import matplotlib.pyplot as plt
 
     if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
-        # Regressão
         model = DecisionTreeRegressor(max_depth=4, random_state=42)
-        model.fit(X_final, Y)
-        Y_pred = model.predict(X_final)
+        model.fit(X, Y)
+        Y_pred = model.predict(X)
         score = r2_score(Y, Y_pred)
         score_txt = f"R²: {score:.4f}"
     else:
-        # Classificação
         model = DecisionTreeClassifier(max_depth=4, random_state=42)
-        model.fit(X_final, Y)
-        Y_pred = model.predict(X_final)
+        model.fit(X, Y)
+        Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
         score_txt = f"Percentual de acerto: {acc*100:.2f}%"
 
-    # Importância das variáveis
-    importancias = ", ".join([f"{c}={v*100:.2f}%" for c, v in zip(x_cols_final, model.feature_importances_)])
+    importancias = ", ".join([f"{c}={v*100:.2f}%" for c, v in zip(lista_x, model.feature_importances_)])
+    regras = export_text(model, feature_names=lista_x)
 
-    # Regras
-    regras = export_text(model, feature_names=x_cols_final)
-
-    # Gráfico
     fig, ax = plt.subplots(figsize=(10, 6))
-    plot_tree(model, feature_names=x_cols_final, class_names=[str(c) for c in Y.unique()] if not pd.api.types.is_numeric_dtype(Y) else None,
+    plot_tree(model, feature_names=lista_x,
+              class_names=[str(c) for c in Y.unique()] if not pd.api.types.is_numeric_dtype(Y) else None,
               filled=True, rounded=True, fontsize=8, ax=ax)
     plt.tight_layout()
-
-    from io import BytesIO
-    import base64
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
@@ -768,61 +665,48 @@ def analise_arvore_decisao(df: pd.DataFrame, colunas_usadas: list, field=None):
 
     return texto.strip(), grafico_base64
 
-def analise_random_forest(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) < 2:
-        return "❌ O Random Forest requer 1 Y e pelo menos 1 X.", None
 
-    y_col = colunas_usadas[0]
-    xs_continuo = [c for c in colunas_usadas[1:] if c not in ["", "Xs_discreto"]]
-    xs_discreto = []
-    if "Xs_discreto" in colunas_usadas:
-        idx = colunas_usadas.index("Xs_discreto")
-        xs_discreto = colunas_usadas[idx+1:]
+def analise_random_forest(df: pd.DataFrame, coluna_y: str, lista_x: list, field=None):
+    if not coluna_y or not lista_x or len(lista_x) == 0:
+        return "❌ O Random Forest requer 1 coluna Y e pelo menos 1 X.", None
 
-    cols_todas = [y_col] + xs_continuo + xs_discreto
-    df_valid = df[cols_todas].dropna()
-    if len(df_valid) < len(xs_continuo) + len(xs_discreto) + 5:
+    cols = [coluna_y] + lista_x
+    df_valid = df[cols].dropna()
+    if len(df_valid) < len(lista_x) + 5:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[y_col]
-    X_cont = df_valid[xs_continuo] if xs_continuo else pd.DataFrame(index=df_valid.index)
-    X_disc = pd.get_dummies(df_valid[xs_discreto], drop_first=True) if xs_discreto else pd.DataFrame(index=df_valid.index)
-    X_final = pd.concat([X_cont, X_disc], axis=1)
-    x_cols_final = X_final.columns.tolist()
+    Y = df_valid[coluna_y]
+    X = df_valid[lista_x]
 
     from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
     from sklearn.metrics import accuracy_score, r2_score
+    from io import BytesIO
+    import base64
     import matplotlib.pyplot as plt
 
     if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
-        # Regressão
         model = RandomForestRegressor(n_estimators=100, random_state=42)
-        model.fit(X_final, Y)
-        Y_pred = model.predict(X_final)
+        model.fit(X, Y)
+        Y_pred = model.predict(X)
         score = r2_score(Y, Y_pred)
         score_txt = f"R²: {score:.4f}"
     else:
-        # Classificação
         model = RandomForestClassifier(n_estimators=100, random_state=42)
-        model.fit(X_final, Y)
-        Y_pred = model.predict(X_final)
+        model.fit(X, Y)
+        Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
         score_txt = f"Percentual de acerto: {acc*100:.2f}%"
 
-    # Importância das variáveis
     importancias = model.feature_importances_
-    importancia_str = ", ".join([f"{c}={v*100:.2f}%" for c,v in zip(x_cols_final, importancias)])
+    importancia_str = ", ".join([f"{c}={v*100:.2f}%" for c, v in zip(lista_x, importancias)])
 
-    # Gráfico das importâncias
     fig, ax = plt.subplots(figsize=(8, 5))
     sorted_idx = importancias.argsort()
-    ax.barh([x_cols_final[i] for i in sorted_idx], importancias[sorted_idx])
+    ax.barh([lista_x[i] for i in sorted_idx], importancias[sorted_idx])
     ax.set_title("Importância das Variáveis - Random Forest")
     ax.set_xlabel("Importância")
     plt.tight_layout()
 
-    from io import BytesIO
-    import base64
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
@@ -837,16 +721,16 @@ def analise_random_forest(df: pd.DataFrame, colunas_usadas: list, field=None):
 
     return texto.strip(), grafico_base64
 
-def analise_arima(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) != 1:
-        return "❌ O ARIMA requer apenas 1 coluna Y (série temporal).", None
 
-    y_col = colunas_usadas[0]
-    df_valid = df[[y_col]].dropna()
+def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
+    if not coluna_y or coluna_y not in df.columns:
+        return "❌ O ARIMA requer 1 coluna Y (série temporal).", None
+
+    df_valid = df[[coluna_y]].dropna()
     if len(df_valid) < 10:
         return "❌ A série temporal requer pelo menos 10 observações.", None
 
-    Y = df_valid[y_col].values
+    Y = df_valid[coluna_y].values
 
     try:
         import pmdarima as pm
@@ -858,27 +742,25 @@ def analise_arima(df: pd.DataFrame, colunas_usadas: list, field=None):
     aic = modelo.aic()
     bic = modelo.bic()
 
-    # Previsão
     horizonte = int(field) if field and str(field).isdigit() else 5
     previsao = modelo.predict(n_periods=horizonte)
 
-    # Gráfico
     import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
+
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(range(len(Y)), Y, label='Série Original', color='black')
-    ax.plot(range(len(Y), len(Y)+horizonte), previsao, label='Previsão', color='blue')
+    ax.plot(range(len(Y), len(Y) + horizonte), previsao, label='Previsão', color='blue')
     ax.set_title(f'ARIMA{ordem} - Previsão {horizonte} períodos')
     ax.legend()
     plt.tight_layout()
 
-    from io import BytesIO
-    import base64
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto
     texto = f"""
 **ARIMA**
 - Equação ARIMA: ARIMA{ordem}
@@ -892,51 +774,61 @@ def analise_arima(df: pd.DataFrame, colunas_usadas: list, field=None):
 
     return texto.strip(), grafico_base64
 
-def analise_holt_winters(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) != 1:
-        return "❌ O Holt-Winters requer apenas 1 coluna Y (série temporal).", None
 
-    y_col = colunas_usadas[0]
+def analise_holt_winters(df: pd.DataFrame, coluna_y: list, field=None):
+    if len(coluna_y) != 1:
+        return "❌ O Holt-Winters requer exatamente 1 coluna Y (série temporal).", None
+
+    y_col = coluna_y[0]
     df_valid = df[[y_col]].dropna()
+
     if len(df_valid) < 10:
         return "❌ A série temporal requer pelo menos 10 observações.", None
 
     Y = df_valid[y_col].values
 
-    from statsmodels.tsa.holtwinters import ExponentialSmoothing
+    try:
+        from statsmodels.tsa.holtwinters import ExponentialSmoothing
+    except ImportError:
+        return "❌ O pacote statsmodels não está disponível neste ambiente.", None
 
-    # Auto-ajuste: tentamos com tendência e sem sazonalidade (simples e robusto)
-    modelo = ExponentialSmoothing(Y, trend='add', seasonal=None).fit()
-    previsao = modelo.forecast(int(field) if field and str(field).isdigit() else 5)
+    # Previsão
+    horizonte = int(field) if field and str(field).isdigit() else 5
+
+    # Ajusta o modelo
+    modelo = ExponentialSmoothing(Y, trend="add", seasonal=None, damped_trend=True).fit()
+    previsao = modelo.forecast(horizonte)
 
     # Gráfico
     import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
+
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(range(len(Y)), Y, label='Série Original', color='black')
-    ax.plot(range(len(Y), len(Y)+len(previsao)), previsao, label='Previsão', color='blue')
-    ax.set_title('Holt-Winters (Suavização Exponencial)')
+    ax.plot(range(len(Y)), Y, label="Série Original", color="black")
+    ax.plot(range(len(Y), len(Y) + horizonte), previsao, label="Previsão", color="blue")
+    ax.set_title(f"Holt-Winters (Suavização Exponencial) - Previsão {horizonte} períodos")
     ax.legend()
     plt.tight_layout()
 
-    from io import BytesIO
-    import base64
     buf = BytesIO()
-    plt.savefig(buf, format='png')
+    plt.savefig(buf, format="png")
     plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
     # Texto
     texto = f"""
 **Holt-Winters (Suavização Exponencial)**
-- Componente de tendência: aditivo
+- Tendência: aditiva (com amortecimento)
 - Sazonalidade: não aplicada
-- Previsão para os próximos {len(previsao)} períodos: {', '.join([f"{p:.2f}" for p in previsao])}
+- Previsão para os próximos {horizonte} períodos: {', '.join([f"{p:.2f}" for p in previsao])}
 
 **Conclusão**
-✅ Modelo ajustado com suavização exponencial. Simples e robusto para séries com tendência. Avalie o gráfico para validar a qualidade da previsão.
+✅ Modelo ajustado automaticamente. Simples e robusto para séries com tendência. Avalie o gráfico e ajuste os parâmetros (ex.: sazonalidade) se necessário.
 """
 
     return texto.strip(), grafico_base64
+
 
 ANALISES = {
     "Tipo de modelo de regressão": analise_tipo_modelo_regressao,
