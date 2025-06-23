@@ -445,7 +445,6 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 
 
 
-
 def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística ordinal requer 1 Y e pelo menos 1 X.", None
@@ -458,9 +457,17 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[coluna_y]
-    if not pd.api.types.is_integer_dtype(Y) and not pd.api.types.is_categorical_dtype(Y):
-        return "❌ Y deve ser ordinal (numérica inteira ou categórica ordenada).", None
+    Y_raw = df_valid[coluna_y]
+    if pd.api.types.is_numeric_dtype(Y_raw):
+        Y = Y_raw
+    else:
+        # Cria mapeamento ordinal automaticamente
+        categorias = sorted(Y_raw.unique())
+        mapeamento = {cat: i for i, cat in enumerate(categorias)}
+        Y = Y_raw.map(mapeamento)
+
+        if Y.isnull().any():
+            return f"❌ Y contém valores não mapeados.", None
 
     X_final = df_valid[lista_x]
     x_cols_final = X_final.columns.tolist()
@@ -543,23 +550,26 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 
 
 
-def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x,):
+
+def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
 
-    for col in [coluna_y] + lista_x:
+    if coluna_y not in df.columns:
+        return f"❌ Coluna Y '{coluna_y}' não encontrada no arquivo.", None
+    for col in lista_x:
         if col not in df.columns:
-            return f"❌ Coluna {col} não encontrada no arquivo.", None
+            return f"❌ Coluna X '{col}' não encontrada no arquivo.", None
 
     df_valid = df[[coluna_y] + lista_x].dropna()
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[coluna_y]
+    Y = df_valid[coluna_y].astype(str)  # Garante que Y seja categórico (nominal)
     if len(Y.unique()) < 3:
         return "❌ Y deve ter pelo menos 3 categorias para regressão logística nominal.", None
 
-    X_final = df_valid[lista_x]
+    X_final = pd.get_dummies(df_valid[lista_x], drop_first=True)
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
@@ -630,6 +640,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x,):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
