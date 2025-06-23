@@ -108,19 +108,19 @@ def analise_de_outliers(df, lista_y):
 
     return resultado_texto, imagem_base64
 
-def analise_correlacao_person(df, colunas_y, lista_x):
+def analise_correlacao_person(df, coluna_y, lista_x):
     nomes_df = df.columns.tolist()
 
-    if not colunas_y or len(colunas_y) != 1:
+    if not coluna_y or len(coluna_y) != 1:
         return "❌ É necessário exatamente uma coluna Y.", None
     if not lista_x or len(lista_x) < 1:
         return "❌ É necessário ao menos uma coluna X.", None
 
-    nome_coluna_y = colunas_y[0]
+    nome_coluna_y = coluna_y[0]
     if nome_coluna_y not in nomes_df:
         return f"❌ A coluna Y '{nome_coluna_y}' não foi encontrada no arquivo.", None
 
-    serie_y = pd.to_numeric(df[nome_coluna_y], errors='coerce').dropna()
+    serie_y = df[nome_coluna_y].dropna()
     if serie_y.empty:
         return f"❌ A coluna Y '{nome_coluna_y}' não contém dados válidos.", None
 
@@ -130,7 +130,7 @@ def analise_correlacao_person(df, colunas_y, lista_x):
             linhas.append(f"- {nome_x}: ❌ A coluna X não foi encontrada no arquivo.")
             continue
 
-        serie_x = pd.to_numeric(df[nome_x], errors='coerce').dropna()
+        serie_x = df[nome_x].dropna()
         if serie_x.empty:
             linhas.append(f"- {nome_x}: ❌ Dados X inválidos.")
             continue
@@ -144,9 +144,7 @@ def analise_correlacao_person(df, colunas_y, lista_x):
         forca = "fraca" if abs(r) < 0.3 else "moderada" if abs(r) < 0.7 else "forte"
         dependencia = "existe dependência estatística" if p < 0.05 else "não há dependência estatística"
 
-        linhas.append(
-            f"- {nome_x}: Coeficiente de Pearson = {r:.2f}, p-valor = {p:.4f} → Correlação {forca}, {dependencia}."
-        )
+        linhas.append(f"- {nome_x}: Coeficiente de Pearson = {r:.2f}, p-valor = {p:.4f} → Correlação {forca}, {dependencia}.")
 
     resumo = f"""📊 **Análise de Correlação de Pearson**
 Coluna Y: **{nome_coluna_y}**
