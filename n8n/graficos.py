@@ -166,7 +166,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
 
 
-  def gerar_pizza(df, coluna_x, coluna_y=None, subgrupo=None):
+def gerar_pizza(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
@@ -182,56 +182,61 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
     aplicar_estilo_minitab()
 
-    if subgrupo:
-        dados = df[[coluna_x, coluna_y, subgrupo]].dropna() if coluna_y else df[[coluna_x, subgrupo]].dropna()
-        subgrupos = dados[subgrupo].unique()
+    try:
+        if subgrupo:
+            dados = df[[coluna_x, subgrupo] + ([coluna_y] if coluna_y else [])].dropna()
+            subgrupos = dados[subgrupo].dropna().unique()
 
-        if len(subgrupos) != 2:
-            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
+            if len(subgrupos) != 2:
+                return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
 
-        fig, axs = plt.subplots(1, 2, figsize=(16, 6))
-        for ax, sub in zip(axs, subgrupos):
-            dados_sub = dados[dados[subgrupo] == sub]
-            if coluna_y:
-                soma = dados_sub.groupby(coluna_x)[coluna_y].sum()
-            else:
-                soma = dados_sub[coluna_x].value_counts()
+            fig, axs = plt.subplots(1, 2, figsize=(16, 6))
+            for ax, sub in zip(axs, subgrupos):
+                dados_sub = dados[dados[subgrupo] == sub]
+                if coluna_y:
+                    soma = dados_sub.groupby(coluna_x)[coluna_y].sum()
+                else:
+                    soma = dados_sub[coluna_x].value_counts()
 
-            if soma.sum() == 0:
-                return f"❌ Dados insuficientes para gerar o gráfico para o subgrupo {sub}.", None
+                if soma.empty or soma.sum() == 0:
+                    return f"❌ Dados insuficientes para gerar o gráfico para o subgrupo {sub}.", None
 
-            soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, ax=ax)
-            ax.set_ylabel("")
-            ax.set_title(f"Pizza de {coluna_x} ({sub})")
+                soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, ax=ax)
+                ax.set_ylabel("")
+                ax.set_title(f"Pizza de {coluna_x} ({sub})")
 
-        plt.tight_layout()
+            plt.tight_layout()
 
-    else:
-        dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
-        if dados.empty:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
-
-        if coluna_y:
-            soma = dados.groupby(coluna_x)[coluna_y].sum()
         else:
-            soma = dados[coluna_x].value_counts()
+            dados = df[[coluna_x] + ([coluna_y] if coluna_y else [])].dropna()
+            if dados.empty:
+                return "❌ Dados insuficientes para gerar o gráfico.", None
 
-        if soma.sum() == 0:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
+            if coluna_y:
+                soma = dados.groupby(coluna_x)[coluna_y].sum()
+            else:
+                soma = dados[coluna_x].value_counts()
 
-        plt.figure(figsize=(8, 6))
-        soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
-        plt.ylabel("")
-        plt.title(f"Pizza de {coluna_x}")
-        plt.tight_layout()
+            if soma.empty or soma.sum() == 0:
+                return "❌ Dados insuficientes para gerar o gráfico.", None
 
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close()
+            plt.figure(figsize=(8, 6))
+            soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
+            plt.ylabel("")
+            plt.title(f"Pizza de {coluna_x}")
+            plt.tight_layout()
 
-    return "", imagem_base64
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        plt.close()
+
+        return "", imagem_base64
+
+    except Exception as e:
+        return f"❌ Erro ao gerar o gráfico: {str(e)}", None
+
 
 
 def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
