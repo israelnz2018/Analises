@@ -99,25 +99,25 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     if not coluna_x or coluna_x not in df.columns:
         return "❌ A coluna X informada não foi encontrada no arquivo.", None
 
-    if Subgrupo and Subgrupo not in df.columns:
+    if subgrupo and subgrupo not in df.columns:
         return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
 
     if coluna_y and coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    if Subgrupo:
-        dados = df[[coluna_x, coluna_y, Subgrupo]].dropna() if coluna_y else df[[coluna_x, Subgrupo]].dropna()
+    if subgrupo:
+        dados = df[[coluna_x, coluna_y, subgrupo]].dropna() if coluna_y else df[[coluna_x, subgrupo]].dropna()
         if dados.empty:
             return "❌ Dados insuficientes para gerar o gráfico.", None
 
-        subgrupos = dados[Subgrupo].unique()
+        subgrupos = dados[subgrupo].unique()
         if len(subgrupos) != 2:
             return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
 
         fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
 
         for ax, sub in zip(axs, subgrupos):
-            dados_sub = dados[dados[Subgrupo] == sub]
+            dados_sub = dados[dados[subgrupo] == sub]
             if coluna_y:
                 soma = dados_sub.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
             else:
