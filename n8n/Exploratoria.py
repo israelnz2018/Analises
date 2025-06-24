@@ -200,63 +200,175 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
     return resumo, img_base64
 
 
-def analise_estabilidade(df, coluna_y, subgrupo=None):
+def analise_estabilidade(df, coluna_y):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+    from io import BytesIO
+    import base64
+
+    aplicar_estilo_minitab()
+
     nome_coluna_y = coluna_y if isinstance(coluna_y, str) else (coluna_y[0] if coluna_y else None)
     if not nome_coluna_y or nome_coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    nome_coluna_subgrupo = subgrupo if subgrupo and subgrupo in df.columns else None
+    dados = df[[nome_coluna_y]].dropna().copy()
+    dados["Subgrupo"] = range(1, len(dados) + 1)
 
-    dados = df[[nome_coluna_y]].copy()
-    if nome_coluna_subgrupo:
-        dados["Subgrupo"] = df[nome_coluna_subgrupo]
-    else:
-        dados["Subgrupo"] = range(1, len(dados) + 1)
-
-    if dados.empty or dados[nome_coluna_y].dropna().empty:
+    if dados.empty:
         return "❌ Dados insuficientes para análise.", None
 
-    aplicar_estilo_minitab()
-    texto_resumo = f"📊 **Análise de Estabilidade da coluna '{nome_coluna_y}'**\n"
-
-    if nome_coluna_subgrupo:
-        fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
-        sns.lineplot(x="Subgrupo", y=nome_coluna_y, data=dados, ax=axs[0], marker="o")
-        axs[0].set_title("Carta X-Barra")
-        axs[0].set_ylabel("Média")
-
-        grupo_stats = dados.groupby("Subgrupo")[nome_coluna_y].agg(["mean", "std"])
-        r_values = grupo_stats["std"] * (2 ** 0.5)
-
-        axs[1].plot(grupo_stats.index, r_values, marker="o")
-        axs[1].set_title("Carta R")
-        axs[1].set_ylabel("Amplitude (aprox)")
-
-        texto_resumo += "- Carta X-BarraR usada (subgrupos detectados).\n"
-    else:
-        fig, axs = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
-        sns.lineplot(x="Subgrupo", y=nome_coluna_y, data=dados, ax=axs[0], marker="o")
-        axs[0].set_title("Carta Individual")
-        axs[0].set_ylabel("Valor")
-
-        mr = dados[nome_coluna_y].diff().abs()
-        axs[1].plot(dados["Subgrupo"][1:], mr[1:], marker="o")
-        axs[1].set_title("Carta MR")
-        axs[1].set_ylabel("Movimento Range")
-
-        texto_resumo += "- Carta I-MR usada (sem subgrupos).\n"
-
+    # Estatísticas
     media = dados[nome_coluna_y].mean()
     sigma = dados[nome_coluna_y].std()
-    outliers = dados[
-        (dados[nome_coluna_y] > media + 3 * sigma) |
-        (dados[nome_coluna_y] < media - 3 * sigma)
-    ]
+    UCL_I = media + 3 * sigma
+    LCL_I = media - 3 * sigma
 
-    if not outliers.empty:
-        texto_resumo += f"- ⚠ Detectados {len(outliers)} ponto(s) fora dos limites (3 sigma). Processo potencialmente instável.\n"
+    mr = dados[nome_coluna_y].diff().abs()
+    mr_mean = mr[1:].mean()
+    UCL_MR = mr_mean * 3.267
+
+    # Gráficos
+    fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+
+    axs[0].plot(dados["Subgrupo"], dados[nome_coluna_y], marker="o", linestyle="-")
+    axs[0].axhline(media, color="black", linestyle="--", label="Média")
+    axs[0].axhline(UCL_I, color="red", linestyle="--", label="Limite Superior")
+    axs[0].axhline(LCL_I, color="red", linestyle="--", label="Limite Inferior")
+    axs[0].set_title("Carta Individual (I)")
+    axs[0].set_ylabel("Valor")
+    axs[0].legend()
+
+    axs[1].plot(dados["Subgrupo"][1:], mr[1:], marker="o", linestyle="-")
+    axs[1].axhline(mr_mean, color="black", linestyle="--", label="Média MR")
+    axs[1].axhline(UCL_MR, color="red", linestyle="--", label="Limite Superior MR")
+    axs[1].set_title("Carta Amplitude Móvel (MR)")
+    axs[1].set_ylabel("Amplitude")
+    axs[1].legend()
+
+    texto_resumo = f"📊 **Análise de Estabilidade da coluna '{nome_coluna_y}'**\n"
+    texto_resumo += "- Carta I-MR usada (dados individuais).\n"
+
+    y = dados[nome_coluna_y].values
+
+    # Critérios
+    def check_crit1():
+        return np.any((y > UCL_I) | (y < LCL_I))
+
+    def check_crit2():
+        seq = (y > media).astype(int)
+        return any(sum(seq[i:i+9]) == 9 or sum(1 - seq[i:i+9]) == 9 for i in range(len(seq)-8))
+
+    def check_crit3():
+        diff = np.sign(np.diff(y))
+        count = 1
+        for i in range(1, len(diff)):
+            if diff[i] == diff[i-1] and diff[i] != 0:
+                count += 1
+                if count >= 6:
+                    return True
+            else:
+                count = 1
+        return False
+
+    def check_crit4():
+        diff = np.sign(np.diff(y))
+        return np.all(diff[:14] != 0) and np.all(diff[:14][::2] * diff[1:15:2] == -1) if len(y) >= 15 else False
+
+    def check_crit5():
+        z = (y - media) / sigma
+        for i in range(len(z)-2):
+            s = z[i:i+3]
+            if (np.sum(np.abs(s) > 2) >= 2) and (np.all(s > 0) or np.all(s < 0)):
+                return True
+        return False
+
+    def check_crit6():
+        z = (y - media) / sigma
+        for i in range(len(z)-4):
+            s = z[i:i+5]
+            if (np.sum(np.abs(s) > 1) >= 4) and (np.all(s > 0) or np.all(s < 0)):
+                return True
+        return False
+
+    def check_crit7():
+        z = (y - media) / sigma
+        for i in range(len(z)-14):
+            if np.all(np.abs(z[i:i+15]) < 1):
+                return True
+        return False
+
+    def check_crit8():
+        z = (y - media) / sigma
+        for i in range(len(z)-7):
+            if np.all(np.abs(z[i:i+8]) > 1):
+                return True
+        return False
+
+    def check_crit9():
+        diff = np.sign(np.diff(y))
+        alt = 1
+        for i in range(1, len(diff)):
+            if diff[i] == -diff[i-1] and diff[i] != 0:
+                alt += 1
+                if alt >= 12:
+                    return True
+            else:
+                alt = 1
+        return False
+
+    def check_crit10():
+        return False  # Minitab original não define critério 10 padrão, deixamos reservado
+
+    # Aplica critérios
+    if check_crit1():
+        texto_resumo += "- ⚠ Critério 1: Ponto fora dos limites de controle.\n"
     else:
-        texto_resumo += "- ✅ Nenhum ponto fora dos limites (3 sigma). Processo aparentemente estável.\n"
+        texto_resumo += "- ✅ Critério 1: Nenhum ponto fora dos limites.\n"
+
+    if check_crit2():
+        texto_resumo += "- ⚠ Critério 2: 9 pontos seguidos do mesmo lado da média.\n"
+    else:
+        texto_resumo += "- ✅ Critério 2: Nenhuma sequência longa de um lado.\n"
+
+    if check_crit3():
+        texto_resumo += "- ⚠ Critério 3: 6 pontos seguidos subindo ou descendo.\n"
+    else:
+        texto_resumo += "- ✅ Critério 3: Nenhuma tendência longa.\n"
+
+    if check_crit4():
+        texto_resumo += "- ⚠ Critério 4: 14 pontos alternando.\n"
+    else:
+        texto_resumo += "- ✅ Critério 4: Nenhuma alternância suspeita.\n"
+
+    if check_crit5():
+        texto_resumo += "- ⚠ Critério 5: 2 de 3 pontos consecutivos além de 2 sigma no mesmo lado.\n"
+    else:
+        texto_resumo += "- ✅ Critério 5: OK.\n"
+
+    if check_crit6():
+        texto_resumo += "- ⚠ Critério 6: 4 de 5 pontos além de 1 sigma no mesmo lado.\n"
+    else:
+        texto_resumo += "- ✅ Critério 6: OK.\n"
+
+    if check_crit7():
+        texto_resumo += "- ⚠ Critério 7: 15 pontos dentro de 1 sigma.\n"
+    else:
+        texto_resumo += "- ✅ Critério 7: OK.\n"
+
+    if check_crit8():
+        texto_resumo += "- ⚠ Critério 8: 8 pontos fora de 1 sigma.\n"
+    else:
+        texto_resumo += "- ✅ Critério 8: OK.\n"
+
+    if check_crit9():
+        texto_resumo += "- ⚠ Critério 9: 12 pontos alternando.\n"
+    else:
+        texto_resumo += "- ✅ Critério 9: OK.\n"
+
+    # critério 10 reservado
+    texto_resumo += "- ℹ Critério 10: Não implementado (padrão Minitab reservado).\n"
 
     buffer = BytesIO()
     plt.tight_layout()
@@ -269,7 +381,11 @@ def analise_estabilidade(df, coluna_y, subgrupo=None):
 
 
 
+
 def analise_limpeza_dados(df):
+    import numpy as np
+    import pandas as pd
+
     linhas_total = len(df)
     colunas_total = df.shape[1]
     linhas_duplicadas = df.duplicated().sum()
@@ -284,15 +400,52 @@ def analise_limpeza_dados(df):
         n_valores = df[coluna].notnull().sum()
         n_gaps = linhas_total - n_valores
 
+        # Linhas faltando
         if n_gaps > 0:
             idx_gaps = df[df[coluna].isnull()].index
             primeira_linha_gap = idx_gaps[0] + 2 if len(idx_gaps) > 0 else "?"
             resultado.append(
-                f"Coluna <strong>{coluna}</strong>: {n_gaps} linhas faltando (primeiro gap na linha {primeira_linha_gap})"
+                f"Coluna <strong>{coluna}</strong>: {n_gaps} célula(s) vazia(s) (primeira ocorrência na linha {primeira_linha_gap})"
             )
+
+        # Coluna totalmente vazia
+        if n_valores == 0:
+            resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ Totalmente vazia")
+
+        # Coluna sem variação
+        if df[coluna].nunique(dropna=True) <= 1:
+            resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ Sem variação (todos os valores iguais)")
+
+        # Dados não numéricos em colunas que parecem numéricas
+        if df[coluna].dtype == object:
+            try:
+                pd.to_numeric(df[coluna].dropna())
+            except:
+                resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ Contém dados não numéricos suspeitos")
+
+        # Outliers extremos
+        if pd.api.types.is_numeric_dtype(df[coluna]):
+            media = df[coluna].mean()
+            sigma = df[coluna].std()
+            if sigma > 0:
+                extremos = df[(df[coluna] > media + 10 * sigma) | (df[coluna] < media - 10 * sigma)]
+                if not extremos.empty:
+                    resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ {len(extremos)} valor(es) extremamente fora do padrão")
+
+    # Colunas duplicadas
+    colunas_duplicadas = []
+    for i in range(len(df.columns)):
+        for j in range(i + 1, len(df.columns)):
+            if df[df.columns[i]].equals(df[df.columns[j]]):
+                colunas_duplicadas.append(f"{df.columns[i]} / {df.columns[j]}")
+    if colunas_duplicadas:
+        resultado.append(f"⚠ Colunas duplicadas detectadas: {colunas_duplicadas}")
+    else:
+        resultado.append("✅ Nenhuma coluna duplicada")
 
     texto_final = "<br>".join(resultado)
     return texto_final, None
+
 
 
 ANALISES = {
