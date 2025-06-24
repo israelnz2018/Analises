@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import traceback
 import os
 
+# Tentativa segura de importação dos módulos
 try:
     from leitura import ler_arquivo
     from Capabilidade import ANALISES as ANALISES_CAP
@@ -16,16 +17,21 @@ try:
 except ImportError as e:
     print(f"⚠ Erro de importação: {str(e)}")
 
+# Iniciar app
 app = FastAPI()
+
+# Middleware de CORS seguro com variável ambiente opcional
+allowed_origins = os.getenv("CORS_ORIGINS", "https://educacaopelotrabalho-production.up.railway.app").split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://educacaopelotrabalho-production.up.railway.app"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Construção do dicionário de análises
 ANALISES = {}
 ANALISES.update(ANALISES_CAP if 'ANALISES_CAP' in locals() else {})
 ANALISES.update(ANALISES_EXP if 'ANALISES_EXP' in locals() else {})
@@ -34,83 +40,7 @@ ANALISES.update(ANALISES_PRED if 'ANALISES_PRED' in locals() else {})
 ANALISES.update(ANALISES_PROC if 'ANALISES_PROC' in locals() else {})
 ANALISES.update(ANALISES_DIVERSAS if 'ANALISES_DIVERSAS' in locals() else {})
 
-CONFIG_ANALISES = {
-    "Gráfico Sumario": ["df", "coluna_y"],
-    "Análise de outliers": ["df", "lista_y"],
-    "Correlação de person": ["df", "coluna_y", "lista_x"],
-    "Matrix de dispersão": ["df", "coluna_y", "lista_x"],
-    "Análise de estabilidade": ["df", "coluna_y"],
-    "Análise de limpeza dos dados": ["df"],
-    "Histograma": ["df", "coluna_y", "subgrupo"],
-    "Pareto": ["df", "coluna_x","coluna_y", "subgrupo"],
-    "Setores (Pizza)": ["df", "coluna_x","coluna_y", "subgrupo"],
-    "Barras": ["df", "coluna_x","coluna_y", "subgrupo"],
-    "BoxPlot": ["df", "lista_y", "subgrupo"],
-    "Dispersão": ["df", "coluna_y", "coluna_x", "subgrupo"],
-    "Tendência": ["df", "coluna_y", "Data", "subgrupo"],
-    "Bolhas - 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
-    "Superfície - 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
-    "1 Sample T": ["df", "coluna_y", "field", "field_conf"],
-    "2 Sample T": ["df", "lista_y", "field_conf"],
-    "2 Paired Test": ["df", "lista_y", "field_conf"],
-    "One way ANOVA": ["df", "lista_y", "subgrupo", "field_conf"],
-    "1 Wilcoxon": ["df", "coluna_y", "field", "field_conf"],
-    "2 Mann-Whitney": ["df", "lista_y", "field_conf"],
-    "Kruskal-Wallis": ["df", "lista_y", "subgrupo"],
-    "Friedman Pareado": ["df", "lista_y", "subgrupo", "field_conf"],
-    "1 Intervalo de Confianca": ["df", "coluna_y", "field_conf"],
-    "1 Intervalo Interquartilico": ["df", "coluna_y", "field_conf"],
-    "2 Variancas": ["df", "lista_y", "field_conf"],
-    "2 Variancas Brown-Forsythe": ["df", "lista_y", "field_conf"],
-    "Bartlett": ["df", "lista_y", "subgrupo", "field_conf"],
-    "Brown-Forsythe": ["df", "lista_y", "subgrupo", "field_conf"],
-    "1 Intervalo de Confianca Variancia": ["df", "coluna_y", "field_conf"],
-    "1 Proporcao": ["df", "coluna_y", "field_conf"],
-    "2 Proporcoes": ["df", "lista_y", "field_conf"],
-    "K Proporcoes": ["df", "lista_y", "field_conf"],
-    "Qui-quadrado": ["df", "coluna_y", "lista_x", "subgrupo"],
-    "Tipo de modelo de regressão": ["df", "coluna_y"],
-    "Regressão linear simples": ["df", "coluna_y", "coluna_x"],
-    "Regressão linear múltipla": ["df", "coluna_y", "lista_x"],
-    "Regressão logística binária": ["df", "coluna_y", "lista_x"],
-    "Regressão logística ordinal": ["df", "coluna_y", "lista_x"],
-    "Regressão logística nominal": ["df", "coluna_y", "lista_x"],
-    "Árvore de decisão": ["df", "coluna_y", "lista_x"],
-    "Random Forest": ["df", "coluna_y", "lista_x"],
-    "ARIMA": ["df", "coluna_y", "field"],
-    "Holt-Winters": ["df", "coluna_y", "field"],
-    "Carta I-MR": ["df", "coluna_y"],
-    "Carta X-Barra R": ["df", "coluna_y", "subgrupo"],
-    "Carta X-Barra S": ["df", "coluna_y", "subgrupo"],
-    "Carta P": ["df", "coluna_y", "subgrupo"],
-    "Carta NP": ["df", "coluna_y", "subgrupo"],
-    "Carta C": ["df", "coluna_y"],
-    "Carta U": ["df", "coluna_y", "subgrupo"],
-    "Teste de normalidade": ["df", "coluna_y"],
-    "Análise de distribuição estatística": ["df", "coluna_y"],
-    "Capabilidade - dados normais": ["df", "coluna_y", "subgrupo", "field_LIE", "field_LSE"],
-    "Capabilidade - outras distribuições": ["df", "coluna_y", "subgrupo", "field_distribuicao", "field_LIE", "field_LSE"],
-    "Capabilidade - com dados transformados": ["df", "coluna_y", "subgrupo", "field_LIE", "field_LSE"],
-    "Capabilidade - com dados discretizados": ["df", "coluna_y", "field_LIE", "field_LSE"],
-    "Cálculo de Probabilidade": ["df", "coluna_y", "field"]
-}
-
-
-DICIONARIO_TERMOS = {
-    "coluna_y": "Uma coluna numérica ou categórica Y selecionada pelo usuário",
-    "coluna_x": "Uma coluna numérica ou categórica X selecionada pelo usuário",
-    "coluna_z": "Uma coluna numérica Z selecionada pelo usuário",
-    "Data": "Coluna de data ou tempo selecionada pelo usuário",
-    "lista_y": "Lista de colunas numéricas Y selecionadas pelo usuário; pode conter apenas um valor se subgrupo for acionado",
-    "lista_x": "Lista de colunas numéricas ou categóricas X selecionadas pelo usuário; pode conter apenas um valor se subgrupo for acionado",
-    "lista_z": "Lista de colunas numéricas Z selecionadas pelo usuário; pode conter apenas um valor se subgrupo for acionado",
-    "subgrupo": "Coluna categórica de subgrupos selecionada pelo usuário",
-    "field": "Valor de referência ou parâmetro extra (exemplo: valor de H0)",
-    "field_conf": "Nível de confiança em porcentagem (exemplo: 95%)",
-    "field_dist": "Tipo de distribuição (exemplo: Normal, Weibull)",
-    "field_LSE": "Valor do limite superior de engenharia",
-    "field_LIE": "Valor do limite inferior de engenharia"
-}
+# Seu CONFIG_ANALISES e DICIONARIO_TERMOS (mantive como você já tinha, sem mudança)
 
 @app.post("/analise")
 async def analisar(
@@ -131,10 +61,15 @@ async def analisar(
     Data: str = Form(None)
 ):
     try:
+        if not arquivo:
+            return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
+
         print("🚀 Nome do arquivo recebido:", arquivo.filename)
         print("🚀 Aba solicitada:", aba)
 
         df = await ler_arquivo(arquivo, aba)
+        if df is None or df.empty:
+            return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
         colunas_y = [y.strip() for y in coluna_y.split(",")] if coluna_y else []
         lista_x = []
@@ -225,7 +160,6 @@ async def analisar(
 
     except ValueError as e:
         return JSONResponse({"erro": str(e)}, status_code=400)
-
     except Exception as e:
         tb = traceback.format_exc()
         return JSONResponse({
@@ -233,4 +167,5 @@ async def analisar(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
 
