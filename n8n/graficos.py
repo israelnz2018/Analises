@@ -21,9 +21,13 @@ def salvar_grafico():
 
 
 
-
 def gerar_histograma(df, coluna_y, subgrupo=None):
-    # Garante que coluna_y seja string e não lista
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+
+    # Garante que coluna_y seja string
     if isinstance(coluna_y, list):
         coluna_y = coluna_y[0] if coluna_y else None
 
@@ -31,26 +35,38 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
     aplicar_estilo_minitab()
-    plt.figure(figsize=(10, 6))
 
-    if subgrupo and subgrupo in df.columns:
-        grupos = df.groupby(subgrupo)
-        cores = sns.color_palette("tab10", n_colors=len(grupos))
+    if subgrupo:
+        if subgrupo not in df.columns:
+            return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
 
-        for i, (nome, grupo) in enumerate(grupos):
+        dados = df[[coluna_y, subgrupo]].dropna()
+        if dados.empty:
+            return "❌ Dados insuficientes para gerar o gráfico.", None
+
+        subgrupos = dados[subgrupo].unique()
+        if len(subgrupos) != 2:
+            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
+
+        fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
+        for ax, sub in zip(axs, subgrupos):
             sns.histplot(
-                grupo[coluna_y],
+                dados[dados[subgrupo] == sub][coluna_y],
                 bins=10,
                 kde=True,
                 stat="density",
                 alpha=0.4,
-                label=str(nome),
-                color=cores[i],
-                edgecolor="black"
+                color="steelblue",
+                edgecolor="black",
+                ax=ax
             )
+            ax.set_title(f"Histograma - {sub}")
+            ax.set_xlabel(coluna_y)
+            ax.set_ylabel("Densidade")
     else:
+        plt.figure(figsize=(10, 6))
         sns.histplot(
-            df[coluna_y],
+            df[coluna_y].dropna(),
             bins=10,
             kde=True,
             stat="density",
@@ -58,12 +74,10 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
             color="steelblue",
             edgecolor="black"
         )
-
-    plt.xlabel(coluna_y)
-    plt.ylabel("Densidade")
-    plt.title("Histograma com Curva de Densidade")
-    plt.legend()
-    plt.tight_layout()
+        plt.xlabel(coluna_y)
+        plt.ylabel("Densidade")
+        plt.title("Histograma com Curva de Densidade")
+        plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
@@ -74,58 +88,70 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
     return "", imagem_base64
 
 
-
-
-
-
-def gerar_pareto(df, coluna_y, subgrupo=None, subgrupo2=None):
-    if not coluna_y or coluna_y not in df.columns:
-        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
+def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import base64
+    from io import BytesIO
 
     aplicar_estilo_minitab()
 
-    if not subgrupo:
-        contagem = df[coluna_y].value_counts().sort_values(ascending=False)
-        if contagem.sum() == 0:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
+    if not coluna_x or coluna_x not in df.columns:
+        return "❌ A coluna X informada não foi encontrada no arquivo.", None
 
-        plt.figure(figsize=(8, 5))
-        ax = contagem.plot(kind="bar")
-        cum = contagem.cumsum() / contagem.sum() * 100
-        ax2 = cum.plot(secondary_y=True, color='r', marker='o', ax=ax)
-        ax.set_ylabel("Frequência")
-        ax2.set_ylabel("Acumulado (%)")
-        ax.set_title(f"Pareto - {coluna_y}")
-        plt.tight_layout()
+    if Subgrupo and Subgrupo not in df.columns:
+        return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
 
-    elif subgrupo and subgrupo in df.columns and not subgrupo2:
-        dados = df[[coluna_y, subgrupo]].dropna()
+    if coluna_y and coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
+
+    if Subgrupo:
+        dados = df[[coluna_x, coluna_y, Subgrupo]].dropna() if coluna_y else df[[coluna_x, Subgrupo]].dropna()
         if dados.empty:
             return "❌ Dados insuficientes para gerar o gráfico.", None
 
-        soma = dados.groupby(subgrupo)[coluna_y].value_counts().unstack().fillna(0)
-        soma.plot(kind="bar", stacked=True, figsize=(8, 5))
-        plt.ylabel("Frequência")
-        plt.title(f"Pareto - {coluna_y} por {subgrupo}")
-        plt.tight_layout()
-
-    elif subgrupo and subgrupo in df.columns and subgrupo2 and subgrupo2 in df.columns:
-        dados = df[[coluna_y, subgrupo, subgrupo2]].dropna()
-        if dados.empty:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
+        subgrupos = dados[Subgrupo].unique()
+        if len(subgrupos) != 2:
+            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
 
         fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
 
-        for ax, sub, titulo in zip(axs, [subgrupo, subgrupo2], [subgrupo, subgrupo2]):
-            soma = dados.groupby(sub)[coluna_y].value_counts().unstack().fillna(0)
-            soma.plot(kind="bar", stacked=True, ax=ax)
-            ax.set_ylabel("Frequência")
-            ax.set_title(f"Pareto - {coluna_y} por {titulo}")
+        for ax, sub in zip(axs, subgrupos):
+            dados_sub = dados[dados[Subgrupo] == sub]
+            if coluna_y:
+                soma = dados_sub.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
+            else:
+                soma = dados_sub[coluna_x].value_counts().sort_values(ascending=False)
+
+            soma.plot(kind="bar", ax=ax)
+            cum = soma.cumsum() / soma.sum() * 100
+            ax2 = ax.twinx()
+            ax2.plot(cum.index, cum.values, color='r', marker='o')
+            ax.set_ylabel("Frequência / Soma")
+            ax2.set_ylabel("Acumulado (%)")
+            ax.set_title(f"Pareto - {coluna_x} ({sub})")
 
         plt.tight_layout()
 
     else:
-        return "❌ Os subgrupos informados não foram encontrados no arquivo.", None
+        dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
+        if dados.empty:
+            return "❌ Dados insuficientes para gerar o gráfico.", None
+
+        if coluna_y:
+            soma = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
+        else:
+            soma = dados[coluna_x].value_counts().sort_values(ascending=False)
+
+        plt.figure(figsize=(10, 5))
+        ax = soma.plot(kind="bar")
+        cum = soma.cumsum() / soma.sum() * 100
+        ax2 = ax.twinx()
+        ax2.plot(cum.index, cum.values, color='r', marker='o')
+        ax.set_ylabel("Frequência / Soma")
+        ax2.set_ylabel("Acumulado (%)")
+        ax.set_title(f"Pareto - {coluna_x}")
+        plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
@@ -134,6 +160,7 @@ def gerar_pareto(df, coluna_y, subgrupo=None, subgrupo2=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
+
 
 
 
@@ -145,63 +172,125 @@ def gerar_pizza(df, coluna_y, subgrupo):
     aplicar_estilo_minitab()
     plt.figure(figsize=(8, 8))
 
-    if subgrupo and subgrupo in df.columns:
-        dados = df[[coluna_y, subgrupo]].dropna()
-        soma = dados.groupby(subgrupo)[coluna_y].sum().sort_values(ascending=False)
-        if soma.sum() == 0:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
-        soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
-        plt.title(f"Pizza de {coluna_y} por {subgrupo}")
-    else:
-        contagem = df[coluna_y].value_counts().sort_values(ascending=False)
-        if contagem.sum() == 0:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
-        contagem.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
-        plt.title(f"Pizza de frequência por {coluna_y}")
+  def gerar_pizza(df, coluna_x, coluna_y=None, subgrupo=None):
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
 
-    plt.ylabel("")
-    plt.tight_layout()
+    if not coluna_x or coluna_x not in df.columns:
+        return "❌ A coluna X informada não foi encontrada no arquivo.", None
 
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close()
-
-    return "", imagem_base64
-
-
-def gerar_barras(df, coluna_y, subgrupo, subgrupo2=None):
-    if not coluna_y or coluna_y not in df.columns:
+    if coluna_y and coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
+    if subgrupo and subgrupo not in df.columns:
+        return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
+
     aplicar_estilo_minitab()
-    plt.figure(figsize=(10, 6))
 
-    if subgrupo and subgrupo in df.columns and not subgrupo2:
-        dados = df[[coluna_y, subgrupo]].dropna()
-        contagem = dados.groupby(subgrupo)[coluna_y].value_counts().unstack().fillna(0)
-        contagem.plot(kind="bar", stacked=True, ax=plt.gca())
-        plt.ylabel("Frequência")
-        plt.title(f"Barras de {coluna_y} por {subgrupo}")
+    if subgrupo:
+        dados = df[[coluna_x, coluna_y, subgrupo]].dropna() if coluna_y else df[[coluna_x, subgrupo]].dropna()
+        subgrupos = dados[subgrupo].unique()
 
-    elif subgrupo and subgrupo in df.columns and subgrupo2 and subgrupo2 in df.columns:
-        dados = df[[coluna_y, subgrupo, subgrupo2]].dropna()
-        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+        if len(subgrupos) != 2:
+            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
 
-        for ax, sub, titulo in zip(axs, [subgrupo, subgrupo2], [subgrupo, subgrupo2]):
-            contagem = dados.groupby(sub)[coluna_y].value_counts().unstack().fillna(0)
-            contagem.plot(kind="bar", stacked=True, ax=ax)
-            ax.set_ylabel("Frequência")
-            ax.set_title(f"Barras de {coluna_y} por {titulo}")
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6))
+        for ax, sub in zip(axs, subgrupos):
+            dados_sub = dados[dados[subgrupo] == sub]
+            if coluna_y:
+                soma = dados_sub.groupby(coluna_x)[coluna_y].sum()
+            else:
+                soma = dados_sub[coluna_x].value_counts()
+
+            if soma.sum() == 0:
+                return f"❌ Dados insuficientes para gerar o gráfico para o subgrupo {sub}.", None
+
+            soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, ax=ax)
+            ax.set_ylabel("")
+            ax.set_title(f"Pizza de {coluna_x} ({sub})")
 
         plt.tight_layout()
 
     else:
-        contagem = df[coluna_y].value_counts().sort_values(ascending=False)
-        contagem.plot(kind="bar", ax=plt.gca())
-        plt.ylabel("Frequência")
-        plt.title(f"Barras de frequência por {coluna_y}")
+        dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
+        if dados.empty:
+            return "❌ Dados insuficientes para gerar o gráfico.", None
+
+        if coluna_y:
+            soma = dados.groupby(coluna_x)[coluna_y].sum()
+        else:
+            soma = dados[coluna_x].value_counts()
+
+        if soma.sum() == 0:
+            return "❌ Dados insuficientes para gerar o gráfico.", None
+
+        plt.figure(figsize=(8, 6))
+        soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
+        plt.ylabel("")
+        plt.title(f"Pizza de {coluna_x}")
+        plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close()
+
+    return "", imagem_base64
+
+
+def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+
+    if not coluna_x or coluna_x not in df.columns:
+        return "❌ A coluna X informada não foi encontrada no arquivo.", None
+
+    if coluna_y and coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
+
+    if subgrupo and subgrupo not in df.columns:
+        return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
+
+    aplicar_estilo_minitab()
+
+    if subgrupo:
+        dados = df[[coluna_x, coluna_y, subgrupo]].dropna() if coluna_y else df[[coluna_x, subgrupo]].dropna()
+        subgrupos = dados[subgrupo].unique()
+
+        if len(subgrupos) != 2:
+            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
+
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+
+        for ax, sub in zip(axs, subgrupos):
+            dados_sub = dados[dados[subgrupo] == sub]
+            if coluna_y:
+                contagem = dados_sub.groupby(coluna_x)[coluna_y].sum()
+                contagem.plot(kind="bar", ax=ax)
+                ax.set_ylabel("Soma de Y")
+            else:
+                contagem = dados_sub[coluna_x].value_counts()
+                contagem.plot(kind="bar", ax=ax)
+                ax.set_ylabel("Frequência")
+            ax.set_title(f"Barras de {coluna_x} ({sub})")
+
+        plt.tight_layout()
+
+    else:
+        dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
+        if coluna_y:
+            contagem = dados.groupby(coluna_x)[coluna_y].sum()
+            contagem.plot(kind="bar", figsize=(10,6))
+            plt.ylabel("Soma de Y")
+        else:
+            contagem = dados[coluna_x].value_counts()
+            contagem.plot(kind="bar", figsize=(10,6))
+            plt.ylabel("Frequência")
+        plt.title(f"Barras de {coluna_x}")
+        plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
@@ -211,33 +300,45 @@ def gerar_barras(df, coluna_y, subgrupo, subgrupo2=None):
 
     return "", imagem_base64
 
-def gerar_boxplot(df, lista_y, subgrupo, subgrupo2=None):
+
+def gerar_boxplot(df, lista_y, subgrupo=None):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+
     if not lista_y or any(y not in df.columns for y in lista_y):
         return "❌ Uma ou mais colunas Y informadas não foram encontradas no arquivo.", None
 
+    if subgrupo and subgrupo not in df.columns:
+        return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
+
     aplicar_estilo_minitab()
-    plt.figure(figsize=(10, 6))
 
-    if subgrupo and subgrupo in df.columns and not subgrupo2:
-        if len(lista_y) != 1:
-            return "⚠ Para BoxPlot com subgrupo, selecione apenas uma variável Y.", None
-        sns.boxplot(x=subgrupo, y=lista_y[0], data=df, orient="v")
-        plt.title(f"Boxplot de {lista_y[0]} por {subgrupo}")
+    if subgrupo:
+        dados = df[lista_y + [subgrupo]].dropna()
+        subgrupos = dados[subgrupo].unique()
 
-    elif subgrupo and subgrupo in df.columns and subgrupo2 and subgrupo2 in df.columns:
-        dados = df[[*lista_y, subgrupo, subgrupo2]].dropna()
+        if len(subgrupos) != 2:
+            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
+
         fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
 
-        for ax, sub, titulo in zip(axs, [subgrupo, subgrupo2], [subgrupo, subgrupo2]):
-            sns.boxplot(x=sub, y=lista_y[0], data=dados, orient="v", ax=ax)
-            ax.set_title(f"Boxplot de {lista_y[0]} por {titulo}")
+        for ax, sub in zip(axs, subgrupos):
+            dados_sub = dados[dados[subgrupo] == sub]
+            sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax)
+            ax.set_title(f"Boxplot ({sub})")
 
         plt.tight_layout()
 
     else:
         dados = df[lista_y].dropna()
+        if dados.empty:
+            return "❌ Dados insuficientes para gerar o gráfico.", None
+        plt.figure(figsize=(10, 6))
         sns.boxplot(data=dados, orient="v")
         plt.title("Boxplot de variáveis contínuas")
+        plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
@@ -246,6 +347,7 @@ def gerar_boxplot(df, lista_y, subgrupo, subgrupo2=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
+
 
     
 def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
@@ -277,24 +379,37 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
 
     
 def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
+
+    if Data and Data not in df.columns:
+        return "❌ A coluna Data informada não foi encontrada no arquivo.", None
+
+    if subgrupo and subgrupo not in df.columns:
+        return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
 
     aplicar_estilo_minitab()
     plt.figure(figsize=(10, 6))
 
     df = df.dropna(subset=[coluna_y]).reset_index(drop=True)
 
-    if Data and Data in df.columns:
+    if Data:
         df = df.dropna(subset=[Data])
         eixo_x = df[Data]
         titulo_base = f"Tendência temporal de {coluna_y} por {Data}"
+        x_label = Data
     else:
         df["sequencia"] = df.index + 1
         eixo_x = df["sequencia"]
         titulo_base = f"Tendência temporal de {coluna_y} por sequência"
+        x_label = "Tempo / Sequência"
 
-    if subgrupo and subgrupo in df.columns:
+    if subgrupo:
         sns.lineplot(x=eixo_x, y=coluna_y, hue=subgrupo, data=df, marker="o")
         titulo = f"{titulo_base} (Subgrupo: {subgrupo})"
     else:
@@ -302,7 +417,7 @@ def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
         titulo = titulo_base
 
     plt.title(titulo)
-    plt.xlabel(Data if Data and Data in df.columns else "Tempo / Sequência")
+    plt.xlabel(x_label)
     plt.ylabel(coluna_y)
     plt.tight_layout()
 
@@ -313,6 +428,7 @@ def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
+
 
 
 def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
@@ -333,7 +449,7 @@ def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
     plt.scatter(
         x=dados[coluna_x],
         y=dados[coluna_y],
-        s=dados[coluna_z] * 10,
+        s=dados[coluna_z] * 20,
         alpha=0.5,
         edgecolors="w"
     )
@@ -359,6 +475,13 @@ import base64
 import pandas as pd
 
 def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    import numpy as np
+    from scipy.interpolate import griddata
+    import base64
+    from io import BytesIO
+
     if not coluna_x or coluna_x not in df.columns:
         return "❌ A coluna X informada não foi encontrada no arquivo.", None
     if not coluna_y or coluna_y not in df.columns:
@@ -407,6 +530,7 @@ def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
 
     except Exception as e:
         return f"❌ Erro ao gerar superfície 3D: {str(e)}", None
+
 
 
 GRAFICOS = {
