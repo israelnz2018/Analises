@@ -165,12 +165,6 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
 
 
-def gerar_pizza(df, coluna_y, subgrupo):
-    if not coluna_y or coluna_y not in df.columns:
-        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
-
-    aplicar_estilo_minitab()
-    plt.figure(figsize=(8, 8))
 
   def gerar_pizza(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
