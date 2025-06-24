@@ -4,14 +4,17 @@ from fastapi.middleware.cors import CORSMiddleware
 import traceback
 import os
 
-from leitura import ler_arquivo
-from Capabilidade import ANALISES as ANALISES_CAP
-from Exploratoria import ANALISES as ANALISES_EXP
-from Inferencial import ANALISES as ANALISES_INF
-from Preditiva import ANALISES as ANALISES_PRED
-from Controledeprocesso import ANALISES as ANALISES_PROC
-from Analisesdiversas import ANALISES as ANALISES_DIVERSAS
-from graficos import GRAFICOS
+try:
+    from leitura import ler_arquivo
+    from Capabilidade import ANALISES as ANALISES_CAP
+    from Exploratoria import ANALISES as ANALISES_EXP
+    from Inferencial import ANALISES as ANALISES_INF
+    from Preditiva import ANALISES as ANALISES_PRED
+    from Controledeprocesso import ANALISES as ANALISES_PROC
+    from Analisesdiversas import ANALISES as ANALISES_DIVERSAS
+    from graficos import GRAFICOS
+except ImportError as e:
+    print(f"⚠ Erro de importação: {str(e)}")
 
 app = FastAPI()
 
@@ -24,19 +27,19 @@ app.add_middleware(
 )
 
 ANALISES = {}
-ANALISES.update(ANALISES_CAP)
-ANALISES.update(ANALISES_EXP)
-ANALISES.update(ANALISES_INF)
-ANALISES.update(ANALISES_PRED)
-ANALISES.update(ANALISES_PROC)
-ANALISES.update(ANALISES_DIVERSAS)
+ANALISES.update(ANALISES_CAP if 'ANALISES_CAP' in locals() else {})
+ANALISES.update(ANALISES_EXP if 'ANALISES_EXP' in locals() else {})
+ANALISES.update(ANALISES_INF if 'ANALISES_INF' in locals() else {})
+ANALISES.update(ANALISES_PRED if 'ANALISES_PRED' in locals() else {})
+ANALISES.update(ANALISES_PROC if 'ANALISES_PROC' in locals() else {})
+ANALISES.update(ANALISES_DIVERSAS if 'ANALISES_DIVERSAS' in locals() else {})
 
 CONFIG_ANALISES = {
     "Gráfico Sumario": ["df", "coluna_y"],
     "Análise de outliers": ["df", "lista_y"],
     "Correlação de person": ["df", "coluna_y", "lista_x"],
     "Matrix de dispersão": ["df", "coluna_y", "lista_x"],
-    "Análise de estabilidade": ["df", "coluna_y", "subgrupo"],
+    "Análise de estabilidade": ["df", "coluna_y"],
     "Análise de limpeza dos dados": ["df"],
     "Histograma": ["df", "coluna_y", "subgrupo"],
     "Pareto": ["df", "coluna_x","coluna_y", "subgrupo"],
@@ -84,7 +87,6 @@ CONFIG_ANALISES = {
     "Carta C": ["df", "coluna_y"],
     "Carta U": ["df", "coluna_y", "subgrupo"],
     "Teste de normalidade": ["df", "coluna_y"],
-    "Análise de estabilidade": ["df", "coluna_y"],
     "Análise de distribuição estatística": ["df", "coluna_y"],
     "Capabilidade - dados normais": ["df", "coluna_y", "subgrupo", "field_LIE", "field_LSE"],
     "Capabilidade - outras distribuições": ["df", "coluna_y", "subgrupo", "field_distribuicao", "field_LIE", "field_LSE"],
@@ -92,6 +94,7 @@ CONFIG_ANALISES = {
     "Capabilidade - com dados discretizados": ["df", "coluna_y", "field_LIE", "field_LSE"],
     "Cálculo de Probabilidade": ["df", "coluna_y", "field"]
 }
+
 
 DICIONARIO_TERMOS = {
     "coluna_y": "Uma coluna numérica ou categórica Y selecionada pelo usuário",
