@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form, Request
+from fastapi import FastAPI, File, UploadFile, Form, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import traceback
@@ -21,15 +21,27 @@ except ImportError as e:
 app = FastAPI()
 
 # Middleware de CORS seguro com variável ambiente opcional
-allowed_origins = os.getenv("CORS_ORIGINS", "https://educacaopelotrabalho-production.up.railway.app").split(",")
+allowed_origins = os.getenv(
+    "CORS_ORIGINS", 
+    "https://educacaopelotrabalho-production.up.railway.app"
+).split(",")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
+
+# Responde preflight OPTIONS universalmente
+@app.options("/{path:path}")
+async def preflight_handler(path: str):
+    response = Response()
+    response.headers["Access-Control-Allow-Origin"] = ",".join(allowed_origins)
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 # Construção do dicionário de análises
 ANALISES = {}
@@ -40,7 +52,6 @@ ANALISES.update(ANALISES_PRED if 'ANALISES_PRED' in locals() else {})
 ANALISES.update(ANALISES_PROC if 'ANALISES_PROC' in locals() else {})
 ANALISES.update(ANALISES_DIVERSAS if 'ANALISES_DIVERSAS' in locals() else {})
 
-# Seu CONFIG_ANALISES e DICIONARIO_TERMOS (mantive como você já tinha, sem mudança)
 
 @app.post("/analise")
 async def analisar(
