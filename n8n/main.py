@@ -75,7 +75,7 @@ CONFIG_ANALISES = {
     "One way ANOVA": ["df", "lista_y", "subgrupo", "field_conf"],
     "1 Wilcoxon": ["df", "coluna_y", "field", "field_conf"],
     "2 Mann-Whitney": ["df", "lista_y", "field_conf"],
-    "Kruskal-Wallis": ["df", "lista_y", "subgrupo"],
+    "Kruskal-Wallis": ["df", "lista_y", "subgrupo", "field_conf"],
     "Friedman Pareado": ["df", "lista_y", "subgrupo", "field_conf"],
     "1 Intervalo de Confianca": ["df", "coluna_y", "field_conf"],
     "1 Intervalo Interquartilico": ["df", "coluna_y", "field_conf"],
