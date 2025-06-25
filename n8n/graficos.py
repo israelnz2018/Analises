@@ -93,7 +93,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     import numpy as np
     import base64
     from io import BytesIO
-    from estilo import aplicar_estilo_minitab
+    from suporte import aplicar_estilo_minitab
 
     aplicar_estilo_minitab()
 
