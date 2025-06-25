@@ -79,7 +79,7 @@ CONFIG_ANALISES = {
     "Friedman Pareado": ["df", "lista_y", "subgrupo", "field_conf"],
     "1 Intervalo de Confianca": ["df", "coluna_y", "field_conf"],
     "1 Intervalo Interquartilico": ["df", "coluna_y", "field_conf"],
-    "2 Variancas": ["df", "lista_y", "field_conf"],
+    "2 Varianças":["df", "lista_y", "field_conf"],
     "2 Variancas Brown-Forsythe": ["df", "lista_y", "field_conf"],
     "Bartlett": ["df", "lista_y", "subgrupo", "field_conf"],
     "Brown-Forsythe": ["df", "lista_y", "subgrupo", "field_conf"],
