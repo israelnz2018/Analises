@@ -460,6 +460,15 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 
     return texto.strip(), grafico_base64
 
+ import pandas as pd
+    import statsmodels.api as sm
+    from statsmodels.miscmodels.ordinal_model import OrderedModel
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
+    import numpy as np
+    import pandas as pd
 
 def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
@@ -485,16 +494,6 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     nomes_originais = dict(zip(X_final.columns, lista_x))
     x_cols_final = X_final.columns.tolist()
 
-    
-    import pandas as pd
-    import statsmodels.api as sm
-    from statsmodels.miscmodels.ordinal_model import OrderedModel
-    from statsmodels.stats.outliers_influence import variance_inflation_factor
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-    import numpy as np
-    import pandas as pd
 
     model = OrderedModel(Y, X_final, distr='logit')
     res = model.fit(method='bfgs', disp=0)
