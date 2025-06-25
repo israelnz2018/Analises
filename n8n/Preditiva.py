@@ -799,21 +799,22 @@ Importância das variáveis:
 
 
 
+import pandas as pd
 
 def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
     if not coluna_y or coluna_y not in df.columns:
-        return "❌ O ARIMA requer 1 coluna Y (série temporal).", None
+        return "O ARIMA requer 1 coluna Y (série temporal).", None
 
     df_valid = df[[coluna_y]].dropna()
     if len(df_valid) < 10:
-        return "❌ A série temporal requer pelo menos 10 observações.", None
+        return "A série temporal requer pelo menos 10 observações.", None
 
     Y = df_valid[coluna_y].values
 
     try:
         import pmdarima as pm
     except ImportError:
-        return "❌ O pacote pmdarima não está disponível neste ambiente.", None
+        return "O pacote pmdarima não está disponível neste ambiente.", None
 
     modelo = pm.auto_arima(Y, seasonal=False, stepwise=True, suppress_warnings=True)
     ordem = modelo.order
@@ -830,7 +831,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(range(len(Y)), Y, label='Série Original', color='black')
     ax.plot(range(len(Y), len(Y) + horizonte), previsao, label='Previsão', color='blue')
-    ax.set_title(f'ARIMA{ordem} - Previsão {horizonte} períodos')
+    ax.set_title(f'Modelo ARIMA{ordem} - Previsão de {horizonte} períodos')
     ax.legend()
     plt.tight_layout()
 
@@ -840,19 +841,17 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-    **Modelo ARIMA**
+Modelo ARIMA
 
-   **Configuração do modelo**: ARIMA{ordem}  
-   **Qualidade do ajuste**:
+Configuração do modelo: ARIMA{ordem}  
+Qualidade do ajuste:
 - AIC: {aic:.2f}
 - BIC: {bic:.2f}
 
-   **Previsão para os próximos {horizonte} períodos**:
+Previsão para os próximos {horizonte} períodos:
 {', '.join([f"{p:.2f}" for p in previsao])}
 
----
-
-✅ O modelo foi ajustado automaticamente.  
+O modelo foi ajustado automaticamente.
 Use o gráfico para avaliar a tendência e decidir se precisa refinar manualmente.
 """
 
@@ -860,24 +859,27 @@ Use o gráfico para avaliar a tendência e decidir se precisa refinar manualment
 
 
 
+
+import pandas as pd
+
 def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
     if not coluna_y or len(coluna_y) != 1:
-        return "❌ O Holt-Winters requer exatamente 1 coluna Y (série temporal).", None
+        return "O Holt-Winters requer exatamente 1 coluna Y (série temporal).", None
 
     y_col = coluna_y[0]
     if y_col not in df.columns:
-        return f"❌ Coluna {y_col} não encontrada no arquivo.", None
+        return f"Coluna {y_col} não encontrada no arquivo.", None
 
     df_valid = df[[y_col]].dropna()
     if len(df_valid) < 10:
-        return "❌ A série temporal requer pelo menos 10 observações.", None
+        return "A série temporal requer pelo menos 10 observações.", None
 
     Y = df_valid[y_col].values
 
     try:
         from statsmodels.tsa.holtwinters import ExponentialSmoothing
     except ImportError:
-        return "❌ O pacote statsmodels não está disponível neste ambiente.", None
+        return "O pacote statsmodels não está disponível neste ambiente.", None
 
     horizonte = int(field) if field and str(field).isdigit() else 5
     modelo = ExponentialSmoothing(Y, trend="add", seasonal=None, damped_trend=True).fit()
@@ -890,7 +892,7 @@ def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.plot(range(len(Y)), Y, label="Série Original", color="black")
     ax.plot(range(len(Y), len(Y) + horizonte), previsao, label="Previsão", color="blue")
-    ax.set_title(f"Holt-Winters (Suavização Exponencial) - Previsão {horizonte} períodos")
+    ax.set_title(f"Holt-Winters - Previsão de {horizonte} períodos")
     ax.legend()
     plt.tight_layout()
 
@@ -900,16 +902,21 @@ def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
     texto = f"""
-**Holt-Winters (Suavização Exponencial)**
-- Tendência: aditiva (com amortecimento)
-- Sazonalidade: não aplicada
-- Previsão para os próximos {horizonte} períodos: {', '.join([f"{p:.2f}" for p in previsao])}
+Holt-Winters (Suavização Exponencial)
 
-**Conclusão**
-✅ Modelo ajustado automaticamente. Simples e robusto para séries com tendência. Avalie o gráfico e ajuste os parâmetros (ex.: sazonalidade) se necessário.
+Tendência: aditiva (com amortecimento)  
+Sazonalidade: não aplicada  
+
+Previsão para os próximos {horizonte} períodos:  
+{', '.join([f"{p:.2f}" for p in previsao])}
+
+Conclusão:  
+Modelo ajustado automaticamente. Simples e robusto para séries com tendência.  
+Use o gráfico para avaliar se ajustes adicionais são necessários (ex: sazonalidade).
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
