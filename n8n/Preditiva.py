@@ -485,6 +485,8 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     nomes_originais = dict(zip(X_final.columns, lista_x))
     x_cols_final = X_final.columns.tolist()
 
+    
+    import pandas as pd
     import statsmodels.api as sm
     from statsmodels.miscmodels.ordinal_model import OrderedModel
     from statsmodels.stats.outliers_influence import variance_inflation_factor
