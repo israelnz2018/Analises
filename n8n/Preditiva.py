@@ -7,7 +7,6 @@ def analise_tipo_modelo_regressao(df: pd.DataFrame, coluna_y):
     if coluna_y not in df.columns:
         return f"❌ Coluna {coluna_y} não encontrada no arquivo.", None
 
-    # Busca uma coluna X numérica automaticamente
     colunas_x = [col for col in df.columns if col != coluna_y and pd.api.types.is_numeric_dtype(df[col])]
     if not colunas_x:
         return "❌ Nenhuma coluna X numérica encontrada automaticamente no arquivo.", None
@@ -26,13 +25,11 @@ def analise_tipo_modelo_regressao(df: pd.DataFrame, coluna_y):
         "Cúbico": np.polyfit(X_raw, Y, 3)
     }
 
-    # Logarítmico
     X_log = X_raw[X_raw > 0]
     Y_log = Y[X_raw > 0]
     if len(X_log) >= 5:
         modelos["Logarítmico"] = np.polyfit(np.log(X_log), Y_log, 1)
 
-    # Exponencial
     Y_exp = Y[Y > 0]
     X_exp = X_raw[Y > 0]
     if len(Y_exp) >= 5:
@@ -61,8 +58,17 @@ def analise_tipo_modelo_regressao(df: pd.DataFrame, coluna_y):
             "r2_adj": adj
         }
 
-    melhor = max(resultados.items(), key=lambda x: x[1]["r2_adj"])
+    resultados_validos = {k: v for k, v in resultados.items() if v["r2_adj"] >= 0}
+
+    if not resultados_validos:
+        return "❌ Nenhum modelo apresentou R² ajustado positivo. Regressão não recomendada.", None
+
+    melhor = max(resultados_validos.items(), key=lambda x: x[1]["r2_adj"])
     nome_vencedor, res_vencedor = melhor
+
+    aviso = ""
+    if all(r["r2_adj"] < 0.3 for r in resultados_validos.values()):
+        aviso = "⚠ Todos os modelos apresentaram baixo poder de explicação (R² ajustado < 0.3). Use com cautela.\n"
 
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -100,10 +106,11 @@ def analise_tipo_modelo_regressao(df: pd.DataFrame, coluna_y):
 {chr(10).join(linhas)}
 
 **Conclusão**
-Modelo recomendado: {nome_vencedor}
+{aviso}Modelo recomendado: {nome_vencedor} (R² ajustado = {res_vencedor['r2_adj']:.4f})
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
