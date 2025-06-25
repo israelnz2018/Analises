@@ -365,11 +365,12 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
         return "❌ O modelo requer mais dados válidos.", None
 
     # Mapeamento automático do Y categórico
-    classes = sorted(df_valid[coluna_y].unique())
+    classes = df_valid[coluna_y].unique()
     if len(classes) != 2:
         return "❌ A variável Y deve conter exatamente 2 categorias distintas para regressão logística binária.", None
 
-    Y = df_valid[coluna_y].map({classes[0]: 0, classes[1]: 1}).values
+    mapeamento = {str(classes[0]): 0, str(classes[1]): 1}
+    Y = df_valid[coluna_y].astype(str).map(mapeamento).values
     X_final = df_valid[lista_x]
     x_cols_final = X_final.columns.tolist()
 
@@ -458,6 +459,7 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
