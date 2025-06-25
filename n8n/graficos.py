@@ -591,7 +591,7 @@ GRAFICOS = {
     "Tendência": gerar_tendencia,
     "Bolhas - 3D": gerar_bolhas_3d,
     "Superfície - 3D": gerar_superficie_3d,
-    "Dispersão 3D com Regressão": gerar_dispersao_3d_regressao
+    "Dispersão 3D com Regressão": gerar_dispersao_3d_com_regressao
     
 }
 
