@@ -540,7 +540,6 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 
 
 
-
 def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
@@ -553,16 +552,6 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    # ✅ Converte Y para códigos numéricos
-    Y = df_valid[coluna_y].astype("category")
-    Y_codes = Y.cat.codes
-    Y_labels = dict(enumerate(Y.cat.categories))
-
-    # ✅ X com nomes seguros (0, 1, 2...) e sem MultiIndex
-    X_final = df_valid[lista_x].copy()
-    X_final.columns = [str(i) for i in range(X_final.shape[1])]
-    nomes_originais = dict(zip(X_final.columns, lista_x))
-
     import statsmodels.api as sm
     from statsmodels.stats.outliers_influence import variance_inflation_factor
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
@@ -571,13 +560,33 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     import base64
     import numpy as np
 
-    model = sm.MNLogit(Y_codes, X_final)
-    res = model.fit(disp=0)
+    # Converte Y em categorias numéricas
+    Y = df_valid[coluna_y].astype("category")
+    Y_codes = Y.cat.codes
+    Y_codes.name = "target"
+    Y_labels = dict(enumerate(Y.cat.categories))
 
-    ll_null = sm.MNLogit(Y_codes, np.ones((len(Y_codes), 1))).fit(disp=0).llf
-    ll_model = res.llf
-    r2_mcf = 1 - ll_model / ll_null
+    # Prepara X com nomes seguros (strings) e únicos
+    X_final = df_valid[lista_x].copy()
+    X_final.columns = [str(i) for i in range(X_final.shape[1])]
+    X_final.columns = [str(col) for col in X_final.columns]
+    nomes_originais = dict(zip(X_final.columns, lista_x))
 
+    # Ajusta modelo MNLogit
+    try:
+        model = sm.MNLogit(Y_codes, X_final)
+        res = model.fit(disp=0)
+    except Exception as e:
+        return f"❌ Erro ao ajustar o modelo: {str(e)}", None
+
+    try:
+        ll_null = sm.MNLogit(Y_codes, np.ones((len(Y_codes), 1))).fit(disp=0).llf
+        ll_model = res.llf
+        r2_mcf = 1 - ll_model / ll_null
+    except:
+        r2_mcf = None
+
+    # Calcula VIFs
     vif = []
     if X_final.shape[1] > 1:
         X_vif = sm.add_constant(X_final.copy())
@@ -586,6 +595,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     else:
         vif.append(1.0)
 
+    # Previsões e matriz de confusão
     Y_pred = res.predict().argmax(axis=1)
     cm = confusion_matrix(Y_codes, Y_pred)
 
@@ -600,6 +610,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Resultados do modelo
     linhas = []
     melhor_var = None
     menor_pval = 1.0
@@ -614,23 +625,25 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
                 menor_pval = p
                 melhor_var = nomes_originais[nome_coluna]
 
-    linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
+    if r2_mcf is not None:
+        linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
     acerto = (cm.diagonal().sum()) / cm.sum()
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
     linhas.append("VIFs: " + ", ".join([f"{nomes_originais[c]}={v:.2f}" for c, v in zip(X_final.columns, vif)]))
 
+    # Sugestões e conclusão
     sugestao = ""
     if melhor_var:
         sugestao = f"\n📌 A variável **{melhor_var}** teve o menor p-valor ({menor_pval:.4f}) e pode ser a explicação mais relevante isoladamente."
-
     if len(lista_x) > 1 and any(v >= 10 for v in vif):
         sugestao += "\n⚠ Considere remover variáveis com VIF alto ou p-valor elevado para melhorar o modelo."
 
     conclusao = []
-    if r2_mcf > 0.2:
-        conclusao.append("✅ Modelo apresenta bom ajuste (R² de McFadden adequado).")
-    else:
-        conclusao.append("⚠ R² de McFadden baixo, modelo pode não ter bom ajuste.")
+    if r2_mcf is not None:
+        if r2_mcf > 0.2:
+            conclusao.append("✅ Modelo apresenta bom ajuste (R² de McFadden adequado).")
+        else:
+            conclusao.append("⚠ R² de McFadden baixo, modelo pode não ter bom ajuste.")
     if all(v < 10 for v in vif):
         conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
     else:
@@ -646,6 +659,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
