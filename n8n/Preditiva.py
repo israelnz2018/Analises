@@ -480,8 +480,9 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
-    X_final = df_valid[lista_x]
-    X_final.columns = [str(c) for c in X_final.columns]  # ✅ evita MultiIndex
+    X_final = df_valid[lista_x].copy()
+    X_final.columns = [str(i) for i in range(X_final.shape[1])]
+    nomes_originais = dict(zip(X_final.columns, lista_x))
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
@@ -491,6 +492,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     from io import BytesIO
     import base64
     import numpy as np
+    import pandas as pd
 
     model = OrderedModel(Y, X_final, distr='logit')
     res = model.fit(method='bfgs', disp=0)
@@ -499,7 +501,6 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
-    # ✅ Cálculo de VIF com constante, sem alterar X_final
     vif = []
     if X_final.shape[1] > 1:
         X_vif = sm.add_constant(X_final.copy())
@@ -514,17 +515,23 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     comentario_odds = "⚠ Teste de proporcionalidade dos odds não implementado diretamente no Python. Avalie graficamente ou com software complementar (ex: Stata, R)."
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    if len(x_cols_final) == 1:
-        X_plot = np.linspace(X_final.iloc[:, 0].min(), X_final.iloc[:, 0].max(), 100)
-        probas = res.model.predict(res.params, exog=pd.DataFrame({x_cols_final[0]: X_plot}))
-        for cat in probas.columns:
-            ax.plot(X_plot, probas[cat], label=f'Prob(Y={cat})')
-        ax.set_xlabel(x_cols_final[0])
-        ax.set_ylabel('Probabilidade')
-        ax.set_title('Regressão Logística Ordinal')
-        ax.legend()
+    if len(x_cols_final) == 1 and not X_final.empty:
+        nome_coluna = x_cols_final[0]
+        valores_x = X_final[nome_coluna].astype(float)
+        if valores_x.nunique() > 1:
+            X_plot = np.linspace(valores_x.min(), valores_x.max(), 100)
+            probas = res.model.predict(res.params, exog=pd.DataFrame({nome_coluna: X_plot}))
+            for cat in probas.columns:
+                ax.plot(X_plot, probas[cat], label=f'Prob(Y={cat})')
+            ax.set_xlabel(nomes_originais[nome_coluna])
+            ax.set_ylabel('Probabilidade')
+            ax.set_title('Regressão Logística Ordinal')
+            ax.legend()
+        else:
+            ax.text(0.5, 0.5, 'Valores de X constantes — gráfico indisponível.', ha='center', va='center')
+            ax.axis('off')
     else:
-        ax.text(0.5, 0.5, 'Gráfico indisponível para múltiplas X.', ha='center', va='center')
+        ax.text(0.5, 0.5, 'Gráfico indisponível para múltiplas X ou dados ausentes.', ha='center', va='center')
         ax.axis('off')
 
     plt.tight_layout()
@@ -534,22 +541,22 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     linhas = []
-    melhores_var = None
+    melhor_var = None
     menor_pval = 1.0
 
     for name, coef, pval in zip(res.model.exog_names, res.params, res.pvalues):
-        linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
+        linhas.append(f"- {nomes_originais.get(name, name)}: coef={coef:.4f}, p-valor={pval:.4f}")
         if name in x_cols_final and pval < menor_pval:
             menor_pval = pval
-            melhores_var = name
+            melhor_var = nomes_originais.get(name, name)
 
     sugestao = ""
-    if melhores_var:
-        sugestao = f"\n📌 A variável **{melhores_var}** apresentou maior significância (p-valor = {menor_pval:.4f}) e pode ser a melhor explicação individual da variável Y."
+    if melhor_var:
+        sugestao = f"\n📌 A variável **{melhor_var}** apresentou maior significância (p-valor = {menor_pval:.4f}) e pode ser a melhor explicação individual da variável Y."
 
     linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
+    linhas.append("VIFs: " + ", ".join([f"{nomes_originais[c]}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
     conclusao = []
     if r2_mcf > 0.2:
@@ -572,6 +579,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
