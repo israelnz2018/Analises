@@ -459,16 +459,14 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
-
-    import pandas as pd
-    import statsmodels.api as sm
-    from statsmodels.miscmodels.ordinal_model import OrderedModel
-    from statsmodels.stats.outliers_influence import variance_inflation_factor
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-    import numpy as np
-    import pandas as pd
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.miscmodels.ordinal_model import OrderedModel
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+import numpy as np
 
 def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
@@ -489,50 +487,58 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
-    X_final = df_valid[lista_x].copy()
-    X_final.columns = [str(i) for i in range(X_final.shape[1])]
-    nomes_originais = dict(zip(X_final.columns, lista_x))
-    x_cols_final = X_final.columns.tolist()
+    X_real = df_valid[lista_x].copy()
+    X_real.columns = [str(i) for i in range(X_real.shape[1])]
+    nomes_originais = dict(zip(X_real.columns, lista_x))
+    x_cols_final = X_real.columns.tolist()
 
+    try:
+        model = OrderedModel(Y, X_real, distr='logit')
+        res = model.fit(method='bfgs', disp=0)
+        ll_null = OrderedModel(Y, pd.DataFrame(index=Y.index), distr='logit').fit(method='bfgs', disp=0).llf
+    except Exception as e:
+        return f"❌ Erro ao ajustar o modelo: {str(e)}", None
 
-    model = OrderedModel(Y, X_final, distr='logit')
-    res = model.fit(method='bfgs', disp=0)
-
-    ll_null = OrderedModel(Y, pd.DataFrame(index=Y.index), distr='logit').fit(method='bfgs', disp=0).llf
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
     vif = []
-    if X_final.shape[1] > 1:
-        X_vif = sm.add_constant(X_final.copy())
+    if X_real.shape[1] > 1:
+        X_vif = sm.add_constant(X_real.copy())
         for i in range(1, X_vif.shape[1]):
             vif.append(variance_inflation_factor(X_vif.values, i))
     else:
         vif.append(1.0)
 
-    Y_pred = res.model.predict(res.params, exog=X_final).idxmax(axis=1)
+    Y_pred = res.model.predict(res.params, exog=X_real).idxmax(axis=1)
     acerto = (Y_pred == Y).mean()
 
     comentario_odds = "⚠ Teste de proporcionalidade dos odds não implementado diretamente no Python. Avalie graficamente ou com software complementar (ex: Stata, R)."
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    if len(x_cols_final) == 1 and not X_final.empty:
+
+    if len(x_cols_final) == 1:
         nome_coluna = x_cols_final[0]
-        valores_x = X_final[nome_coluna].astype(float)
+        valores_x = X_real[nome_coluna].astype(float)
         if valores_x.nunique() > 1:
             X_plot = np.linspace(valores_x.min(), valores_x.max(), 100)
-            probas = res.model.predict(res.params, exog=pd.DataFrame({nome_coluna: X_plot}))
-            for cat in probas.columns:
-                ax.plot(X_plot, probas[cat], label=f'Prob(Y={cat})')
-            ax.set_xlabel(nomes_originais[nome_coluna])
-            ax.set_ylabel('Probabilidade')
-            ax.set_title('Regressão Logística Ordinal')
-            ax.legend()
+            df_plot = pd.DataFrame({nome_coluna: X_plot})
+            try:
+                probas = res.model.predict(res.params, exog=df_plot)
+                for cat in probas.columns:
+                    ax.plot(X_plot, probas[cat], label=f'Prob(Y={cat})')
+                ax.set_xlabel(nomes_originais[nome_coluna])
+                ax.set_ylabel('Probabilidade')
+                ax.set_title('Regressão Logística Ordinal')
+                ax.legend()
+            except:
+                ax.text(0.5, 0.5, 'Erro ao gerar gráfico.', ha='center', va='center')
+                ax.axis('off')
         else:
             ax.text(0.5, 0.5, 'Valores de X constantes — gráfico indisponível.', ha='center', va='center')
             ax.axis('off')
     else:
-        ax.text(0.5, 0.5, 'Gráfico indisponível para múltiplas X ou dados ausentes.', ha='center', va='center')
+        ax.text(0.5, 0.5, 'Gráfico indisponível para múltiplas X.', ha='center', va='center')
         ax.axis('off')
 
     plt.tight_layout()
@@ -546,10 +552,11 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     menor_pval = 1.0
 
     for name, coef, pval in zip(res.model.exog_names, res.params, res.pvalues):
-        linhas.append(f"- {nomes_originais.get(name, name)}: coef={coef:.4f}, p-valor={pval:.4f}")
+        nome_exibicao = nomes_originais.get(name, name)
+        linhas.append(f"- {nome_exibicao}: coef={coef:.4f}, p-valor={pval:.4f}")
         if name in x_cols_final and pval < menor_pval:
             menor_pval = pval
-            melhor_var = nomes_originais.get(name, name)
+            melhor_var = nome_exibicao
 
     sugestao = ""
     if melhor_var:
@@ -580,6 +587,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
