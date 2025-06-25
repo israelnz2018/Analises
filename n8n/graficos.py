@@ -284,6 +284,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
                 contagem.plot(kind="bar", ax=ax)
                 ax.set_ylabel("Frequência")
             ax.set_title(f"Barras de {coluna_x} ({sub})")
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
 
         plt.tight_layout()
 
@@ -298,6 +299,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
             contagem.plot(kind="bar", figsize=(10,6))
             plt.ylabel("Frequência")
         plt.title(f"Barras de {coluna_x}")
+        plt.xticks(rotation=90)  # <<< Aqui está o ajuste
         plt.tight_layout()
 
     buf = BytesIO()
@@ -307,6 +309,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
+
 
 
 def gerar_boxplot(df, lista_y, subgrupo=None):
