@@ -481,6 +481,7 @@ def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
     from scipy.interpolate import griddata
     import base64
     from io import BytesIO
+    from suporte import aplicar_estilo_minitab
 
     if not coluna_x or coluna_x not in df.columns:
         return "❌ A coluna X informada não foi encontrada no arquivo.", None
@@ -493,35 +494,34 @@ def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
     if dados.empty:
         return "❌ Dados insuficientes para gerar o gráfico.", None
 
-    dados = dados.astype(float)
-
     try:
         aplicar_estilo_minitab()
 
-        X = dados[coluna_x].values
-        Y = dados[coluna_y].values
-        Z = dados[coluna_z].values
+        X = dados[coluna_x].astype(float).values
+        Y = dados[coluna_y].astype(float).values
+        Z = dados[coluna_z].astype(float).values
 
-        xi = np.linspace(X.min(), X.max(), 50)
-        yi = np.linspace(Y.min(), Y.max(), 50)
+        xi = np.linspace(X.min(), X.max(), 60)
+        yi = np.linspace(Y.min(), Y.max(), 60)
         xi, yi = np.meshgrid(xi, yi)
+        zi = griddata((X, Y), Z, (xi, yi), method='cubic')
 
-        zi = griddata((X, Y), Z, (xi, yi), method='linear')
-
-        fig = plt.figure(figsize=(10, 6))
+        fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(111, projection='3d')
 
-        ax.plot_surface(xi, yi, zi, cmap='viridis', edgecolor='none', alpha=0.8)
+        surf = ax.plot_surface(xi, yi, zi, cmap='viridis', edgecolor='k', linewidth=0.2, alpha=0.9, antialiased=True)
 
-        ax.set_xlabel(coluna_x)
-        ax.set_ylabel(coluna_y)
-        ax.set_zlabel(coluna_z)
-        ax.set_title(f"Superfície 3D: {coluna_x} x {coluna_y} x {coluna_z}")
+        ax.set_xlabel(coluna_x, labelpad=12)
+        ax.set_ylabel(coluna_y, labelpad=12)
+        ax.set_zlabel(coluna_z, labelpad=12)
+        ax.set_title("Gráfico de Superfície 3D", pad=20)
+
+        fig.colorbar(surf, shrink=0.5, aspect=10, pad=0.1)
 
         plt.tight_layout()
 
         buf = BytesIO()
-        plt.savefig(buf, format="png")
+        plt.savefig(buf, format="png", dpi=300)
         plt.close()
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
@@ -530,6 +530,7 @@ def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
 
     except Exception as e:
         return f"❌ Erro ao gerar superfície 3D: {str(e)}", None
+
 
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.linear_model import LinearRegression
