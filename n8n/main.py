@@ -8,7 +8,7 @@ import os
 try:
     from leitura import ler_arquivo
     from Capabilidade import ANALISES as ANALISES_CAP
-    from Exploratoria import ANALISES as ANALISES_EXP
+    from Exploratoria import ANALISES as ANALISES_EXP 
     from Inferencial import ANALISES as ANALISES_INF
     from Preditiva import ANALISES as ANALISES_PRED
     from Controledeprocesso import ANALISES as ANALISES_PROC
