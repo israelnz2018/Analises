@@ -495,7 +495,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     model = OrderedModel(Y, X_final, distr='logit')
     res = model.fit(method='bfgs', disp=0)
 
-    ll_null = OrderedModel(Y, np.ones((len(Y), 1)), distr='logit').fit(method='bfgs', disp=0).llf
+    ll_null = OrderedModel(Y, pd.DataFrame(index=Y.index), distr='logit').fit(method='bfgs', disp=0).llf
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
