@@ -93,6 +93,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     import numpy as np
     import base64
     from io import BytesIO
+    from estilo import aplicar_estilo_minitab
 
     aplicar_estilo_minitab()
 
@@ -105,61 +106,69 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     if coluna_y and coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    if subgrupo:
-        dados = df[[coluna_x, coluna_y, subgrupo]].dropna() if coluna_y else df[[coluna_x, subgrupo]].dropna()
-        if dados.empty:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
-
-        subgrupos = dados[subgrupo].unique()
-        if len(subgrupos) != 2:
-            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
-
-        fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
-
-        for ax, sub in zip(axs, subgrupos):
-            dados_sub = dados[dados[subgrupo] == sub]
+    try:
+        if subgrupo:
+            colunas_usadas = [coluna_x, subgrupo]
             if coluna_y:
-                soma = dados_sub.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
-            else:
-                soma = dados_sub[coluna_x].value_counts().sort_values(ascending=False)
+                colunas_usadas.append(coluna_y)
+            dados = df[colunas_usadas].dropna()
+            if dados.empty:
+                return "❌ Dados insuficientes para gerar o gráfico.", None
 
-            soma.plot(kind="bar", ax=ax)
+            subgrupos = dados[subgrupo].unique()
+            if len(subgrupos) != 2:
+                return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
+
+            fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
+
+            for ax, sub in zip(axs, subgrupos):
+                dados_sub = dados[dados[subgrupo] == sub]
+                if coluna_y:
+                    soma = dados_sub.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
+                else:
+                    soma = dados_sub[coluna_x].value_counts().sort_values(ascending=False)
+
+                soma.plot(kind="bar", ax=ax)
+                cum = soma.cumsum() / soma.sum() * 100
+                ax2 = ax.twinx()
+                ax2.plot(cum.index, cum.values, color='r', marker='o')
+                ax.set_ylabel("Frequência / Soma")
+                ax2.set_ylabel("Acumulado (%)")
+                ax.set_title(f"Pareto - {coluna_x} ({sub})")
+
+            plt.tight_layout()
+
+        else:
+            dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
+            if dados.empty:
+                return "❌ Dados insuficientes para gerar o gráfico.", None
+
+            if coluna_y:
+                soma = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
+            else:
+                soma = dados[coluna_x].value_counts().sort_values(ascending=False)
+
+            plt.figure(figsize=(10, 5))
+            ax = soma.plot(kind="bar")
             cum = soma.cumsum() / soma.sum() * 100
             ax2 = ax.twinx()
             ax2.plot(cum.index, cum.values, color='r', marker='o')
             ax.set_ylabel("Frequência / Soma")
             ax2.set_ylabel("Acumulado (%)")
-            ax.set_title(f"Pareto - {coluna_x} ({sub})")
+            ax.set_title(f"Pareto - {coluna_x}")
+            plt.tight_layout()
 
-        plt.tight_layout()
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close()
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    else:
-        dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
-        if dados.empty:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
+        return "", imagem_base64
 
-        if coluna_y:
-            soma = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
-        else:
-            soma = dados[coluna_x].value_counts().sort_values(ascending=False)
+    except Exception as e:
+        return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None
 
-        plt.figure(figsize=(10, 5))
-        ax = soma.plot(kind="bar")
-        cum = soma.cumsum() / soma.sum() * 100
-        ax2 = ax.twinx()
-        ax2.plot(cum.index, cum.values, color='r', marker='o')
-        ax.set_ylabel("Frequência / Soma")
-        ax2.set_ylabel("Acumulado (%)")
-        ax.set_title(f"Pareto - {coluna_x}")
-        plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    plt.close()
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-
-    return "", imagem_base64
 
 
 
