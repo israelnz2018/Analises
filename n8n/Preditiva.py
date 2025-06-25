@@ -574,8 +574,6 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     return texto.strip(), grafico_base64
 
 
-
-
 def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
@@ -593,9 +591,10 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     Y_codes = Y.cat.codes
     Y_labels = dict(enumerate(Y.cat.categories))
 
-    X_final = df_valid[lista_x]
-    X_final.columns = [str(c) for c in X_final.columns]  # 🔧 Evita erro do MultiIndex
-    x_cols_final = X_final.columns.tolist()
+    # ✅ X com nomes seguros (0, 1, 2...) e sem MultiIndex
+    X_final = df_valid[lista_x].copy()
+    X_final.columns = [str(i) for i in range(X_final.shape[1])]
+    nomes_originais = dict(zip(X_final.columns, lista_x))
 
     import statsmodels.api as sm
     from statsmodels.stats.outliers_influence import variance_inflation_factor
@@ -614,9 +613,9 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 
     vif = []
     if X_final.shape[1] > 1:
-        X_sm = X_final.copy()
-        for i in range(X_sm.shape[1]):
-            vif.append(variance_inflation_factor(X_sm.values, i))
+        X_vif = sm.add_constant(X_final.copy())
+        for i in range(1, X_vif.shape[1]):
+            vif.append(variance_inflation_factor(X_vif.values, i))
     else:
         vif.append(1.0)
 
@@ -643,16 +642,15 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
         pval_str = ", ".join([f"{p:.4f}" for p in pval])
         linhas.append(f"- {cat}: coef=[{coef_str}], p-valor=[{pval_str}]")
 
-        # Sugestão de melhor variável
-        for var, p in zip(x_cols_final, pval):
+        for nome_coluna, p in zip(X_final.columns, pval):
             if p < menor_pval:
                 menor_pval = p
-                melhor_var = var
+                melhor_var = nomes_originais[nome_coluna]
 
     linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
     acerto = (cm.diagonal().sum()) / cm.sum()
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
+    linhas.append("VIFs: " + ", ".join([f"{nomes_originais[c]}={v:.2f}" for c, v in zip(X_final.columns, vif)]))
 
     sugestao = ""
     if melhor_var:
@@ -681,6 +679,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
