@@ -832,17 +832,24 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-**ARIMA**
-- Equação ARIMA: ARIMA{ordem}
+📈 **Modelo ARIMA**
+
+🔹 **Configuração do modelo**: ARIMA{ordem}  
+🔹 **Qualidade do ajuste**:
 - AIC: {aic:.2f}
 - BIC: {bic:.2f}
-- Previsão para os próximos {horizonte} períodos: {', '.join([f"{p:.2f}" for p in previsao])}
 
-**Conclusão**
-✅ Modelo ajustado automaticamente. AIC e BIC indicam qualidade do ajuste. Avalie o gráfico e, se necessário, refine o modelo manualmente.
+🔹 **Previsão para os próximos {horizonte} períodos**:
+{', '.join([f"{p:.2f}" for p in previsao])}
+
+---
+
+✅ O modelo foi ajustado automaticamente.  
+Use o gráfico para avaliar a tendência e decidir se precisa refinar manualmente.
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
