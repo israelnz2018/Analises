@@ -90,7 +90,6 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
 
 def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
-    import numpy as np
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
@@ -99,19 +98,34 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
     if not coluna_x or coluna_x not in df.columns:
         return "❌ A coluna X informada não foi encontrada no arquivo.", None
-
+    if coluna_y and coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
     if subgrupo and subgrupo not in df.columns:
         return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
 
-    if coluna_y and coluna_y not in df.columns:
-        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
-
     try:
-        if subgrupo:
-            colunas_usadas = [coluna_x, subgrupo]
+        def plotar(dados, titulo, ax):
             if coluna_y:
-                colunas_usadas.append(coluna_y)
-            dados = df[colunas_usadas].dropna()
+                contagem = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
+            else:
+                contagem = dados[coluna_x].value_counts().sort_values(ascending=False)
+
+            acumulado = contagem.cumsum() / contagem.sum() * 100
+            contagem.plot(kind="bar", ax=ax, color="C0")
+            ax.set_ylabel("Frequência / Soma")
+            ax.set_title(titulo)
+
+            ax2 = ax.twinx()
+            ax2.plot(acumulado.index, acumulado.values, color="red", marker="o")
+            ax2.set_ylabel("Acumulado (%)")
+            ax2.set_ylim(0, 110)
+
+            for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
+                ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
+
+        if subgrupo:
+            colunas = [coluna_x, subgrupo] + ([coluna_y] if coluna_y else [])
+            dados = df[colunas].dropna()
             if dados.empty:
                 return "❌ Dados insuficientes para gerar o gráfico.", None
 
@@ -120,47 +134,21 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
                 return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
 
             fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
-
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
-                if coluna_y:
-                    soma = dados_sub.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
-                else:
-                    soma = dados_sub[coluna_x].value_counts().sort_values(ascending=False)
-
-                soma.plot(kind="bar", ax=ax)
-                cum = soma.cumsum() / soma.sum() * 100
-                ax2 = ax.twinx()
-                ax2.plot(cum.index, cum.values, color='r', marker='o')
-                ax.set_ylabel("Frequência / Soma")
-                ax2.set_ylabel("Acumulado (%)")
-                ax.set_title(f"Pareto - {coluna_x} ({sub})")
-
-            plt.tight_layout()
-
+                plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
         else:
             dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
             if dados.empty:
                 return "❌ Dados insuficientes para gerar o gráfico.", None
 
-            if coluna_y:
-                soma = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
-            else:
-                soma = dados[coluna_x].value_counts().sort_values(ascending=False)
+            fig, ax = plt.subplots(figsize=(10, 5))
+            plotar(dados, f"Pareto - {coluna_x}", ax)
 
-            plt.figure(figsize=(10, 5))
-            ax = soma.plot(kind="bar")
-            cum = soma.cumsum() / soma.sum() * 100
-            ax2 = ax.twinx()
-            ax2.plot(cum.index, cum.values, color='r', marker='o')
-            ax.set_ylabel("Frequência / Soma")
-            ax2.set_ylabel("Acumulado (%)")
-            ax.set_title(f"Pareto - {coluna_x}")
-            plt.tight_layout()
-
+        plt.tight_layout()
         buf = BytesIO()
-        plt.savefig(buf, format="png")
-        plt.close()
+        fig.savefig(buf, format="png")
+        plt.close(fig)
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
@@ -168,6 +156,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None
+
 
 
 
