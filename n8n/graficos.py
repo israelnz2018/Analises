@@ -275,7 +275,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
             ax.set_title(f"Barras de {coluna_x} ({sub})")
             ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
 
-        plt.tight_layout()
+        plt.tight_layout() 
 
     else:
         dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
