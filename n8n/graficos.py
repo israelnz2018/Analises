@@ -449,7 +449,7 @@ def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
     plt.scatter(
         x=dados[coluna_x],
         y=dados[coluna_y],
-        s=dados[coluna_z] * 20,
+        s=dados[coluna_z] * 30,
         alpha=0.5,
         edgecolors="w"
     )
@@ -531,6 +531,53 @@ def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
     except Exception as e:
         return f"❌ Erro ao gerar superfície 3D: {str(e)}", None
 
+from mpl_toolkits.mplot3d import Axes3D
+from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import base64
+from io import BytesIO
+
+def grafico_dispersao_3d_com_regressao(df, col_x, col_y, col_z):
+    # Dados
+    X = df[[col_x, col_y]].values
+    y = df[col_z].values
+
+    # Regressão
+    model = LinearRegression()
+    model.fit(X, y)
+
+    # Grade para superfície
+    x_range = np.linspace(df[col_x].min(), df[col_x].max(), 20)
+    y_range = np.linspace(df[col_y].min(), df[col_y].max(), 20)
+    x_grid, y_grid = np.meshgrid(x_range, y_range)
+    z_pred = model.predict(np.c_[x_grid.ravel(), y_grid.ravel()]).reshape(x_grid.shape)
+
+    # Gráfico
+    fig = plt.figure(figsize=(10, 6))
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Dispersão real
+    ax.scatter(df[col_x], df[col_y], df[col_z], color='b', label='Pontos reais')
+
+    # Plano de regressão
+    ax.plot_surface(x_grid, y_grid, z_pred, alpha=0.5, color='red', label='Plano de regressão')
+
+    ax.set_xlabel(col_x)
+    ax.set_ylabel(col_y)
+    ax.set_zlabel(col_z)
+    ax.set_title(f'Dispersão 3D com Regressão - {col_z} ~ {col_x} + {col_y}')
+    plt.tight_layout()
+
+    # Exporta imagem
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close(fig)
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    return "", imagem_base64
 
 
 GRAFICOS = {
@@ -543,6 +590,8 @@ GRAFICOS = {
     "Tendência": gerar_tendencia,
     "Bolhas - 3D": gerar_bolhas_3d,
     "Superfície - 3D": gerar_superficie_3d,
+    "Dispersão 3D com Regressão": grafico_dispersao_3d_com_regressao,
+
     
 
 }
