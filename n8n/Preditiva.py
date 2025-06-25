@@ -783,17 +783,18 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-🌲 **Random Forest**
+Random Forest
 
-🔹 Desempenho do modelo:  
+Desempenho do modelo:  
 {score_txt}
 
-🔹 Número de árvores usadas: 100  
-🔹 Importância das variáveis:  
+Número de árvores usadas: 100  
+Importância das variáveis:  
 {importancia_str}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
