@@ -459,6 +459,8 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
+
+
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.miscmodels.ordinal_model import OrderedModel
@@ -472,121 +474,69 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística ordinal requer 1 Y e pelo menos 1 X.", None
 
-    for col in [coluna_y] + lista_x:
-        if col not in df.columns:
-            return f"❌ Coluna {col} não encontrada no arquivo.", None
-
-    if df[coluna_y].dtype == 'object' or str(df[coluna_y].dtype).startswith("category"):
-        categorias_unicas = sorted(df[coluna_y].dropna().unique())
-        df[coluna_y] = pd.Categorical(df[coluna_y], categories=categorias_unicas, ordered=True)
-    else:
-        return "❌ A variável Y precisa ser categórica (com níveis ordenáveis, como 'Insatisfatorio', 'Satisfatorio', etc).", None
-
-    df_valid = df[[coluna_y] + lista_x].dropna()
-    if len(df_valid) < len(lista_x) + 3:
-        return "❌ O modelo requer mais dados válidos.", None
-
-    Y = df_valid[coluna_y]
-    X_real = df_valid[lista_x].copy()
-    X_real.columns = [str(i) for i in range(X_real.shape[1])]
-    nomes_originais = dict(zip(X_real.columns, lista_x))
-    x_cols_final = X_real.columns.tolist()
-
     try:
-        model = OrderedModel(Y, X_real, distr='logit')
-        res = model.fit(method='bfgs', disp=0)
-        ll_null = OrderedModel(Y, pd.DataFrame(index=Y.index), distr='logit').fit(method='bfgs', disp=0).llf
+        # Selecionar e limpar dados
+        df = df[[coluna_y] + lista_x].copy()
+        df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
+        df.dropna(inplace=True)
+        for coluna in lista_x:
+            df[coluna] = pd.to_numeric(df[coluna], errors='coerce')
+        df.dropna(inplace=True)
+
+        if df.empty:
+            return "❌ A análise falhou: após limpeza, os dados estão vazios.", None
+
+        categorias_unicas = sorted(df[coluna_y].dropna().unique().tolist())
+        df[coluna_y] = pd.Categorical(df[coluna_y], categories=categorias_unicas, ordered=True)
+
+        y = df[coluna_y]
+        X = sm.add_constant(df[lista_x])
+
+        model = OrderedModel(y, X, distr='logit')
+        result = model.fit(method='bfgs', disp=False)
+
+        odds_ratios = np.exp(result.params)
+        pvalores = result.pvalues
+
+        texto_resultado = "📊 **Regressão Logística Ordinal**\n\n"
+        texto_resultado += "Categorias (ordem): " + " < ".join(categorias_unicas) + "\n\n"
+        texto_resultado += "📌 **Parâmetros estimados**:\n"
+        for param, val in result.params.items():
+            texto_resultado += f"- {param}: {val:.4f} (p = {pvalores[param]:.4f})\n"
+
+        texto_resultado += "\n💡 **Odds Ratios**:\n"
+        for param, val in odds_ratios.items():
+            texto_resultado += f"- {param}: {val:.4f}\n"
+
+        # VIF
+        vif_texto = "\n📉 **VIF (Multicolinearidade)**:\n"
+        X_vif = df[lista_x]
+        X_vif_const = sm.add_constant(X_vif)
+        for i in range(1, X_vif_const.shape[1]):
+            vif = variance_inflation_factor(X_vif_const.values, i)
+            vif_texto += f"- {X_vif_const.columns[i]}: {vif:.2f}\n"
+        texto_resultado += vif_texto
+
+        # Gráfico de boxplot para visualização
+        fig, ax = plt.subplots(figsize=(8, 4))
+        df.boxplot(column=lista_x[0], by=coluna_y, ax=ax, grid=False)
+        plt.suptitle('')
+        plt.title(f"{lista_x[0]} por {coluna_y}")
+        plt.xlabel(coluna_y)
+        plt.ylabel(lista_x[0])
+        plt.tight_layout()
+
+        buffer = BytesIO()
+        plt.savefig(buffer, format="png")
+        buffer.seek(0)
+        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+        plt.close()
+
+        return texto_resultado, imagem_base64
+
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
 
-    ll_model = res.llf
-    r2_mcf = 1 - ll_model / ll_null
-
-    vif = []
-    if X_real.shape[1] > 1:
-        X_vif = sm.add_constant(X_real.copy())
-        for i in range(1, X_vif.shape[1]):
-            vif.append(variance_inflation_factor(X_vif.values, i))
-    else:
-        vif.append(1.0)
-
-    Y_pred = res.model.predict(res.params, exog=X_real).idxmax(axis=1)
-    acerto = (Y_pred == Y).mean()
-
-    comentario_odds = "⚠ Teste de proporcionalidade dos odds não implementado diretamente no Python. Avalie graficamente ou com software complementar (ex: Stata, R)."
-
-    fig, ax = plt.subplots(figsize=(6, 4))
-
-    if len(x_cols_final) == 1:
-        nome_coluna = x_cols_final[0]
-        valores_x = X_real[nome_coluna].astype(float)
-        if valores_x.nunique() > 1:
-            X_plot = np.linspace(valores_x.min(), valores_x.max(), 100)
-            df_plot = pd.DataFrame({nome_coluna: X_plot})
-            try:
-                probas = res.model.predict(res.params, exog=df_plot)
-                for cat in probas.columns:
-                    ax.plot(X_plot, probas[cat], label=f'Prob(Y={cat})')
-                ax.set_xlabel(nomes_originais[nome_coluna])
-                ax.set_ylabel('Probabilidade')
-                ax.set_title('Regressão Logística Ordinal')
-                ax.legend()
-            except:
-                ax.text(0.5, 0.5, 'Erro ao gerar gráfico.', ha='center', va='center')
-                ax.axis('off')
-        else:
-            ax.text(0.5, 0.5, 'Valores de X constantes — gráfico indisponível.', ha='center', va='center')
-            ax.axis('off')
-    else:
-        ax.text(0.5, 0.5, 'Gráfico indisponível para múltiplas X.', ha='center', va='center')
-        ax.axis('off')
-
-    plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-    linhas = []
-    melhor_var = None
-    menor_pval = 1.0
-
-    for name, coef, pval in zip(res.model.exog_names, res.params, res.pvalues):
-        nome_exibicao = nomes_originais.get(name, name)
-        linhas.append(f"- {nome_exibicao}: coef={coef:.4f}, p-valor={pval:.4f}")
-        if name in x_cols_final and pval < menor_pval:
-            menor_pval = pval
-            melhor_var = nome_exibicao
-
-    sugestao = ""
-    if melhor_var:
-        sugestao = f"\n📌 A variável **{melhor_var}** apresentou maior significância (p-valor = {menor_pval:.4f}) e pode ser a melhor explicação individual da variável Y."
-
-    linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
-    linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{nomes_originais[c]}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
-
-    conclusao = []
-    if r2_mcf > 0.2:
-        conclusao.append("✅ Modelo apresenta bom ajuste (R² de McFadden adequado).")
-    else:
-        conclusao.append("⚠ R² de McFadden baixo, modelo pode não ter bom ajuste.")
-    if all(v < 10 for v in vif):
-        conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
-    else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
-    conclusao.append(comentario_odds)
-
-    texto = f"""
-**Regressão Logística Ordinal**
-{chr(10).join(linhas)}
-{sugestao}
-
-**Conclusão**
-{chr(10).join(conclusao)}
-"""
-
-    return texto.strip(), grafico_base64
 
 
 
