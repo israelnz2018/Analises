@@ -735,15 +735,14 @@ Abaixo estão as condições que o modelo usou para chegar em cada decisão:
 
     return texto.strip(), grafico_base64
 
-
 def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
-        return "❌ O Random Forest requer 1 coluna Y e pelo menos 1 X.", None
+        return "O Random Forest requer 1 coluna Y e pelo menos 1 X.", None
 
     cols = [coluna_y] + lista_x
     df_valid = df[cols].dropna()
     if len(df_valid) < len(lista_x) + 5:
-        return "❌ O modelo requer mais dados válidos.", None
+        return "O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
     X = df_valid[lista_x]
@@ -785,15 +784,16 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     texto = f"""
 Random Forest
 
-Desempenho do modelo:  
+Desempenho do modelo:
 {score_txt}
 
-Número de árvores usadas: 100  
-Importância das variáveis:  
+Número de árvores usadas: 100
+Importância das variáveis:
 {importancia_str}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
