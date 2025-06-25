@@ -734,6 +734,7 @@ Abaixo estão as condições que o modelo usou para chegar em cada decisão:
 
 
     return texto.strip(), grafico_base64
+import pandas as pd
 
 def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
@@ -764,10 +765,10 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
         model.fit(X, Y)
         Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
-        score_txt = f"Percentual de acerto: {acc*100:.2f}%"
+        score_txt = f"Percentual de acerto: {acc * 100:.2f}%"
 
     importancias = model.feature_importances_
-    importancia_str = ", ".join([f"{c}={v*100:.2f}%" for c, v in zip(lista_x, importancias)])
+    importancia_str = ", ".join([f"{c} = {v * 100:.2f}%" for c, v in zip(lista_x, importancias)])
 
     fig, ax = plt.subplots(figsize=(8, 5))
     sorted_idx = importancias.argsort()
@@ -781,18 +782,19 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    texto = f"""
-Random Forest
+    texto = f"""Random Forest - Resultado
 
 Desempenho do modelo:
 {score_txt}
 
 Número de árvores usadas: 100
+
 Importância das variáveis:
 {importancia_str}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
