@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import traceback
 import os
 
-# Tentativa segura de importação dos módulos
+# Tentativa segura de importação dos módulos 
 try:
     from leitura import ler_arquivo
     from Capabilidade import ANALISES as ANALISES_CAP
