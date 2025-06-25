@@ -592,6 +592,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     Y_labels = dict(enumerate(Y.cat.categories))
 
     X_final = df_valid[lista_x]
+    X_final.columns = [str(c) for c in X_final.columns]  # 🔧 Evita erro do MultiIndex
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
@@ -611,8 +612,8 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 
     vif = []
     if X_final.shape[1] > 1:
-        X_sm = sm.add_constant(X_final)
-        for i in range(1, X_sm.shape[1]):
+        X_sm = X_final.copy()
+        for i in range(X_sm.shape[1]):
             vif.append(variance_inflation_factor(X_sm.values, i))
     else:
         vif.append(1.0)
@@ -632,14 +633,31 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     linhas = []
+    melhor_var = None
+    menor_pval = 1.0
+
     for (cat, coef, pval) in zip(res.params.index, res.params.values, res.pvalues.values):
         coef_str = ", ".join([f"{c:.4f}" for c in coef])
         pval_str = ", ".join([f"{p:.4f}" for p in pval])
         linhas.append(f"- {cat}: coef=[{coef_str}], p-valor=[{pval_str}]")
+
+        # Sugestão de melhor variável
+        for var, p in zip(x_cols_final, pval):
+            if p < menor_pval:
+                menor_pval = p
+                melhor_var = var
+
     linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
     acerto = (cm.diagonal().sum()) / cm.sum()
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
     linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
+
+    sugestao = ""
+    if melhor_var:
+        sugestao = f"\n📌 A variável **{melhor_var}** teve o menor p-valor ({menor_pval:.4f}) e pode ser a explicação mais relevante isoladamente."
+
+    if len(lista_x) > 1 and any(v >= 10 for v in vif):
+        sugestao += "\n⚠ Considere remover variáveis com VIF alto ou p-valor elevado para melhorar o modelo."
 
     conclusao = []
     if r2_mcf > 0.2:
@@ -654,10 +672,12 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     texto = f"""
 **Regressão Logística Nominal**
 {chr(10).join(linhas)}
+{sugestao}
 
 **Conclusão**
 {chr(10).join(conclusao)}
 """
+
     return texto.strip(), grafico_base64
 
 
