@@ -470,12 +470,12 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         if col not in df.columns:
             return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    # ✅ Conversão do Y para categórico ordenado
-    df[coluna_y] = pd.Categorical(
-        df[coluna_y],
-        categories=["Insatisfatorio", "Neutro", "Satisfatorio"],  # ajuste a ordem conforme seu caso
-        ordered=True
-    )
+    # ✅ Conversão segura de Y para categórico ordenado
+    if df[coluna_y].dtype == 'object' or str(df[coluna_y].dtype).startswith("category"):
+        categorias_unicas = sorted(df[coluna_y].dropna().unique())
+        df[coluna_y] = pd.Categorical(df[coluna_y], categories=categorias_unicas, ordered=True)
+    else:
+        return "❌ A variável Y precisa ser categórica (com níveis ordenáveis, como 'Insatisfatorio', 'Satisfatorio', etc).", None
 
     df_valid = df[[coluna_y] + lista_x].dropna()
     if len(df_valid) < len(lista_x) + 3:
@@ -574,9 +574,10 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    Y = df_valid[coluna_y]
-    if len(Y.unique()) < 3:
-        return "❌ Y deve ter pelo menos 3 categorias para regressão logística nominal.", None
+    # ✅ Converte Y para códigos numéricos
+    Y = df_valid[coluna_y].astype("category")
+    Y_codes = Y.cat.codes
+    Y_labels = dict(enumerate(Y.cat.categories))
 
     X_final = df_valid[lista_x]
     x_cols_final = X_final.columns.tolist()
@@ -589,10 +590,10 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     import base64
     import numpy as np
 
-    model = sm.MNLogit(Y, X_final)
+    model = sm.MNLogit(Y_codes, X_final)
     res = model.fit(disp=0)
 
-    ll_null = sm.MNLogit(Y, np.ones((len(Y), 1))).fit(disp=0).llf
+    ll_null = sm.MNLogit(Y_codes, np.ones((len(Y_codes), 1))).fit(disp=0).llf
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
@@ -605,11 +606,10 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
         vif.append(1.0)
 
     Y_pred = res.predict().argmax(axis=1)
-    Y_true_idx = pd.factorize(Y)[0]
-    cm = confusion_matrix(Y_true_idx, Y_pred)
+    cm = confusion_matrix(Y_codes, Y_pred)
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(Y_labels.values()))
     disp.plot(ax=ax, cmap="Blues", colorbar=False)
     ax.set_title("Matriz de Confusão - Regressão Logística Nominal")
     plt.tight_layout()
@@ -646,8 +646,8 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 **Conclusão**
 {chr(10).join(conclusao)}
 """
-
     return texto.strip(), grafico_base64
+
 
 
 
