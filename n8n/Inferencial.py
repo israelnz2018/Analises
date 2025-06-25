@@ -255,7 +255,7 @@ def analise_paired_t(df: pd.DataFrame, lista_y: list, field_conf=None):
 
 
 
-def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo, field_conf=None):
+def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None), field_conf=None):
     ys = [c for c in lista_y if c not in ["", "Subgrupo"]]
     x = subgrupo if subgrupo and subgrupo in df.columns else None
 
@@ -534,35 +534,32 @@ def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
     return texto.strip(), grafico_base64
 
 
-def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo):
-    ys = [c for c in lista_y if c != ""]
+def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
+    if not lista_y or len(lista_y) != 1:
+        return "❌ A análise Kruskal-Wallis requer exatamente 1 coluna Y.", None
+
+    coluna_y = lista_y[0]
     x = subgrupo if subgrupo and subgrupo in df.columns else None
 
-    if len(ys) == 0:
-        return "❌ O Kruskal-Wallis requer pelo menos 1 coluna Y.", None
+    if coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no DataFrame.", None
 
     if x:
-        y_col = ys[0]
-        df_valid = df[[y_col, x]].dropna()
-        grupos = [grupo[1].values for grupo in df_valid.groupby(x)[y_col]]
+        df_valid = df[[coluna_y, x]].dropna()
+        grupos = [grupo[1].values for grupo in df_valid.groupby(x)[coluna_y]]
 
         if len(grupos) < 2:
             return "❌ O Kruskal-Wallis requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
     else:
-        grupos = []
-        for y_col in ys:
-            grupo = df[y_col].dropna().values
-            if len(grupo) > 0:
-                grupos.append(grupo)
-
-        if len(grupos) < 2:
-            return "❌ O Kruskal-Wallis requer pelo menos 2 colunas Y com dados.", None
+        grupos = [df[coluna_y].dropna().values]
+        if len(grupos[0]) < 2:
+            return "❌ O Kruskal-Wallis requer ao menos uma coluna Y com dados suficientes.", None
 
     h_stat, p_valor = stats.kruskal(*grupos)
 
     normal_flag = False
     if x:
-        for nome, g in df_valid.groupby(x)[y_col]:
+        for nome, g in df_valid.groupby(x)[coluna_y]:
             dados = g.dropna()
             if len(dados) >= 5:
                 ad = stats.anderson(dados)
@@ -604,11 +601,11 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo):
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     if x:
-        df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
-        medias = df_valid.groupby(x)[y_col].mean()
+        df_valid.boxplot(column=coluna_y, by=x, ax=ax, grid=False)
+        medias = df_valid.groupby(x)[coluna_y].mean()
         ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
     else:
-        ax.boxplot(grupos, labels=ys)
+        ax.boxplot(grupos, labels=[coluna_y])
         medias = [np.mean(g) for g in grupos]
         ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
 
@@ -636,6 +633,8 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo):
 """
 
     return texto.strip(), grafico_base64
+
+
 
 def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
     ys = [c for c in lista_y if c != ""]
@@ -885,7 +884,7 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     return texto.strip(), grafico_base64
 
 
-def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf):
+def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
     if len(lista_y) != 2:
         return "❌ O teste 2 Variâncias requer exatamente 2 colunas Y.", None
 
@@ -1113,7 +1112,7 @@ def analise_bartlett(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=
     return texto.strip(), grafico_base64
 
 
-def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo, field_conf):
+def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo=None), field_conf=None):
     grupos = []
     variancias = {}
 
@@ -1176,7 +1175,7 @@ def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo, field_conf
     return texto.strip(), grafico_base64
 
 
-def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_conf):
+def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_conf=None):
     if not coluna_y:
         return "❌ O intervalo de confiança da variância requer exatamente 1 coluna Y.", None
 
@@ -1258,7 +1257,7 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
 
     return texto.strip(), grafico_base64
 
-def analise_1_proporcao(df: pd.DataFrame, coluna_y, field_conf):
+def analise_1_proporcao(df: pd.DataFrame, coluna_y, field_conf=None):
     if not coluna_y:
         return "❌ O teste 1 Proporção requer exatamente 1 coluna Y.", None
 
@@ -1329,7 +1328,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_y, field_conf):
     return texto.strip(), grafico_base64
 
     
-def analise_2_proporcoes(df: pd.DataFrame, lista_y, field_conf):
+def analise_2_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
     if len(lista_y) != 2:
         return "❌ O teste 2 Proporções requer exatamente 2 colunas Y.", None
 
@@ -1403,7 +1402,7 @@ def analise_2_proporcoes(df: pd.DataFrame, lista_y, field_conf):
 
     return texto.strip(), grafico_base64
 
-def analise_k_proporcoes(df: pd.DataFrame, lista_y, field_conf):
+def analise_k_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
     if len(lista_y) < 2:
         return "❌ O teste K Proporções requer pelo menos 2 colunas Y (grupos).", None
 
