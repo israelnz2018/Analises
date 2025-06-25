@@ -470,7 +470,6 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         if col not in df.columns:
             return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    # ✅ Conversão segura de Y para categórico ordenado
     if df[coluna_y].dtype == 'object' or str(df[coluna_y].dtype).startswith("category"):
         categorias_unicas = sorted(df[coluna_y].dropna().unique())
         df[coluna_y] = pd.Categorical(df[coluna_y], categories=categorias_unicas, ordered=True)
@@ -502,8 +501,8 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 
     vif = []
     if X_final.shape[1] > 1:
-        X_sm = sm.add_constant(X_final)
-        for i in range(1, X_sm.shape[1]):
+        X_sm = X_final.copy()
+        for i in range(X_sm.shape[1]):
             vif.append(variance_inflation_factor(X_sm.values, i))
     else:
         vif.append(1.0)
@@ -534,8 +533,19 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     linhas = []
+    melhores_var = None
+    menor_pval = 1.0
+
     for name, coef, pval in zip(res.model.exog_names, res.params, res.pvalues):
         linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
+        if name in x_cols_final and pval < menor_pval:
+            menor_pval = pval
+            melhores_var = name
+
+    sugestao = ""
+    if melhores_var:
+        sugestao = f"\n📌 A variável **{melhores_var}** apresentou maior significância (p-valor = {menor_pval:.4f}) e pode ser a melhor explicação individual da variável Y."
+
     linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
     linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
@@ -554,12 +564,14 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     texto = f"""
 **Regressão Logística Ordinal**
 {chr(10).join(linhas)}
+{sugestao}
 
 **Conclusão**
 {chr(10).join(conclusao)}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
