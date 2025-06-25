@@ -981,7 +981,7 @@ def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
 
 
 
-def analise_2_variancas_brown_forsythe(df: pd.DataFrame, lista_y, field_conf=None):
+def analise_2_variancas_brown_forsythe(df: pd.DataFrame, lista_y, field_conf=None): 
     if len(lista_y) != 2:
         return "❌ O teste 2 Variâncias Brown-Forsythe requer exatamente 2 colunas Y.", None
 
