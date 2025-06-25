@@ -490,7 +490,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         df[coluna_y] = pd.Categorical(df[coluna_y], categories=categorias_unicas, ordered=True)
 
         y = df[coluna_y]
-        X = sm.add_constant(df[lista_x])
+        X = df[lista_x]  # NÃO adicionar constante para OrderedModel
 
         model = OrderedModel(y, X, distr='logit')
         result = model.fit(method='bfgs', disp=False)
