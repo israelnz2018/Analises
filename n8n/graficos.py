@@ -540,7 +540,7 @@ import numpy as np
 import base64
 from io import BytesIO
 
-def grafico_dispersao_3d_com_regressao(df, col_x, col_y, col_z):
+def gerar_dispersao_3d_com_regressao(df, col_x, col_y, col_z):
     # Dados
     X = df[[col_x, col_y]].values
     y = df[col_z].values
@@ -591,8 +591,11 @@ GRAFICOS = {
     "Tendência": gerar_tendencia,
     "Bolhas - 3D": gerar_bolhas_3d,
     "Superfície - 3D": gerar_superficie_3d,
-    "Dispersão 3D com Regressão": grafico_dispersao_3d_com_regressao,
-
+    "Dispersão 3D com Regressão": gerar_dispersao_3d_regressao
     
+}
+
+
+
 
 }
