@@ -68,6 +68,7 @@ CONFIG_ANALISES = {
     "Tendência": ["df", "coluna_y", "Data", "subgrupo"],
     "Bolhas - 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
     "Superfície - 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
+    "Dispersão 3D com Regressão": ["df", "coluna_y", "coluna_x", "coluna_z"],
     "1 Sample T": ["df", "coluna_y", "field", "field_conf"],
     "2 Sample T": ["df", "lista_y", "field_conf"],
     "2 Paired Test": ["df", "lista_y", "field_conf"],
