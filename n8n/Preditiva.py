@@ -461,7 +461,6 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     return texto.strip(), grafico_base64
 
 
-
 def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística ordinal requer 1 Y e pelo menos 1 X.", None
@@ -482,6 +481,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 
     Y = df_valid[coluna_y]
     X_final = df_valid[lista_x]
+    X_final.columns = [str(c) for c in X_final.columns]  # ✅ evita MultiIndex
     x_cols_final = X_final.columns.tolist()
 
     import statsmodels.api as sm
@@ -499,11 +499,12 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     ll_model = res.llf
     r2_mcf = 1 - ll_model / ll_null
 
+    # ✅ Cálculo de VIF com constante, sem alterar X_final
     vif = []
     if X_final.shape[1] > 1:
-        X_sm = X_final.copy()
-        for i in range(X_sm.shape[1]):
-            vif.append(variance_inflation_factor(X_sm.values, i))
+        X_vif = sm.add_constant(X_final.copy())
+        for i in range(1, X_vif.shape[1]):
+            vif.append(variance_inflation_factor(X_vif.values, i))
     else:
         vif.append(1.0)
 
@@ -571,6 +572,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
