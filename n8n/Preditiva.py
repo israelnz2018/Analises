@@ -206,7 +206,6 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
 
 
 
-
 def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão linear múltipla requer 1 Y e pelo menos 1 X.", None
@@ -220,8 +219,6 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y].values
-
-    # Trata X misto: numéricos ficam como estão, categóricos viram dummies
     X_final = pd.get_dummies(df_valid[lista_x], drop_first=True)
     x_cols_final = X_final.columns.tolist()
     X_values = X_final.values
@@ -265,11 +262,11 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         resid = Y - Y_pred
         mse_full = np.sum((Y - LinearRegression().fit(X_values, Y).predict(X_values)) ** 2) / (n - p_full - 1)
         cp = (np.sum(resid ** 2) / mse_full) - (n - 2 * (X_sub.shape[1] + 1))
-
         dw = sm.stats.stattools.durbin_watson(resid)
 
         return {
             "cols": cols_sub,
+            "model": model,
             "r2": r2,
             "r2_adj": r2_adj,
             "r2_pred": r2_pred,
@@ -310,16 +307,11 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    linhas = [
-        f"Modelo recomendado: {', '.join(modelo_recomendado['cols'])}",
-        f"R²: {modelo_recomendado['r2']:.4f}",
-        f"R² ajustado: {modelo_recomendado['r2_adj']:.4f}",
-        f"R² preditivo: {modelo_recomendado['r2_pred']:.4f}",
-        f"Mallows Cp: {modelo_recomendado['cp']:.4f}",
-        f"Durbin-Watson: {modelo_recomendado['dw']:.4f}",
-        "VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(modelo_recomendado['cols'], modelo_recomendado['vif'])])
-    ]
+    # Equação
+    coef_str = " + ".join([f"{coef:.2f}·{col}" for coef, col in zip(modelo_recomendado["model"].coef_, modelo_recomendado["cols"])])
+    equacao = f"Y = {modelo_recomendado['model'].intercept_:.2f} + {coef_str}"
 
+    # Diagnóstico
     conclusao = []
     if modelo_recomendado['r2_pred'] > 0.5:
         conclusao.append("✅ R² preditivo adequado.")
@@ -328,17 +320,34 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     if all(v < 10 for v in modelo_recomendado['vif']):
         conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
     else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
+        conclusao.append("⚠ Multicolinearidade identificada (VIF ≥ 10).")
+    if abs(modelo_recomendado["cp"] - (len(modelo_recomendado["cols"]) + 1)) < 2:
+        conclusao.append("✅ Cp dentro do esperado.")
+    else:
+        conclusao.append("⚠ Cp elevado, modelo pode estar superajustado.")
+    if 1.5 < modelo_recomendado["dw"] < 2.5:
+        conclusao.append("✅ Sem autocorrelação nos resíduos (DW adequado).")
+    else:
+        conclusao.append("⚠ Autocorrelação identificada nos resíduos (DW fora do ideal).")
 
     texto = f"""
 **Regressão Linear Múltipla**
-{chr(10).join(linhas)}
 
-**Conclusão**
+📌 Modelo recomendado: {', '.join(modelo_recomendado['cols'])}  
+📈 Equação: {equacao}  
+R²: {modelo_recomendado['r2']:.4f}  
+R² ajustado: {modelo_recomendado['r2_adj']:.4f}  
+R² preditivo: {modelo_recomendado['r2_pred']:.4f}  
+Mallows Cp: {modelo_recomendado['cp']:.4f}  
+Durbin-Watson: {modelo_recomendado['dw']:.4f}  
+VIFs: {', '.join([f"{c}={v:.2f}" for c, v in zip(modelo_recomendado['cols'], modelo_recomendado['vif'])])}
+
+**Conclusão**  
 {chr(10).join(conclusao)}
-"""
+""".strip()
 
-    return texto.strip(), grafico_base64
+    return texto, grafico_base64
+
 
 
 
