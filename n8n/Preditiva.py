@@ -460,7 +460,7 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 
     return texto.strip(), grafico_base64
 
- import pandas as pd
+    import pandas as pd
     import statsmodels.api as sm
     from statsmodels.miscmodels.ordinal_model import OrderedModel
     from statsmodels.stats.outliers_influence import variance_inflation_factor
