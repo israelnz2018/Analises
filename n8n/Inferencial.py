@@ -255,7 +255,7 @@ def analise_paired_t(df: pd.DataFrame, lista_y: list, field_conf=None):
 
 
 
-def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None), field_conf=None):
+def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
     ys = [c for c in lista_y if c not in ["", "Subgrupo"]]
     x = subgrupo if subgrupo and subgrupo in df.columns else None
 
