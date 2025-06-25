@@ -832,14 +832,14 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-📈 **Modelo ARIMA**
+    **Modelo ARIMA**
 
-🔹 **Configuração do modelo**: ARIMA{ordem}  
-🔹 **Qualidade do ajuste**:
+   **Configuração do modelo**: ARIMA{ordem}  
+   **Qualidade do ajuste**:
 - AIC: {aic:.2f}
 - BIC: {bic:.2f}
 
-🔹 **Previsão para os próximos {horizonte} períodos**:
+   **Previsão para os próximos {horizonte} períodos**:
 {', '.join([f"{p:.2f}" for p in previsao])}
 
 ---
