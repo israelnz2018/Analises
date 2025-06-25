@@ -1112,7 +1112,7 @@ def analise_bartlett(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=
     return texto.strip(), grafico_base64
 
 
-def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo=None), field_conf=None):
+def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
     grupos = []
     variancias = {}
 
