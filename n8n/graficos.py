@@ -540,18 +540,25 @@ import numpy as np
 import base64
 from io import BytesIO
 
-def gerar_dispersao_3d_com_regressao(df, col_x, col_y, col_z):
+def gerar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z):
+    from sklearn.linear_model import LinearRegression
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    from io import BytesIO
+    import base64
+
     # Dados
-    X = df[[col_x, col_y]].values
-    y = df[col_z].values
+    X = df[[coluna_x, coluna_y]].values
+    y = df[coluna_z].values
 
     # Regressão
     model = LinearRegression()
     model.fit(X, y)
 
     # Grade para superfície
-    x_range = np.linspace(df[col_x].min(), df[col_x].max(), 20)
-    y_range = np.linspace(df[col_y].min(), df[col_y].max(), 20)
+    x_range = np.linspace(df[coluna_x].min(), df[coluna_x].max(), 20)
+    y_range = np.linspace(df[coluna_y].min(), df[coluna_y].max(), 20)
     x_grid, y_grid = np.meshgrid(x_range, y_range)
     z_pred = model.predict(np.c_[x_grid.ravel(), y_grid.ravel()]).reshape(x_grid.shape)
 
@@ -560,15 +567,15 @@ def gerar_dispersao_3d_com_regressao(df, col_x, col_y, col_z):
     ax = fig.add_subplot(111, projection='3d')
 
     # Dispersão real
-    ax.scatter(df[col_x], df[col_y], df[col_z], color='b', label='Pontos reais')
+    ax.scatter(df[coluna_x], df[coluna_y], df[coluna_z], color='b', label='Pontos reais')
 
     # Plano de regressão
-    ax.plot_surface(x_grid, y_grid, z_pred, alpha=0.5, color='red', label='Plano de regressão')
+    ax.plot_surface(x_grid, y_grid, z_pred, alpha=0.5, color='red')
 
-    ax.set_xlabel(col_x)
-    ax.set_ylabel(col_y)
-    ax.set_zlabel(col_z)
-    ax.set_title(f'Dispersão 3D com Regressão - {col_z} ~ {col_x} + {col_y}')
+    ax.set_xlabel(coluna_x)
+    ax.set_ylabel(coluna_y)
+    ax.set_zlabel(coluna_z)
+    ax.set_title(f'Dispersão 3D com Regressão - {coluna_z} ~ {coluna_x} + {coluna_y}')
     plt.tight_layout()
 
     # Exporta imagem
@@ -579,6 +586,7 @@ def gerar_dispersao_3d_com_regressao(df, col_x, col_y, col_z):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
+
 
 
 GRAFICOS = {
