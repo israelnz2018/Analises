@@ -319,12 +319,11 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo, field_LIE, field_LSE):
 
 
 
-
-def analise_capabilidade_outros(df, coluna_y, subgrupo, field_distribuicao, field_LIE, field_LSE):
+def analise_capabilidade_outros(df, coluna_y, subgrupo, field_dist, field_LIE, field_LSE):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
 
-    if not field_distribuicao:
+    if not field_dist:
         return "❌ É necessário informar a distribuição escolhida.", None
 
     if not field_LIE and not field_LSE:
@@ -340,7 +339,7 @@ def analise_capabilidade_outros(df, coluna_y, subgrupo, field_distribuicao, fiel
     except:
         USL = float('inf')
 
-    dist_nome = field_distribuicao.strip()
+    dist_nome = field_dist.strip()
     dados = df[coluna_y].dropna()
     if len(dados) < 30:
         return "⚠ Recomenda-se pelo menos 30 dados para capabilidade.", None
@@ -357,7 +356,12 @@ def analise_capabilidade_outros(df, coluna_y, subgrupo, field_distribuicao, fiel
         "Exponencial": stats.expon,
         "Weibull": stats.weibull_min,
         "Gamma": stats.gamma,
-        "Loglogística": stats.fisk
+        "Beta": stats.beta,
+        "Gumbel": stats.gumbel_r,
+        "Loglogística": stats.fisk,
+        "Uniforme": stats.uniform,
+        "Triangular": stats.triang,
+        "Johnson SU": stats.johnsonsu
     }
 
     if dist_nome not in distros:
@@ -423,6 +427,7 @@ def analise_capabilidade_outros(df, coluna_y, subgrupo, field_distribuicao, fiel
 """
 
     return texto.strip(), grafico_base64
+
 
 def analise_capabilidade_transformado(df, coluna_y, subgrupo, field_LIE, field_LSE):
     if not coluna_y or coluna_y not in df.columns:
