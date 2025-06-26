@@ -100,7 +100,7 @@ CONFIG_ANALISES = {
     "Holt-Winters": ["df", "coluna_y", "field"],
     "Carta I-MR": ["df", "coluna_y"],
     "Carta X-BarraR": ["df", "coluna_y", "subgrupo"],
-    "Carta X-BarraS": ["df", "coluna_y", "subgrupo"],
+    "Carta X-BarraS": ["df", "coluna_y", "subgrupo"], 
     "Carta P": ["df", "coluna_y", "subgrupo"],
     "Carta NP": ["df", "coluna_y", "subgrupo"],
     "Carta C": ["df", "coluna_y"],
