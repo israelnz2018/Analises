@@ -108,7 +108,7 @@ CONFIG_ANALISES = {
     "Teste de normalidade": ["df", "coluna_y"],
     "Análise de distribuição estatística": ["df", "coluna_y"],
     "Capabilidade - dados normais": ["df", "coluna_y", "subgrupo", "field_LIE", "field_LSE"],
-    "Capabilidade - outras distribuições": ["df", "coluna_y", "subgrupo", "field_distribuicao", "field_LIE", "field_LSE"],
+    "Capabilidade - outras distribuições": ["df", "coluna_y", "subgrupo", "field_dist", "field_LIE", "field_LSE"],
     "Capabilidade - com dados transformados": ["df", "coluna_y", "subgrupo", "field_LIE", "field_LSE"],
     "Capabilidade - com dados discretizados": ["df", "coluna_y", "field_LIE", "field_LSE"],
     "Cálculo de Probabilidade": ["df", "coluna_y", "field"]
@@ -132,6 +132,7 @@ DICIONARIO_TERMOS = {
 }
 
 
+
 @app.post("/analise")
 async def analisar(
     request: Request,
@@ -145,7 +146,7 @@ async def analisar(
     subgrupo: str = Form(None),
     field: str = Form(None),
     field_conf: str = Form(None),
-    field_distribuicao: str = Form(None),
+    field_dist: str = Form(None),
     field_LSE: str = Form(None),
     field_LIE: str = Form(None),
     Data: str = Form(None)
@@ -183,7 +184,7 @@ async def analisar(
         print("🔍 Subgrupo:", subgrupo_val)
         print("🔍 Field:", field)
         print("🔍 Field_conf:", field_conf)
-        print("🔍 Field distribuição:", field_distribuicao)
+        print("🔍 Field_dist:", field_dist)
 
         resultado_texto = ""
         imagem_analise_base64 = None
@@ -206,7 +207,7 @@ async def analisar(
                 "subgrupo": subgrupo_val,
                 "field": field,
                 "field_conf": field_conf,
-                "field_dist": field_distribuicao,
+                "field_dist": field_dist,
                 "field_LSE": field_LSE,
                 "field_LIE": field_LIE
             }
@@ -232,7 +233,7 @@ async def analisar(
                 "subgrupo": subgrupo_val,
                 "field": field,
                 "field_conf": field_conf,
-                "field_dist": field_distribuicao,
+                "field_dist": field_dist,
                 "field_LSE": field_LSE,
                 "field_LIE": field_LIE
             }
@@ -257,5 +258,3 @@ async def analisar(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
-
-
