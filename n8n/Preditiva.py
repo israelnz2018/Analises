@@ -734,6 +734,7 @@ Abaixo estão as condições que o modelo usou para chegar em cada decisão:
 
 
     return texto.strip(), grafico_base64
+
 import pandas as pd
 
 def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
@@ -782,18 +783,16 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    texto = f"""Random Forest - Resultado
-
-Desempenho do modelo:
-{score_txt}
-
-Número de árvores usadas: 100
-
-Importância das variáveis:
-{importancia_str}
-"""
+    texto = (
+        "Random Forest - Resultado\n\n"
+        f"Desempenho do modelo:\n{score_txt}\n\n"
+        "Número de árvores usadas: 100\n\n"
+        "Importância das variáveis:\n"
+        f"{importancia_str}"
+    )
 
     return texto.strip(), grafico_base64
+
 
 
 
