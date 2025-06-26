@@ -796,6 +796,7 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
 
 
 
+
 import pandas as pd
 
 def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
