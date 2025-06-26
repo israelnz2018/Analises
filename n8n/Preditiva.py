@@ -721,14 +721,17 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+
+
     texto = (
-        "Análise com Árvore de Decisão\n\n"
-        f"Desempenho do modelo:\n{score_txt}\n\n"
-        f"Estrutura da árvore:\n"
-        f"- Número de folhas: {model.get_n_leaves()}\n"
+        f"📊 **Análise com Árvore de Decisão**\n\n"
+        f"🔹 **Desempenho do modelo**:\n{score_txt}\n\n"
+        f"🔹 **Estrutura da árvore**:\n"
+        f"- Número de decisões finais (folhas): {model.get_n_leaves()}\n"
         f"- Profundidade da árvore: {model.get_depth()} níveis\n\n"
-        f"Importância das variáveis:\n{importancias}\n\n"
-        "Regras aprendidas pelo modelo:\n"
+        f"🔹 **Importância das variáveis utilizadas**:\n"
+        f"{importancias}\n\n"
+        f"📘 **Regras aprendidas pelo modelo**\n"
         f"{regras}"
     )
 
