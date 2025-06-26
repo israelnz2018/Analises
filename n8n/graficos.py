@@ -17,7 +17,7 @@ def salvar_grafico():
     with open(caminho, "rb") as f:
         img_base64 = base64.b64encode(f.read()).decode("utf-8")
     os.remove(caminho)
-    return img_base64
+    return img_base64 
 
 
 
