@@ -797,8 +797,6 @@ Importância das variáveis:
 
 
 
-
-
 import pandas as pd
 
 def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
@@ -840,22 +838,22 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    texto = f"""
-Modelo ARIMA
+    previsao_texto = ", ".join([f"{p:.2f}" for p in previsao])
 
-Configuração do modelo: ARIMA{ordem}  
-Qualidade do ajuste:
-- AIC: {aic:.2f}
-- BIC: {bic:.2f}
-
-Previsão para os próximos {horizonte} períodos:
-{', '.join([f"{p:.2f}" for p in previsao])}
-
-O modelo foi ajustado automaticamente.
-Use o gráfico para avaliar a tendência e decidir se precisa refinar manualmente.
-"""
+    texto = (
+        f"Modelo ARIMA\n\n"
+        f"Configuração do modelo: ARIMA{ordem}\n"
+        f"Qualidade do ajuste:\n"
+        f"- AIC: {aic:.2f}\n"
+        f"- BIC: {bic:.2f}\n\n"
+        f"Previsão para os próximos {horizonte} períodos:\n"
+        f"{previsao_texto}\n\n"
+        f"O modelo foi ajustado automaticamente. "
+        f"Use o gráfico para avaliar a tendência e decidir se precisa refinar manualmente."
+    )
 
     return texto.strip(), grafico_base64
+
 
 
 
