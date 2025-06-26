@@ -857,7 +857,6 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
 
 
 
-
 import pandas as pd
 
 def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
@@ -899,25 +898,22 @@ def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-    texto = f"""
-Holt-Winters (Suavização Exponencial)
+    previsao_texto = ", ".join([f"{p:.2f}" for p in previsao])
 
-Tendência: aditiva (com amortecimento)  
-Sazonalidade: não aplicada  
-
-Previsão para os próximos {horizonte} períodos:  
-{', '.join([f"{p:.2f}" for p in previsao])}
-
-Conclusão:  
-Modelo ajustado automaticamente. Simples e robusto para séries com tendência.  
-Use o gráfico para avaliar se ajustes adicionais são necessários (ex: sazonalidade).
-"""
+    texto = (
+        "Holt-Winters (Suavização Exponencial)\n\n"
+        "Tendência: aditiva (com amortecimento)\n"
+        "Sazonalidade: não aplicada\n\n"
+        f"Previsão para os próximos {horizonte} períodos:\n{previsao_texto}\n\n"
+        "Conclusão:\n"
+        "Modelo ajustado automaticamente. Simples e robusto para séries com tendência.\n"
+        "Use o gráfico para avaliar se ajustes adicionais são necessários (ex: sazonalidade)."
+    )
 
     return texto.strip(), grafico_base64
 
 
-
-
+# Dicionário de análises
 ANALISES = {
     "Tipo de modelo de regressão": analise_tipo_modelo_regressao,
     "Regressão linear simples": analise_regressao_linear_simples,
@@ -929,5 +925,4 @@ ANALISES = {
     "Random Forest": analise_random_forest,
     "ARIMA": analise_arima,
     "Holt-Winters": analise_holt_winters
-   
 }
