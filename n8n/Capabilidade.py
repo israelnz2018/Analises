@@ -193,8 +193,7 @@ def analise_distribuicao_estatistica(df, coluna_y):
 
     return texto.strip(), grafico_base64
 
-
-def analise_capabilidade_normal(df, coluna_y, subgrupo, field_LIE, field_LSE):
+def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
 
@@ -340,10 +339,6 @@ def analise_capabilidade_outros(df, coluna_y, subgrupo, field_dist, field_LIE, f
         USL = float('inf')
 
     dist_nome = field_dist.strip()
-    dados = df[coluna_y].dropna()
-    if len(dados) < 30:
-        return "⚠ Recomenda-se pelo menos 30 dados para capabilidade.", None
-
     from scipy import stats
     import numpy as np
     import matplotlib.pyplot as plt
@@ -369,64 +364,96 @@ def analise_capabilidade_outros(df, coluna_y, subgrupo, field_dist, field_LIE, f
 
     dist = distros[dist_nome]
 
-    try:
-        params = dist.fit(dados)
-    except Exception as e:
-        return f"❌ Erro ao ajustar a distribuição: {str(e)}", None
+    texto_final = f"**Capabilidade - outras distribuições**\n- Distribuição escolhida: {dist_nome}\n\n"
+    imagens = []
 
-    ks_stat, ks_p = stats.kstest(dados, dist.cdf, args=params)
-
-    ppm_lsl = 1e6 * dist.cdf(LSL, *params)
-    ppm_usl = 1e6 * (1 - dist.cdf(USL, *params))
-    ppm_total = ppm_lsl + ppm_usl
-
-    z_bench = min(
-        (dist.ppf(0.99865, *params) - LSL) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params)),
-        (USL - dist.ppf(0.00135, *params)) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params))
-    ) * 6
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
-    x = np.linspace(min(dados), max(dados), 100)
-    y = dist.pdf(x, *params)
-    ax.plot(x, y, 'b-', label=f'Curva {dist_nome}')
-    if LSL != float('-inf'):
-        ax.axvline(LSL, color='red', linestyle='--', label='LIE')
-    if USL != float('inf'):
-        ax.axvline(USL, color='red', linestyle='--', label='LSE')
-    ax.axvline(np.mean(dados), color='green', linestyle='--', label='Média')
-    ax.set_title(f'Capabilidade - {dist_nome}')
-    ax.legend()
-    plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-    alerta = ""
-    if ks_p < 0.05:
-        alerta = f"⚠ A distribuição {dist_nome} não se ajusta bem aos dados (p-valor={ks_p:.4f}). Não recomendado para capabilidade."
+    if subgrupo and subgrupo in df.columns:
+        grupos = df[subgrupo].dropna().unique()
     else:
-        alerta = f"✅ A distribuição {dist_nome} apresentou bom ajuste (p-valor={ks_p:.4f})."
+        grupos = [None]
 
-    texto = f"""
-**Capabilidade - outras distribuições**
-- Distribuição escolhida: {dist_nome}
+    for grupo in grupos:
+        if grupo is None:
+            dados = df[coluna_y].dropna()
+            grupo_nome = "Geral"
+        else:
+            dados = df[df[subgrupo] == grupo][coluna_y].dropna()
+            grupo_nome = f"Subgrupo: {grupo}"
+
+        if len(dados) < 30:
+            texto_final += f"\n🔸 **{grupo_nome}**: mínimo de 30 dados recomendado.\n"
+            continue
+
+        try:
+            params = dist.fit(dados)
+            ks_stat, ks_p = stats.kstest(dados, dist.cdf, args=params)
+            ppm_lsl = 1e6 * dist.cdf(LSL, *params)
+            ppm_usl = 1e6 * (1 - dist.cdf(USL, *params))
+            ppm_total = ppm_lsl + ppm_usl
+            z_bench = min(
+                (dist.ppf(0.99865, *params) - LSL) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params)),
+                (USL - dist.ppf(0.00135, *params)) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params))
+            ) * 6
+
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
+            x = np.linspace(min(dados), max(dados), 100)
+            y = dist.pdf(x, *params)
+            ax.plot(x, y, 'b-', label=f'Curva {dist_nome}')
+            if LSL != float('-inf'):
+                ax.axvline(LSL, color='red', linestyle='--', label='LIE')
+            if USL != float('inf'):
+                ax.axvline(USL, color='red', linestyle='--', label='LSE')
+            ax.axvline(np.mean(dados), color='green', linestyle='--', label='Média')
+            ax.set_title(f'{grupo_nome} - {dist_nome}')
+            ax.legend()
+            plt.tight_layout()
+            buf = BytesIO()
+            plt.savefig(buf, format='png')
+            plt.close(fig)
+            imagens.append(base64.b64encode(buf.getvalue()).decode('utf-8'))
+
+            alerta = (
+                f"⚠ A distribuição não se ajusta bem (p-valor={ks_p:.4f})."
+                if ks_p < 0.05 else
+                f"✅ Bom ajuste aos dados (p-valor={ks_p:.4f})."
+            )
+
+            texto_final += f"""
+🔹 **{grupo_nome}**
 - Parâmetros estimados: {', '.join([f'{p:.4f}' for p in params])}
 - Kolmogorov-Smirnov p-valor: {ks_p:.4f}
-
-**Resultados**
 - PPM < LIE: {ppm_lsl:.2f}
 - PPM > LSE: {ppm_usl:.2f}
 - PPM Total: {ppm_total:.2f}
 - Nível sigma estimado (Z.bench): {z_bench:.2f}
+- {alerta}\n"""
+        except Exception as e:
+            texto_final += f"\n❌ Erro no grupo {grupo_nome}: {str(e)}\n"
 
-**Conclusão**
-{alerta}
-"""
+    if not imagens:
+        return texto_final.strip(), None
+    else:
+        # Junta os gráficos verticalmente
+        from PIL import Image
+        from io import BytesIO
 
-    return texto.strip(), grafico_base64
+        imgs = [Image.open(BytesIO(base64.b64decode(img))) for img in imagens]
+        largura_max = max(img.width for img in imgs)
+        altura_total = sum(img.height for img in imgs)
+        imagem_final = Image.new("RGB", (largura_max, altura_total), (255, 255, 255))
+
+        y_offset = 0
+        for img in imgs:
+            imagem_final.paste(img, (0, y_offset))
+            y_offset += img.height
+
+        buffer = BytesIO()
+        imagem_final.save(buffer, format="PNG")
+        grafico_final_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+        return texto_final.strip(), grafico_final_base64
+
 
 
 def analise_capabilidade_transformado(df, coluna_y, subgrupo, field_LIE, field_LSE):
