@@ -669,14 +669,16 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 
 
 
+import pandas as pd
+
 def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
-        return "❌ A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
+        return "A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
 
     cols = [coluna_y] + lista_x
     df_valid = df[cols].dropna()
     if len(df_valid) < len(lista_x) + 5:
-        return "❌ O modelo requer mais dados válidos.", None
+        return "O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
     X = df_valid[lista_x]
@@ -698,42 +700,40 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         model.fit(X, Y)
         Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
-        score_txt = f"Percentual de acerto: {acc*100:.2f}%"
+        score_txt = f"Percentual de acerto: {acc * 100:.2f}%"
 
-    importancias = ", ".join([f"{c}={v*100:.2f}%" for c, v in zip(lista_x, model.feature_importances_)])
+    importancias = ", ".join([f"{c} = {v * 100:.2f}%" for c, v in zip(lista_x, model.feature_importances_)])
     regras = export_text(model, feature_names=lista_x)
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    plot_tree(model, feature_names=lista_x,
-              class_names=[str(c) for c in Y.unique()] if not pd.api.types.is_numeric_dtype(Y) else None,
-              filled=True, rounded=True, fontsize=8, ax=ax)
+    plot_tree(
+        model,
+        feature_names=lista_x,
+        class_names=[str(c) for c in Y.unique()] if not pd.api.types.is_numeric_dtype(Y) else None,
+        filled=True,
+        rounded=True,
+        fontsize=8,
+        ax=ax
+    )
     plt.tight_layout()
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    texto = f"""
-📊 **Análise com Árvore de Decisão**
-
-🔹 **Desempenho do modelo**:  
-{score_txt}
-
-🔹 **Estrutura da árvore**:  
-- Número de decisões finais (folhas): {model.get_n_leaves()}
-- Profundidade da árvore: {model.get_depth()} níveis
-
-🔹 **Importância das variáveis utilizadas**:  
-{importancias}
-
----
-
-📘 **Regras aprendidas pelo modelo**  
-Abaixo estão as condições que o modelo usou para chegar em cada decisão:
-
-
+    texto = (
+        "Análise com Árvore de Decisão\n\n"
+        f"Desempenho do modelo:\n{score_txt}\n\n"
+        f"Estrutura da árvore:\n"
+        f"- Número de folhas: {model.get_n_leaves()}\n"
+        f"- Profundidade da árvore: {model.get_depth()} níveis\n\n"
+        f"Importância das variáveis:\n{importancias}\n\n"
+        "Regras aprendidas pelo modelo:\n"
+        f"{regras}"
+    )
 
     return texto.strip(), grafico_base64
+
 
 import pandas as pd
 
