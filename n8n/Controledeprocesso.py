@@ -415,12 +415,14 @@ def analise_carta_np(df, coluna_y, subgrupo):
     from io import BytesIO
     import base64
 
-    grupos = dados.groupby(subgrupo)[coluna_y]
-    nc = grupos.sum()
-    n_subgrupos = grupos.count()
+    nc = dados[coluna_y]
+    n = dados[subgrupo]
 
-    if n_subgrupos.nunique() != 1:
+    if n.nunique() != 1:
         return "❌ A Carta NP requer subgrupos com mesmo tamanho. Use Carta P para tamanhos variáveis.", None
+
+    n = n.iloc[0]
+
 
     n = n_subgrupos.iloc[0]
     p_barra = nc.sum() / (n * len(nc))
