@@ -302,3 +302,73 @@ async def atualizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
+@app.post("/personalizar-grafico")
+async def personalizar_grafico(
+    request: Request,
+    arquivo: UploadFile = File(None),
+    aba: str = Form(None),
+    grafico: str = Form(None),
+    coluna_y: str = Form(None),
+    coluna_x: str = Form(None),
+    coluna_z: str = Form(None),
+    subgrupo: str = Form(None),
+    field: str = Form(None),
+    field_conf: str = Form(None),
+    field_dist: str = Form(None),
+    field_LSE: str = Form(None),
+    field_LIE: str = Form(None),
+    Data: str = Form(None),
+    cor: str = Form(None),
+    titulo_x: str = Form(None),
+    titulo_y: str = Form(None),
+    tamanho_fonte: str = Form(None),
+    inclinacao_x: str = Form(None),
+    inclinacao_y: str = Form(None)
+):
+    try:
+        if not arquivo:
+            return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
+
+        df = await ler_arquivo(arquivo, aba)
+        if df is None or df.empty:
+            return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
+
+        # 🔧 Aqui chamamos a função do gráfico passando as personalizações
+        funcao_grafico = GRAFICOS.get(grafico.strip())
+        if not funcao_grafico:
+            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
+
+        # Personalizações como parâmetros extras
+        imagem_grafico_isolado_base64 = funcao_grafico(
+            df,
+            coluna_y,
+            coluna_x,
+            coluna_z,
+            subgrupo,
+            field,
+            field_conf,
+            field_dist,
+            field_LSE,
+            field_LIE,
+            Data,
+            cor=cor,
+            titulo_x=titulo_x,
+            titulo_y=titulo_y,
+            tamanho_fonte=tamanho_fonte,
+            inclinacao_x=inclinacao_x,
+            inclinacao_y=inclinacao_y
+        )
+
+        return {
+            "grafico_isolado_base64": imagem_grafico_isolado_base64
+        }
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao personalizar gráfico.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
