@@ -384,8 +384,8 @@ def analise_carta_p(df, coluna_y, subgrupo):
 
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(p.index, p.values, marker='o', label='Proporção')
-    ax.hlines(LSC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LSC')
-    ax.hlines(LIC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LIC')
+    ax.plot(p.index, LSC, 'r--', label='LSC')
+    ax.plot(p.index, LIC, 'r--', label='LIC')
 
     ax.axhline(p_barra, color='black', linestyle='-', label='Média (p̄)')
     ax.set_title("Carta P")
