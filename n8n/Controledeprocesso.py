@@ -663,8 +663,8 @@ def analise_carta_u(df, coluna_y, subgrupo):
 
 ANALISES = {
     "Carta I-MR": analise_carta_imr,
-    "Carta X-Barra R": analise_carta_xbarra_r, 
-    "Carta X-Barra S": analise_carta_xbarra_s, 
+    "Carta X-BarraR": analise_carta_xbarra_r, 
+    "Carta X-BarraS": analise_carta_xbarra_s, 
     "Carta P": analise_carta_p,
     "Carta NP": analise_carta_np,
     "Carta C": analise_carta_c,
