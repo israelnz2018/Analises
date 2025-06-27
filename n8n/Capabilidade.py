@@ -210,6 +210,9 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
     except:
         USL = float('inf')
 
+    if LSL > USL:
+        LSL, USL = USL, LSL
+
     dados = df[coluna_y].dropna()
     if len(dados) < 30:
         return "⚠ Recomenda-se pelo menos 30 dados para análise de capabilidade.", None
@@ -229,18 +232,17 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
     sw_normal = sw_p > 0.05
     ks_normal = ks_p > 0.05
 
-    if not (ad_normal or sw_normal or ks_normal):
+    dados_normais = ad_normal or sw_normal or ks_normal
+
+    if not dados_normais:
         texto = f"""
-**Capabilidade - dados normais**
-⚠ Nenhum teste indicou normalidade. Recomenda-se realizar análise de distribuição estatística e usar capabilidade para dados não normais.
-- Anderson-Darling: estat={ad_res.statistic:.4f}
-- Shapiro-Wilk: p-valor={sw_p:.4f}
-- Kolmogorov-Smirnov: p-valor={ks_p:.4f}
+⚠ Os dados **não são normais** com base nos testes Anderson-Darling, Shapiro-Wilk e Kolmogorov-Smirnov.
+Recomenda-se realizar a análise de capabilidade para dados **não normais**.
 """
         return texto.strip(), None
 
     mean = np.mean(dados)
-    std_overall = np.std(dados, ddof=0)
+    std_overall = np.std(dados, ddof=1)
 
     if subgrupo and subgrupo in df.columns:
         grupos = df[[coluna_y, subgrupo]].dropna().groupby(subgrupo)[coluna_y]
@@ -253,23 +255,23 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
     Pp = (USL - LSL) / (6 * std_overall)
     Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
 
-    z_bench_within = min((USL - mean) / std_within, (mean - LSL) / std_within)
-    z_bench_overall = min((USL - mean) / std_overall, (mean - LSL) / std_overall)
+    nivel_sigma_within = min((USL - mean), (mean - LSL)) / std_within
+    nivel_sigma_overall = min((USL - mean), (mean - LSL)) / std_overall
 
-    ppm_within_lsl = 1e6 * stats.norm.cdf(LSL, loc=mean, scale=std_within)
-    ppm_within_usl = 1e6 * (1 - stats.norm.cdf(USL, loc=mean, scale=std_within))
-    ppm_within_total = ppm_within_lsl + ppm_within_usl
+    ppm_within_total = 1e6 * (stats.norm.cdf(LSL, loc=mean, scale=std_within) +
+                              (1 - stats.norm.cdf(USL, loc=mean, scale=std_within)))
+    ppm_overall_total = 1e6 * (stats.norm.cdf(LSL, loc=mean, scale=std_overall) +
+                               (1 - stats.norm.cdf(USL, loc=mean, scale=std_overall)))
 
-    ppm_overall_lsl = 1e6 * stats.norm.cdf(LSL, loc=mean, scale=std_overall)
-    ppm_overall_usl = 1e6 * (1 - stats.norm.cdf(USL, loc=mean, scale=std_overall))
-    ppm_overall_total = ppm_overall_lsl + ppm_overall_usl
+    percent_defeito_within = ppm_within_total / 10000
+    percent_defeito_overall = ppm_overall_total / 10000
 
+    from estilo import aplicar_estilo_minitab
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
     x = np.linspace(min(dados), max(dados), 100)
     y_within = stats.norm.pdf(x, mean, std_within)
     y_overall = stats.norm.pdf(x, mean, std_overall)
-
     ax.plot(x, y_within, 'r-', label='Curto prazo')
     ax.plot(x, y_overall, 'k--', label='Longo prazo')
     if LSL != float('-inf'):
@@ -279,6 +281,7 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
     ax.axvline(mean, color='green', linestyle='--', label='Média')
     ax.set_title('Capabilidade - Dados Normais')
     ax.legend()
+    aplicar_estilo_minitab(ax)
     plt.tight_layout()
 
     buf = BytesIO()
@@ -286,39 +289,43 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    texto = f"""
-**Capabilidade - dados normais**
-- Anderson-Darling: estat={ad_res.statistic:.4f}, normalidade={"Aprovada" if ad_normal else "Reprovada"}
-- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={"Aprovada" if sw_normal else "Reprovada"}
-- Kolmogorov-Smirnov: p-valor={ks_p:.4f}, normalidade={"Aprovada" if ks_normal else "Reprovada"}
+    conclusoes = []
+    if Ppk < 1.33:
+        conclusoes.append("❌ O índice **Ppk < 1.33**, indicando que o processo **não atende aos requisitos de qualidade**.")
+        conclusoes.append("🔧 Ações recomendadas: **reduzir a variabilidade** e/ou **ajustar a média do processo**.")
+    else:
+        conclusoes.append("✅ O índice **Ppk ≥ 1.33**, indicando que o processo atende aos requisitos de qualidade.")
 
-**Resultados**
+    if abs(Ppk - Cpk) > 0.1:
+        conclusoes.append("⚠ Diferença significativa entre Ppk e Cpk sugere **instabilidade no processo** ou **causas especiais de variação**.")
+
+    texto = f"""
+✅ Os dados foram considerados **normais** com base em pelo menos um teste de normalidade.
+
+**Índices de Capabilidade**
 - Cp = {Cp:.2f}
 - Cpk = {Cpk:.2f}
 - Pp = {Pp:.2f}
 - Ppk = {Ppk:.2f}
-- Z.bench curto prazo = {z_bench_within:.2f}
-- Z.bench longo prazo = {z_bench_overall:.2f}
 
-**PPM Curto Prazo**
-- < LIE: {ppm_within_lsl:.2f}
-- > LSE: {ppm_within_usl:.2f}
-- Total: {ppm_within_total:.2f}
+**Nível Sigma**
+- Curto prazo: {nivel_sigma_within:.2f}
+- Longo prazo: {nivel_sigma_overall:.2f}
 
-**PPM Longo Prazo**
-- < LIE: {ppm_overall_lsl:.2f}
-- > LSE: {ppm_overall_usl:.2f}
-- Total: {ppm_overall_total:.2f}
+**% de defeito**
+- Curto prazo: {percent_defeito_within:.2f}%
+- Longo prazo: {percent_defeito_overall:.2f}%
 
 **Conclusão**
-✅ Capabilidade calculada com base nos dados normais. Avalie Cp/Cpk e ações de melhoria se Cpk < 1.33.
-"""
+{chr(10).join(conclusoes)}
+""".strip()
 
-    return texto.strip(), grafico_base64
+    return texto, grafico_base64
 
 
 
-def analise_capabilidade_outros(df, coluna_y, subgrupo, field_dist, field_LIE, field_LSE):
+
+def analise_capabilidade_outros(df, coluna_y, subgrupo=None, field_dist, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
 
@@ -390,10 +397,8 @@ def analise_capabilidade_outros(df, coluna_y, subgrupo, field_dist, field_LIE, f
             ppm_lsl = 1e6 * dist.cdf(LSL, *params)
             ppm_usl = 1e6 * (1 - dist.cdf(USL, *params))
             ppm_total = ppm_lsl + ppm_usl
-            z_bench = min(
-                (dist.ppf(0.99865, *params) - LSL) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params)),
-                (USL - dist.ppf(0.00135, *params)) / (dist.ppf(0.99865, *params) - dist.ppf(0.00135, *params))
-            ) * 6
+            perc_defeitos = ppm_total / 10000
+            nivel_sigma = round(6 - stats.norm.ppf(ppm_total / 1e6 / 2) * 2, 2)
 
             fig, ax = plt.subplots(figsize=(8, 5))
             ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
@@ -414,27 +419,30 @@ def analise_capabilidade_outros(df, coluna_y, subgrupo, field_dist, field_LIE, f
             imagens.append(base64.b64encode(buf.getvalue()).decode('utf-8'))
 
             alerta = (
-                f"⚠ A distribuição não se ajusta bem (p-valor={ks_p:.4f})."
+                "⚠ A distribuição não se ajusta bem aos dados. Considere testar outra distribuição."
                 if ks_p < 0.05 else
-                f"✅ Bom ajuste aos dados (p-valor={ks_p:.4f})."
+                "✅ A distribuição se ajusta bem aos dados."
             )
+
+            recomendacao = ""
+            if perc_defeitos > 1.0:
+                recomendacao += "- Alta taxa de defeitos. Recomenda-se ação corretiva.\n"
+            if nivel_sigma < 3:
+                recomendacao += "- Nível sigma abaixo de 3. Processo precisa ser melhorado.\n"
 
             texto_final += f"""
 🔹 **{grupo_nome}**
 - Parâmetros estimados: {', '.join([f'{p:.4f}' for p in params])}
-- Kolmogorov-Smirnov p-valor: {ks_p:.4f}
-- PPM < LIE: {ppm_lsl:.2f}
-- PPM > LSE: {ppm_usl:.2f}
-- PPM Total: {ppm_total:.2f}
-- Nível sigma estimado (Z.bench): {z_bench:.2f}
-- {alerta}\n"""
+- {alerta}
+- Porcentagem de defeitos estimada: {perc_defeitos:.2f}%
+- Nível sigma estimado: {nivel_sigma}
+{recomendacao}"""
         except Exception as e:
             texto_final += f"\n❌ Erro no grupo {grupo_nome}: {str(e)}\n"
 
     if not imagens:
         return texto_final.strip(), None
     else:
-        # Junta os gráficos verticalmente
         from PIL import Image
         from io import BytesIO
 
@@ -456,7 +464,8 @@ def analise_capabilidade_outros(df, coluna_y, subgrupo, field_dist, field_LIE, f
 
 
 
-def analise_capabilidade_transformado(df, coluna_y, subgrupo, field_LIE, field_LSE):
+
+def analise_capabilidade_transformado(df, coluna_y, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
 
@@ -580,7 +589,9 @@ Recomenda-se realizar capabilidade para dados discretizados ou usar métodos nã
 """
 
     return texto.strip(), grafico_base64
-def analise_capabilidade_discretizado(df, coluna_y, field_LIE, field_LSE):
+
+
+def analise_capabilidade_discretizado(df, coluna_y, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
 
