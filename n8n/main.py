@@ -5,6 +5,10 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware 
 import traceback
 import os
+from fastapi import Form
+import base64
+import io
+import matplotlib.pyplot as plt
 
 # Tentativa segura de importação dos módulos 
 try:
@@ -261,10 +265,7 @@ async def analisar(
             "traceback": tb
         }, status_code=500)
 
-from fastapi import Form
-import base64
-import io
-import matplotlib.pyplot as plt
+
 
 @app.post("/atualizar-grafico")
 async def atualizar_grafico(
