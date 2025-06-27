@@ -646,7 +646,7 @@ def analise_carta_u(df, coluna_y, subgrupo):
     ax.set_ylabel("Taxa de Defeitos por Unidade")
     ax.set_xlabel("Subgrupos")
     ax.legend()
-    aplicar_estilo_minitab(ax)
+    aplicar_estilo_minitab()
 
     plt.tight_layout()
     buf = BytesIO()
