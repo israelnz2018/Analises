@@ -567,7 +567,6 @@ def analise_carta_c(df, coluna_y):
 
     return texto.strip(), grafico_base64
 
-
 def analise_carta_u(df, coluna_y, subgrupo):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A Carta U requer uma coluna Y válida.", None
@@ -656,6 +655,7 @@ def analise_carta_u(df, coluna_y, subgrupo):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return texto.strip(), grafico_base64
+
 
 
 
