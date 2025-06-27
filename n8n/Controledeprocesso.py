@@ -384,8 +384,9 @@ def analise_carta_p(df, coluna_y, subgrupo):
 
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(p.index, p.values, marker='o', label='Proporção')
-    ax.plot(p.index, LSC, 'r--', label='LSC')
-    ax.plot(p.index, LIC, 'r--', label='LIC')
+    ax.hlines(LSC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LSC')
+    ax.hlines(LIC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LIC')
+
     ax.axhline(p_barra, color='black', linestyle='-', label='Média (p̄)')
     ax.set_title("Carta P")
     ax.legend()
@@ -481,8 +482,9 @@ def analise_carta_np(df, coluna_y, subgrupo):
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(nc.index, nc.values, marker='o', label='Não conformes')
     ax.axhline(np_barra, color='black', linestyle='-', label='Média (np̄)')
-    ax.axhline(LSC, color='red', linestyle='--', label='LSC')
-    ax.axhline(LIC, color='red', linestyle='--', label='LIC')
+    ax.hlines(LSC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LSC')
+    ax.hlines(LIC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LIC')
+
     ax.set_title("Carta NP")
     ax.legend()
 
@@ -648,8 +650,8 @@ def analise_carta_u(df, coluna_y, subgrupo):
 
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(u.index, u.values, marker='o', label='Taxa de defeitos')
-    ax.plot(u.index, LSC, 'r--', label='LSC')
-    ax.plot(u.index, LIC, 'r--', label='LIC')
+    ax.hlines(LSC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LSC')
+    ax.hlines(LIC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LIC')
     ax.axhline(u_barra, color='black', linestyle='-', label='Média (ū)')
     ax.set_title("Carta U")
     ax.legend()
