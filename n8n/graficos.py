@@ -21,7 +21,7 @@ def salvar_grafico():
 
 
 
-def gerar_histograma(df, coluna_y, subgrupo=None, cor=None, titulo_x=None, titulo_y=None, tamanho_fonte=None, inclinacao_x=None, inclinacao_y=None, espessura=None):
+def gerar_histograma(df, coluna_y, subgrupo=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -35,13 +35,6 @@ def gerar_histograma(df, coluna_y, subgrupo=None, cor=None, titulo_x=None, titul
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
     aplicar_estilo_minitab()
-
-    # Converte parâmetros opcionais para valores padrão se não preenchidos
-    cor = cor if cor else "steelblue"
-    tamanho_fonte = int(tamanho_fonte) if tamanho_fonte else 10
-    inclinacao_x = int(inclinacao_x) if inclinacao_x else 0
-    inclinacao_y = int(inclinacao_y) if inclinacao_y else 0
-    espessura = float(espessura) if espessura else 1.0
 
     if subgrupo:
         if subgrupo not in df.columns:
@@ -63,16 +56,13 @@ def gerar_histograma(df, coluna_y, subgrupo=None, cor=None, titulo_x=None, titul
                 kde=True,
                 stat="density",
                 alpha=0.4,
-                color=cor,
+                color="steelblue",
                 edgecolor="black",
-                linewidth=espessura,
                 ax=ax
             )
-            ax.set_title(f"Histograma - {sub}", fontsize=tamanho_fonte)
-            ax.set_xlabel(titulo_x if titulo_x else coluna_y, fontsize=tamanho_fonte)
-            ax.set_ylabel(titulo_y if titulo_y else "Densidade", fontsize=tamanho_fonte)
-            ax.tick_params(axis='x', rotation=inclinacao_x)
-            ax.tick_params(axis='y', rotation=inclinacao_y)
+            ax.set_title(f"Histograma - {sub}")
+            ax.set_xlabel(coluna_y)
+            ax.set_ylabel("Densidade")
     else:
         plt.figure(figsize=(10, 6))
         sns.histplot(
@@ -81,15 +71,12 @@ def gerar_histograma(df, coluna_y, subgrupo=None, cor=None, titulo_x=None, titul
             kde=True,
             stat="density",
             alpha=0.4,
-            color=cor,
-            edgecolor="black",
-            linewidth=espessura
+            color="steelblue",
+            edgecolor="black"
         )
-        plt.xlabel(titulo_x if titulo_x else coluna_y, fontsize=tamanho_fonte)
-        plt.ylabel(titulo_y if titulo_y else "Densidade", fontsize=tamanho_fonte)
-        plt.title("Histograma com Curva de Densidade", fontsize=tamanho_fonte)
-        plt.xticks(rotation=inclinacao_x)
-        plt.yticks(rotation=inclinacao_y)
+        plt.xlabel(coluna_y)
+        plt.ylabel("Densidade")
+        plt.title("Histograma com Curva de Densidade")
         plt.tight_layout()
 
     buf = BytesIO()
@@ -99,6 +86,47 @@ def gerar_histograma(df, coluna_y, subgrupo=None, cor=None, titulo_x=None, titul
     plt.close()
 
     return "", imagem_base64
+
+def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+
+    if isinstance(coluna_y, list):
+        coluna_y = coluna_y[0] if coluna_y else None
+
+    if not coluna_y or coluna_y not in df.columns:
+        return None
+
+    # 🔧 Aplicar estilo Minitab se desejar
+    aplicar_estilo_minitab()
+
+    plt.figure(figsize=(10, 6))
+    sns.histplot(
+        df[coluna_y].dropna(),
+        bins=10,
+        kde=True,
+        stat="density",
+        alpha=0.4,
+        color=cor,
+        edgecolor="black"
+    )
+    plt.xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y if titulo_y else "Densidade", fontsize=int(tamanho_fonte))
+    plt.title("Histograma com Curva de Densidade", fontsize=int(tamanho_fonte))
+    plt.xticks(rotation=int(inclinacao_x))
+    plt.yticks(rotation=int(inclinacao_y))
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close()
+
+    return imagem_base64
+
 
 
 
