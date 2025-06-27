@@ -397,40 +397,36 @@ def analise_carta_p(df, coluna_y, subgrupo):
 
 def analise_carta_np(df, coluna_y, subgrupo):
     if not coluna_y or coluna_y not in df.columns:
-        return "❌ A Carta NP requer uma coluna Y válida.", None
+        return "❌ A Carta np requer uma coluna Y com número de não conformes.", None
 
     if not subgrupo or subgrupo not in df.columns:
-        return f"❌ A coluna de subgrupo '{subgrupo}' não foi encontrada.", None
+        return f"❌ A coluna de tamanho de amostra '{subgrupo}' não foi encontrada.", None
 
     dados = df[[coluna_y, subgrupo]].dropna()
     if dados.shape[0] < 5:
-        return "❌ É necessário pelo menos 5 dados para gerar a Carta NP.", None
+        return "❌ É necessário pelo menos 5 subgrupos para gerar a Carta np.", None
 
     import numpy as np
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
 
-    nc = dados[coluna_y]
-    n = dados[subgrupo]
+    nc = dados[coluna_y].astype(float)
+    n = dados[subgrupo].astype(float)
 
-    if n.nunique() != 1:
-        return "❌ A Carta NP requer subgrupos com mesmo tamanho. Use Carta P para tamanhos variáveis.", None
+    if n.nunique() > 1:
+        return "❌ A Carta np requer que todos os subgrupos tenham o mesmo tamanho de amostra.", None
 
-    n = n.iloc[0]
-
-
-    n = n_subgrupos.iloc[0]
-    p_barra = nc.sum() / (n * len(nc))
-    np_barra = n * p_barra
-    sigma_np = np.sqrt(n * p_barra * (1 - p_barra))
-
+    n_subgrupo = n.iloc[0]
+    p = nc / n_subgrupo
+    p_barra = p.mean()
+    np_barra = p_barra * n_subgrupo
+    sigma_np = np.sqrt(n_subgrupo * p_barra * (1 - p_barra))
     LSC = np_barra + 3 * sigma_np
     LIC = np_barra - 3 * sigma_np
-    LIC = max(LIC, 0)
+    LIC = np.clip(LIC, 0, None)
 
     testes = []
-
     fora_limite = nc[(nc > LSC) | (nc < LIC)]
     if not fora_limite.empty:
         testes.append(f"🔴 {fora_limite.shape[0]} subgrupo(s) com contagem fora dos limites de controle.")
@@ -441,7 +437,7 @@ def analise_carta_np(df, coluna_y, subgrupo):
         if i == 0 or lado[i] == lado[i-1]:
             conta += 1
             if conta >= 9:
-                testes.append("🟠 9 contagens consecutivas no mesmo lado da linha central.")
+                testes.append("🟠 9 pontos consecutivos no mesmo lado da média.")
                 break
         else:
             conta = 1
@@ -457,13 +453,13 @@ def analise_carta_np(df, coluna_y, subgrupo):
         else:
             conta_up = conta_down = 0
         if conta_up >= 6 or conta_down >= 6:
-            testes.append("🟡 6 contagens consecutivas em tendência (subindo ou descendo).")
+            testes.append("🟡 6 pontos consecutivos em tendência (subindo ou descendo).")
             break
 
     texto = f"""
-**Carta NP**
-- Número médio de não conformes (np̄): {np_barra:.4f}
-- Limites: LSC={LSC:.4f}, LIC={LIC:.4f}
+**Carta np**
+- Proporção média de não conformes (p̄): {p_barra:.4f}
+- Média (np̄): {np_barra:.2f}
 
 **Resultados dos testes**
 """
@@ -476,11 +472,10 @@ def analise_carta_np(df, coluna_y, subgrupo):
 
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(nc.index, nc.values, marker='o', label='Não conformes')
+    ax.hlines(LSC, xmin=0, xmax=len(nc)-1, colors='red', linestyles='--', label='LSC')
+    ax.hlines(LIC, xmin=0, xmax=len(nc)-1, colors='red', linestyles='--', label='LIC')
     ax.axhline(np_barra, color='black', linestyle='-', label='Média (np̄)')
-    ax.hlines(LSC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LSC')
-    ax.hlines(LIC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LIC')
-
-    ax.set_title("Carta NP")
+    ax.set_title("Carta np")
     ax.legend()
 
     plt.tight_layout()
@@ -490,6 +485,7 @@ def analise_carta_np(df, coluna_y, subgrupo):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return texto.strip(), grafico_base64
+
 
 def analise_carta_c(df, coluna_y):
     if not coluna_y or coluna_y not in df.columns:
