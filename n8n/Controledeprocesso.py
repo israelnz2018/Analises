@@ -334,8 +334,12 @@ def analise_carta_p(df, coluna_y, subgrupo):
     p_barra = contagem_nc.sum() / n_subgrupos.sum()
 
     sigma_p = np.sqrt(p_barra * (1 - p_barra) / n_subgrupos)
-    LSC = pd.Series(p_barra + 3 * sigma_p, index=p.index)
-    LIC = pd.Series(np.clip(p_barra - 3 * sigma_p, 0, None), index=p.index)
+    LSC = p_barra + 3 * sigma_p
+    LIC = np.clip(p_barra - 3 * sigma_p, 0, None)
+
+    LSC = pd.Series(LSC, index=p.index)
+    LIC = pd.Series(LIC, index=p.index)
+
 
 
     testes = []
@@ -386,7 +390,6 @@ def analise_carta_p(df, coluna_y, subgrupo):
     ax.plot(p.index, p.values, marker='o', label='Proporção')
     ax.plot(p.index, LSC, 'r--', label='LSC')
     ax.plot(p.index, LIC, 'r--', label='LIC')
-
     ax.axhline(p_barra, color='black', linestyle='-', label='Média (p̄)')
     ax.set_title("Carta P")
     ax.legend()
