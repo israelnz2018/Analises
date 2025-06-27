@@ -274,12 +274,12 @@ async def atualizar_grafico(
     titulo_y: str = Form(""),
     tamanho_fonte: int = Form(12),
     inclinacao_x: int = Form(0),
-    inclinacao_y: int = Form(0)
+    inclinacao_y: int = Form(0),
+    espessura: int = Form(2)
 ):
     try:
-        # Exemplo simples de geração de gráfico atualizado
         fig, ax = plt.subplots()
-        ax.plot([1, 2, 3], [4, 5, 6], color=cor)
+        ax.plot([1, 2, 3], [4, 5, 6], color=cor, linewidth=espessura)
 
         ax.set_xlabel(titulo_x, fontsize=tamanho_fonte)
         ax.set_ylabel(titulo_y, fontsize=tamanho_fonte)
@@ -302,4 +302,3 @@ async def atualizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
-
