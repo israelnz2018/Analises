@@ -297,11 +297,15 @@ async def personalizar_grafico(
         if df is None or df.empty:
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
+        # 🔍 Busca a função do gráfico personalizado diretamente no dicionário
         funcao_grafico = GRAFICOS.get(grafico.strip())
         if not funcao_grafico:
-            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
+            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
 
-        args_to_pass = {
+        # 🔧 Filtra apenas os parâmetros aceitos pela função do gráfico
+        import inspect
+        params_aceitos = inspect.signature(funcao_grafico).parameters
+        args_to_pass = {k: v for k, v in {
             "df": df,
             "coluna_y": coluna_y,
             "coluna_x": coluna_x,
@@ -320,8 +324,9 @@ async def personalizar_grafico(
             "inclinacao_x": inclinacao_x,
             "inclinacao_y": inclinacao_y,
             "espessura": espessura
-        }
+        }.items() if k in params_aceitos}
 
+        # 🖼️ Chama a função do gráfico com os parâmetros filtrados
         imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
 
         return {
