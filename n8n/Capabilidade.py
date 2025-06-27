@@ -325,7 +325,7 @@ Recomenda-se realizar a análise de capabilidade para dados **não normais**.
 
 
 
-def analise_capabilidade_outros(df, coluna_y, subgrupo=None, field_dist, field_LIE=None, field_LSE=None):
+def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
 
