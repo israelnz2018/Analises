@@ -266,7 +266,6 @@ Recomenda-se realizar a análise de capabilidade para dados **não normais**.
     percent_defeito_within = ppm_within_total / 10000
     percent_defeito_overall = ppm_overall_total / 10000
 
-    from suporte import aplicar_estilo_minitab
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
     x = np.linspace(min(dados), max(dados), 100)
@@ -281,7 +280,13 @@ Recomenda-se realizar a análise de capabilidade para dados **não normais**.
     ax.axvline(mean, color='green', linestyle='--', label='Média')
     ax.set_title('Capabilidade - Dados Normais')
     ax.legend()
-    aplicar_estilo_minitab(ax)
+
+    # Estilo Minitab manual (sem usar suporte)
+    ax.set_facecolor('white')
+    ax.grid(True, linestyle=':', color='gray')
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
     plt.tight_layout()
 
     buf = BytesIO()
@@ -321,6 +326,7 @@ Recomenda-se realizar a análise de capabilidade para dados **não normais**.
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
