@@ -184,13 +184,6 @@ async def analisar(
             colunas_usadas.append(subgrupo_val)
 
         print("🔍 Colunas no arquivo recebido:", df.columns.tolist())
-        print("🔍 Colunas Y:", colunas_y)
-        print("🔍 Colunas X:", lista_x)
-        print("🔍 Colunas Z:", lista_z)
-        print("🔍 Subgrupo:", subgrupo_val)
-        print("🔍 Field:", field)
-        print("🔍 Field_conf:", field_conf)
-        print("🔍 Field_dist:", field_dist)
 
         resultado_texto = ""
         imagem_analise_base64 = None
@@ -244,9 +237,9 @@ async def analisar(
                 "field_LIE": field_LIE
             }
 
-            permitidos = CONFIG_ANALISES.get(grafico.strip(), ["df"])
-            args_to_pass = [df] + [disponiveis.get(p) for p in permitidos[1:]]
-            imagem_grafico_isolado_base64 = funcao_grafico(*args_to_pass)
+            permitidos = CONFIG_ANALISES.get(grafico.strip(), ["df", "coluna_y"])
+            args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
+            imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
 
         return {
             "analise": resultado_texto,
@@ -265,43 +258,6 @@ async def analisar(
             "traceback": tb
         }, status_code=500)
 
-
-
-@app.post("/atualizar-grafico")
-async def atualizar_grafico(
-    cor: str = Form("#000000"),
-    titulo_x: str = Form(""),
-    titulo_y: str = Form(""),
-    tamanho_fonte: int = Form(12),
-    inclinacao_x: int = Form(0),
-    inclinacao_y: int = Form(0),
-    espessura: int = Form(2)
-):
-    try:
-        fig, ax = plt.subplots()
-        ax.plot([1, 2, 3], [4, 5, 6], color=cor, linewidth=espessura)
-
-        ax.set_xlabel(titulo_x, fontsize=tamanho_fonte)
-        ax.set_ylabel(titulo_y, fontsize=tamanho_fonte)
-        ax.tick_params(axis='x', labelrotation=inclinacao_x)
-        ax.tick_params(axis='y', labelrotation=inclinacao_y)
-
-        buf = io.BytesIO()
-        plt.tight_layout()
-        plt.savefig(buf, format="png")
-        plt.close(fig)
-        buf.seek(0)
-        img_base64 = base64.b64encode(buf.read()).decode("utf-8")
-
-        return {"grafico_personalizado_base64": img_base64}
-
-    except Exception as e:
-        tb = traceback.format_exc()
-        return JSONResponse({
-            "erro": "Erro ao atualizar gráfico.",
-            "detalhe": str(e),
-            "traceback": tb
-        }, status_code=500)
 
 @app.post("/personalizar-grafico")
 async def personalizar_grafico(
@@ -324,7 +280,8 @@ async def personalizar_grafico(
     titulo_y: str = Form(None),
     tamanho_fonte: str = Form(None),
     inclinacao_x: str = Form(None),
-    inclinacao_y: str = Form(None)
+    inclinacao_y: str = Form(None),
+    espessura: str = Form(None)
 ):
     try:
         if not arquivo:
@@ -334,31 +291,32 @@ async def personalizar_grafico(
         if df is None or df.empty:
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
-        # 🔧 Aqui chamamos a função do gráfico passando as personalizações
         funcao_grafico = GRAFICOS.get(grafico.strip())
         if not funcao_grafico:
             return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
 
-        # Personalizações como parâmetros extras
-        imagem_grafico_isolado_base64 = funcao_grafico(
-            df,
-            coluna_y,
-            coluna_x,
-            coluna_z,
-            subgrupo,
-            field,
-            field_conf,
-            field_dist,
-            field_LSE,
-            field_LIE,
-            Data,
-            cor=cor,
-            titulo_x=titulo_x,
-            titulo_y=titulo_y,
-            tamanho_fonte=tamanho_fonte,
-            inclinacao_x=inclinacao_x,
-            inclinacao_y=inclinacao_y
-        )
+        args_to_pass = {
+            "df": df,
+            "coluna_y": coluna_y,
+            "coluna_x": coluna_x,
+            "coluna_z": coluna_z,
+            "subgrupo": subgrupo,
+            "field": field,
+            "field_conf": field_conf,
+            "field_dist": field_dist,
+            "field_LSE": field_LSE,
+            "field_LIE": field_LIE,
+            "Data": Data,
+            "cor": cor,
+            "titulo_x": titulo_x,
+            "titulo_y": titulo_y,
+            "tamanho_fonte": tamanho_fonte,
+            "inclinacao_x": inclinacao_x,
+            "inclinacao_y": inclinacao_y,
+            "espessura": espessura
+        }
+
+        imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
 
         return {
             "grafico_isolado_base64": imagem_grafico_isolado_base64
@@ -371,4 +329,3 @@ async def personalizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
-
