@@ -309,41 +309,32 @@ def analise_carta_xbarra_s(df, coluna_y, subgrupo):
 
     return texto.strip(), grafico_base64
 
-
 def analise_carta_p(df, coluna_y, subgrupo):
     if not coluna_y or coluna_y not in df.columns:
-        return "❌ A Carta P requer uma coluna Y válida.", None
+        return "❌ A Carta P requer uma coluna com os dados de não conformes.", None
 
     if not subgrupo or subgrupo not in df.columns:
-        return f"❌ A coluna de subgrupo '{subgrupo}' não foi encontrada.", None
+        return f"❌ A coluna de tamanho de amostra '{subgrupo}' não foi encontrada.", None
 
     dados = df[[coluna_y, subgrupo]].dropna()
     if dados.shape[0] < 5:
-        return "❌ É necessário pelo menos 5 dados para gerar a Carta P.", None
+        return "❌ É necessário pelo menos 5 subgrupos para gerar a Carta P.", None
 
     import numpy as np
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
 
-    grupos = dados.groupby(subgrupo)[coluna_y]
-    contagem_nc = grupos.sum()
-    n_subgrupos = grupos.count()
-
-    p = contagem_nc / n_subgrupos
-    p_barra = contagem_nc.sum() / n_subgrupos.sum()
-
-    sigma_p = np.sqrt(p_barra * (1 - p_barra) / n_subgrupos)
+    nc = dados[coluna_y].astype(float)
+    n = dados[subgrupo].astype(float)
+    p = nc / n
+    p_barra = nc.sum() / n.sum()
+    sigma_p = np.sqrt(p_barra * (1 - p_barra) / n)
     LSC = p_barra + 3 * sigma_p
-    LIC = np.clip(p_barra - 3 * sigma_p, 0, None)
-
-    LSC = pd.Series(LSC, index=p.index)
-    LIC = pd.Series(LIC, index=p.index)
-
-
+    LIC = p_barra - 3 * sigma_p
+    LIC = np.clip(LIC, 0, None)
 
     testes = []
-
     fora_limite = p[(p > LSC) | (p < LIC)]
     if not fora_limite.empty:
         testes.append(f"🔴 {fora_limite.shape[0]} subgrupo(s) com proporção fora dos limites de controle.")
@@ -388,8 +379,8 @@ def analise_carta_p(df, coluna_y, subgrupo):
 
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.plot(p.index, p.values, marker='o', label='Proporção')
-    ax.plot(p.index, LSC, 'r--', label='LSC')
-    ax.plot(p.index, LIC, 'r--', label='LIC')
+    ax.plot(p.index, LSC, color='red', linestyle='--', label='LSC')
+    ax.plot(p.index, LIC, color='red', linestyle='--', label='LIC')
     ax.axhline(p_barra, color='black', linestyle='-', label='Média (p̄)')
     ax.set_title("Carta P")
     ax.legend()
@@ -401,6 +392,7 @@ def analise_carta_p(df, coluna_y, subgrupo):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_carta_np(df, coluna_y, subgrupo):
