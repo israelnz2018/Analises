@@ -583,6 +583,7 @@ def analise_carta_u(df, coluna_y, subgrupo):
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
+    from estilo import aplicar_estilo_minitab
 
     grupos = dados.groupby(subgrupo)[coluna_y]
     defeitos = grupos.sum()
@@ -590,7 +591,6 @@ def analise_carta_u(df, coluna_y, subgrupo):
 
     u = defeitos / tamanhos
     u_barra = defeitos.sum() / tamanhos.sum()
-
     sigma_u = np.sqrt(u_barra / tamanhos)
     LSC = u_barra + 3 * sigma_u
     LIC = np.clip(u_barra - 3 * sigma_u, 0, None)
@@ -632,20 +632,22 @@ def analise_carta_u(df, coluna_y, subgrupo):
 
 **Resultados dos testes**
 """
-
     if testes:
         texto += "\n".join(testes)
         texto += "\n⚠ Recomenda-se investigar causas especiais e revisar estabilidade do processo."
     else:
         texto += "✅ Processo dentro dos padrões esperados (nenhum alarme nos testes aplicados).\n✅ O processo está estável no momento da análise."
 
-    fig, ax = plt.subplots(figsize=(8, 4))
+    fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(u.index, u.values, marker='o', label='Taxa de defeitos')
-    ax.hlines(LSC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LSC')
-    ax.hlines(LIC, xmin=0, xmax=len(p)-1, colors='red', linestyles='--', label='LIC')
+    ax.plot(u.index, LSC, linestyle='--', color='red', label='LSC')
+    ax.plot(u.index, LIC, linestyle='--', color='red', label='LIC')
     ax.axhline(u_barra, color='black', linestyle='-', label='Média (ū)')
     ax.set_title("Carta U")
+    ax.set_ylabel("Taxa de Defeitos por Unidade")
+    ax.set_xlabel("Subgrupos")
     ax.legend()
+    aplicar_estilo_minitab(ax)
 
     plt.tight_layout()
     buf = BytesIO()
@@ -654,6 +656,7 @@ def analise_carta_u(df, coluna_y, subgrupo):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return texto.strip(), grafico_base64
+
 
 
 ANALISES = {
