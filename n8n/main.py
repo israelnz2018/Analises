@@ -1,3 +1,5 @@
+# Atualizacao forçada - 27/06/2025
+
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware 
