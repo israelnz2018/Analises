@@ -583,7 +583,7 @@ def analise_carta_u(df, coluna_y, subgrupo):
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
-    from estilo import aplicar_estilo_minitab
+    from suporte import aplicar_estilo_minitab
 
     grupos = dados.groupby(subgrupo)[coluna_y]
     defeitos = grupos.sum()
