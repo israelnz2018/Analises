@@ -266,7 +266,7 @@ Recomenda-se realizar a análise de capabilidade para dados **não normais**.
     percent_defeito_within = ppm_within_total / 10000
     percent_defeito_overall = ppm_overall_total / 10000
 
-    from estilo import aplicar_estilo_minitab
+    from suporte import aplicar_estilo_minitab
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
     x = np.linspace(min(dados), max(dados), 100)
