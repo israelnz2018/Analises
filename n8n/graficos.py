@@ -21,7 +21,7 @@ def salvar_grafico():
 
 
 
-def gerar_histograma(df, coluna_y, subgrupo=None):
+def gerar_histograma(df, coluna_y, subgrupo=None, cor=None, titulo_x=None, titulo_y=None, tamanho_fonte=None, inclinacao_x=None, inclinacao_y=None, espessura=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -35,6 +35,13 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
     aplicar_estilo_minitab()
+
+    # Converte parâmetros opcionais para valores padrão se não preenchidos
+    cor = cor if cor else "steelblue"
+    tamanho_fonte = int(tamanho_fonte) if tamanho_fonte else 10
+    inclinacao_x = int(inclinacao_x) if inclinacao_x else 0
+    inclinacao_y = int(inclinacao_y) if inclinacao_y else 0
+    espessura = float(espessura) if espessura else 1.0
 
     if subgrupo:
         if subgrupo not in df.columns:
@@ -56,13 +63,16 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
                 kde=True,
                 stat="density",
                 alpha=0.4,
-                color="steelblue",
+                color=cor,
                 edgecolor="black",
+                linewidth=espessura,
                 ax=ax
             )
-            ax.set_title(f"Histograma - {sub}")
-            ax.set_xlabel(coluna_y)
-            ax.set_ylabel("Densidade")
+            ax.set_title(f"Histograma - {sub}", fontsize=tamanho_fonte)
+            ax.set_xlabel(titulo_x if titulo_x else coluna_y, fontsize=tamanho_fonte)
+            ax.set_ylabel(titulo_y if titulo_y else "Densidade", fontsize=tamanho_fonte)
+            ax.tick_params(axis='x', rotation=inclinacao_x)
+            ax.tick_params(axis='y', rotation=inclinacao_y)
     else:
         plt.figure(figsize=(10, 6))
         sns.histplot(
@@ -71,12 +81,15 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
             kde=True,
             stat="density",
             alpha=0.4,
-            color="steelblue",
-            edgecolor="black"
+            color=cor,
+            edgecolor="black",
+            linewidth=espessura
         )
-        plt.xlabel(coluna_y)
-        plt.ylabel("Densidade")
-        plt.title("Histograma com Curva de Densidade")
+        plt.xlabel(titulo_x if titulo_x else coluna_y, fontsize=tamanho_fonte)
+        plt.ylabel(titulo_y if titulo_y else "Densidade", fontsize=tamanho_fonte)
+        plt.title("Histograma com Curva de Densidade", fontsize=tamanho_fonte)
+        plt.xticks(rotation=inclinacao_x)
+        plt.yticks(rotation=inclinacao_y)
         plt.tight_layout()
 
     buf = BytesIO()
@@ -86,6 +99,7 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
     plt.close()
 
     return "", imagem_base64
+
 
 
 def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
