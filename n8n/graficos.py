@@ -633,6 +633,7 @@ def gerar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z):
 
 GRAFICOS = {
     "Histograma": gerar_histograma,
+    "Histograma Personalizado": personalizar_histograma,
     "Pareto": gerar_pareto,
     "Setores (Pizza)": gerar_pizza,
     "Barras": gerar_barras,
