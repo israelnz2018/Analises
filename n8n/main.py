@@ -239,7 +239,12 @@ async def analisar(
 
             permitidos = CONFIG_ANALISES.get(grafico.strip(), ["df", "coluna_y"])
             args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
-            imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
+            # Filtra apenas os parâmetros aceitos pela função
+            import inspect
+            params_aceitos = inspect.signature(funcao_grafico).parameters
+            args_filtrados = {k: v for k, v in args_to_pass.items() if k in params_aceitos}
+            imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
+
 
         return {
             "analise": resultado_texto,
