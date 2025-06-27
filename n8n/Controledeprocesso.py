@@ -334,9 +334,9 @@ def analise_carta_p(df, coluna_y, subgrupo):
     p_barra = contagem_nc.sum() / n_subgrupos.sum()
 
     sigma_p = np.sqrt(p_barra * (1 - p_barra) / n_subgrupos)
-    LSC = p_barra + 3 * sigma_p
-    LIC = p_barra - 3 * sigma_p
-    LIC = np.clip(LIC, 0, None)
+    LSC = pd.Series(p_barra + 3 * sigma_p, index=p.index)
+    LIC = pd.Series(np.clip(p_barra - 3 * sigma_p, 0, None), index=p.index)
+
 
     testes = []
 
