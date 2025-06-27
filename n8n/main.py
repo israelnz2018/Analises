@@ -260,3 +260,45 @@ async def analisar(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
+from fastapi import Form
+import base64
+import io
+import matplotlib.pyplot as plt
+
+@app.post("/atualizar-grafico")
+async def atualizar_grafico(
+    cor: str = Form("#000000"),
+    titulo_x: str = Form(""),
+    titulo_y: str = Form(""),
+    tamanho_fonte: int = Form(12),
+    inclinacao_x: int = Form(0),
+    inclinacao_y: int = Form(0)
+):
+    try:
+        # Exemplo simples de geração de gráfico atualizado
+        fig, ax = plt.subplots()
+        ax.plot([1, 2, 3], [4, 5, 6], color=cor)
+
+        ax.set_xlabel(titulo_x, fontsize=tamanho_fonte)
+        ax.set_ylabel(titulo_y, fontsize=tamanho_fonte)
+        ax.tick_params(axis='x', labelrotation=inclinacao_x)
+        ax.tick_params(axis='y', labelrotation=inclinacao_y)
+
+        buf = io.BytesIO()
+        plt.tight_layout()
+        plt.savefig(buf, format="png")
+        plt.close(fig)
+        buf.seek(0)
+        img_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+        return {"grafico_personalizado_base64": img_base64}
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro ao atualizar gráfico.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
