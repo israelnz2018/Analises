@@ -166,14 +166,26 @@ async def analisar(
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
         # 🔧 Processa lista_y
-        lista_y_processada = []
         if lista_y:
-            lista_y_processada = [x.strip() for x in lista_y.split(",")]
+            if isinstance(lista_y, str):
+                lista_y_processada = [x.strip() for x in lista_y.split(",")] if "," in lista_y else [lista_y.strip()]
+            elif isinstance(lista_y, list):
+                lista_y_processada = [x.strip() for x in lista_y]
+            else:
+                lista_y_processada = []
+        else:
+            lista_y_processada = []
 
         # 🔧 Processa lista_x
-        lista_x_processada = []
         if lista_x:
-            lista_x_processada = [x.strip() for x in lista_x.split(",")]
+            if isinstance(lista_x, str):
+                lista_x_processada = [x.strip() for x in lista_x.split(",")] if "," in lista_x else [lista_x.strip()]
+            elif isinstance(lista_x, list):
+                lista_x_processada = [x.strip() for x in lista_x]
+            else:
+                lista_x_processada = []
+        else:
+            lista_x_processada = []
 
         # 🔧 Processa coluna_z
         lista_z = [coluna_z.strip()] if coluna_z else []
@@ -281,133 +293,6 @@ async def analisar(
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao processar a análise.",
-            "detalhe": str(e),
-            "traceback": tb
-        }, status_code=500)
-
-
-@app.post("/personalizar-grafico")
-async def personalizar_grafico(
-    request: Request,
-    arquivo: UploadFile = File(None),
-    aba: str = Form(None),
-    grafico: str = Form(None),
-    coluna_y: str = Form(None),
-    coluna_x: str = Form(None),
-    coluna_z: str = Form(None),
-    lista_y: str = Form(None),
-    lista_x: str = Form(None),
-    subgrupo: str = Form(None),
-    field: str = Form(None),
-    field_conf: str = Form(None),
-    field_dist: str = Form(None),
-    field_LSE: str = Form(None),
-    field_LIE: str = Form(None),
-    Data: str = Form(None),
-    cor: str = Form(None),
-    titulo_x: str = Form(None),
-    titulo_y: str = Form(None),
-    titulo_grafico: str = Form(None),
-    tamanho_fonte: str = Form(None),
-    inclinacao_x: str = Form(None),
-    inclinacao_y: str = Form(None),
-    espessura: str = Form(None)
-):
-    try:
-        if not arquivo:
-            return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
-
-        # 🔧 Processa lista_y
-        lista_y_processada = []
-        if lista_y:
-            lista_y_processada = [x.strip() for x in lista_y.split(",")]
-
-        # 🔧 Processa lista_x
-        lista_x_processada = []
-        if lista_x:
-            lista_x_processada = [x.strip() for x in lista_x.split(",")]
-
-        # 🔧 Processa coluna_z
-        lista_z = [coluna_z.strip()] if coluna_z else []
-
-        subgrupo_val = subgrupo.strip() if subgrupo else None
-
-        # ✅ PRINT DEBUG COMPLETO
-        print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
-        print("📂 Nome do arquivo recebido:", arquivo.filename)
-        print("📑 Aba solicitada:", aba)
-        print("🎨 Gráfico solicitado:", grafico)
-        print("➡ coluna_y:", coluna_y)
-        print("➡ lista_y:", lista_y_processada)
-        print("➡ coluna_x:", coluna_x)
-        print("➡ lista_x:", lista_x_processada)
-        print("➡ coluna_z:", coluna_z)
-        print("➡ lista_z:", lista_z)
-        print("➡ subgrupo:", subgrupo_val)
-        print("➡ field:", field)
-        print("➡ field_conf:", field_conf)
-        print("➡ field_dist:", field_dist)
-        print("➡ field_LSE:", field_LSE)
-        print("➡ field_LIE:", field_LIE)
-        print("➡ Data:", Data)
-        print("➡ cor:", cor)
-        print("➡ titulo_x:", titulo_x)
-        print("➡ titulo_y:", titulo_y)
-        print("➡ titulo_grafico:", titulo_grafico)
-        print("➡ tamanho_fonte:", tamanho_fonte)
-        print("➡ inclinacao_x:", inclinacao_x)
-        print("➡ inclinacao_y:", inclinacao_y)
-        print("➡ espessura:", espessura)
-        print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
-
-        df = await ler_arquivo(arquivo, aba)
-        if df is None or df.empty:
-            return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
-
-        # 🔍 Busca a função do gráfico personalizado diretamente no dicionário
-        funcao_grafico = GRAFICOS.get(grafico.strip())
-        if not funcao_grafico:
-            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
-
-        # 🔧 Filtra apenas os parâmetros aceitos pela função do gráfico
-        import inspect
-        params_aceitos = inspect.signature(funcao_grafico).parameters
-        args_to_pass = {k: v for k, v in {
-            "df": df,
-            "coluna_y": coluna_y.strip() if coluna_y else None,
-            "coluna_x": coluna_x.strip() if coluna_x else None,
-            "coluna_z": coluna_z.strip() if coluna_z else None,
-            "lista_y": lista_y_processada,
-            "lista_x": lista_x_processada,
-            "lista_z": lista_z,
-            "subgrupo": subgrupo_val,
-            "field": field,
-            "field_conf": field_conf,
-            "field_dist": field_dist,
-            "field_LSE": field_LSE,
-            "field_LIE": field_LIE,
-            "Data": Data,
-            "cor": cor,
-            "titulo_x": titulo_x,
-            "titulo_y": titulo_y,
-            "titulo_grafico": titulo_grafico,
-            "tamanho_fonte": tamanho_fonte,
-            "inclinacao_x": inclinacao_x,
-            "inclinacao_y": inclinacao_y,
-            "espessura": espessura
-        }.items() if k in params_aceitos}
-
-        # 🖼️ Chama a função do gráfico com os parâmetros filtrados
-        imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
-
-        return {
-            "grafico_isolado_base64": imagem_grafico_isolado_base64
-        }
-
-    except Exception as e:
-        tb = traceback.format_exc()
-        return JSONResponse({
-            "erro": "Erro interno ao personalizar gráfico.",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
