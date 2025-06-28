@@ -137,28 +137,6 @@ DICIONARIO_TERMOS = {
     "field_LIE": "Valor do limite inferior de engenharia"
 }
 
-print("🔍 DEBUG COMPLETO - INÍCIO 🔍")
-print("📂 Nome do arquivo recebido:", arquivo.filename)
-print("📑 Aba solicitada:", aba)
-print("🧾 Colunas no DataFrame:", df.columns.tolist())
-print("➡ coluna_y recebida:", coluna_y)
-print("➡ lista_y recebida:", lista_y)
-print("➡ coluna_x recebida:", colunas_x)
-print("➡ lista_x recebida:", lista_x)
-print("➡ coluna_z recebida:", coluna_z)
-print("➡ lista_z recebida:", lista_z)
-print("➡ subgrupo recebido:", subgrupo_val)
-print("➡ field:", field)
-print("➡ field_conf:", field_conf)
-print("➡ field_dist:", field_dist)
-print("➡ field_LSE:", field_LSE)
-print("➡ field_LIE:", field_LIE)
-print("➡ Data:", Data)
-print("🔧 ferramenta:", ferramenta)
-print("🔧 grafico:", grafico)
-print("🔍 DEBUG COMPLETO - FIM 🔍")
-
-
 @app.post("/analise")
 async def analisar(
     request: Request,
@@ -182,9 +160,6 @@ async def analisar(
     try:
         if not arquivo:
             return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
-
-        print("🚀 Nome do arquivo recebido:", arquivo.filename)
-        print("🚀 Aba solicitada:", aba)
 
         df = await ler_arquivo(arquivo, aba)
         if df is None or df.empty:
@@ -210,7 +185,27 @@ async def analisar(
         if subgrupo_val:
             colunas_usadas.append(subgrupo_val)
 
-        print("🔍 Colunas no arquivo recebido:", df.columns.tolist())
+        # ✅ PRINT DEBUG COMPLETO
+        print("\n====================== INÍCIO DEBUG /ANALISE ======================")
+        print("📂 Nome do arquivo recebido:", arquivo.filename)
+        print("📑 Aba solicitada:", aba)
+        print("🧾 Colunas no DataFrame:", df.columns.tolist())
+        print("➡ coluna_y recebida:", coluna_y)
+        print("➡ lista_y recebida:", lista_y_processada)
+        print("➡ coluna_x recebida:", coluna_x)
+        print("➡ lista_x recebida:", lista_x_processada)
+        print("➡ coluna_z recebida:", coluna_z)
+        print("➡ lista_z recebida:", lista_z)
+        print("➡ subgrupo recebido:", subgrupo_val)
+        print("➡ field:", field)
+        print("➡ field_conf:", field_conf)
+        print("➡ field_dist:", field_dist)
+        print("➡ field_LSE:", field_LSE)
+        print("➡ field_LIE:", field_LIE)
+        print("➡ Data:", Data)
+        print("🔧 ferramenta:", ferramenta)
+        print("🔧 grafico:", grafico)
+        print("======================= FIM DEBUG /ANALISE ==========================\n")
 
         resultado_texto = ""
         imagem_analise_base64 = None
