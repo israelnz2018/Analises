@@ -168,7 +168,8 @@ async def analisar(
         if df is None or df.empty:
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
-        colunas_y = [y.strip() for y in coluna_y.split(",")] if coluna_y else []
+        # 🔧 Ajuste: interpretação correta de coluna_y e lista_y
+        lista_y = [coluna_y.strip()] if coluna_y else []
         lista_x = []
         if colunas_x:
             if isinstance(colunas_x, str):
@@ -179,7 +180,7 @@ async def analisar(
         lista_z = [coluna_z.strip()] if coluna_z else []
         subgrupo_val = subgrupo.strip() if subgrupo else None
 
-        colunas_usadas = colunas_y + lista_x + lista_z
+        colunas_usadas = lista_y + lista_x + lista_z
         if subgrupo_val:
             colunas_usadas.append(subgrupo_val)
 
@@ -196,11 +197,11 @@ async def analisar(
 
             disponiveis = {
                 "df": df,
-                "coluna_y": colunas_y[0] if colunas_y else None,
+                "coluna_y": lista_y[0] if lista_y else None,
                 "coluna_x": lista_x[0] if lista_x else None,
                 "coluna_z": lista_z[0] if lista_z else None,
                 "Data": Data,
-                "lista_y": colunas_y,
+                "lista_y": lista_y,
                 "lista_x": lista_x,
                 "lista_z": lista_z,
                 "subgrupo": subgrupo_val,
@@ -222,11 +223,11 @@ async def analisar(
 
             disponiveis = {
                 "df": df,
-                "coluna_y": colunas_y[0] if colunas_y else None,
+                "coluna_y": lista_y[0] if lista_y else None,
                 "coluna_x": lista_x[0] if lista_x else None,
                 "coluna_z": lista_z[0] if lista_z else None,
                 "Data": Data,
-                "lista_y": colunas_y,
+                "lista_y": lista_y,
                 "lista_x": lista_x,
                 "lista_z": lista_z,
                 "subgrupo": subgrupo_val,
@@ -246,7 +247,6 @@ async def analisar(
 
             imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
 
-
         return {
             "analise": resultado_texto,
             "grafico_base64": imagem_analise_base64 or [],
@@ -260,85 +260,6 @@ async def analisar(
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao processar a análise.",
-            "detalhe": str(e),
-            "traceback": tb
-        }, status_code=500)
-
-
-@app.post("/personalizar-grafico")
-async def personalizar_grafico(
-    request: Request,
-    arquivo: UploadFile = File(None),
-    aba: str = Form(None),
-    grafico: str = Form(None),
-    coluna_y: str = Form(None),
-    coluna_x: str = Form(None),
-    coluna_z: str = Form(None),
-    subgrupo: str = Form(None),
-    field: str = Form(None),
-    field_conf: str = Form(None),
-    field_dist: str = Form(None),
-    field_LSE: str = Form(None),
-    field_LIE: str = Form(None),
-    Data: str = Form(None),
-    cor: str = Form(None),
-    titulo_x: str = Form(None),
-    titulo_y: str = Form(None),
-    titulo_grafico: str = Form(None),
-    tamanho_fonte: str = Form(None),
-    inclinacao_x: str = Form(None),
-    inclinacao_y: str = Form(None),
-    espessura: str = Form(None)
-):
-    try:
-        if not arquivo:
-            return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
-
-        df = await ler_arquivo(arquivo, aba)
-        if df is None or df.empty:
-            return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
-
-        # 🔍 Busca a função do gráfico personalizado diretamente no dicionário
-        funcao_grafico = GRAFICOS.get(grafico.strip())
-        if not funcao_grafico:
-            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
-
-        # 🔧 Filtra apenas os parâmetros aceitos pela função do gráfico
-        import inspect
-        params_aceitos = inspect.signature(funcao_grafico).parameters
-        args_to_pass = {k: v for k, v in {
-            "df": df,
-            "coluna_y": coluna_y,
-            "coluna_x": coluna_x,
-            "coluna_z": coluna_z,
-            "subgrupo": subgrupo,
-            "field": field,
-            "field_conf": field_conf,
-            "field_dist": field_dist,
-            "field_LSE": field_LSE,
-            "field_LIE": field_LIE,
-            "Data": Data,
-            "cor": cor,
-            "titulo_x": titulo_x,
-            "titulo_y": titulo_y,
-            "titulo_grafico": titulo_grafico,
-            "tamanho_fonte": tamanho_fonte,
-            "inclinacao_x": inclinacao_x,
-            "inclinacao_y": inclinacao_y,
-            "espessura": espessura
-        }.items() if k in params_aceitos}
-
-        # 🖼️ Chama a função do gráfico com os parâmetros filtrados
-        imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
-
-        return {
-            "grafico_isolado_base64": imagem_grafico_isolado_base64
-        }
-
-    except Exception as e:
-        tb = traceback.format_exc()
-        return JSONResponse({
-            "erro": "Erro interno ao personalizar gráfico.",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
