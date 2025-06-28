@@ -607,7 +607,7 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    return "", imagem_base64
+    return imagem_base64
 
   def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
     import matplotlib.pyplot as plt
