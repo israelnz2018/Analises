@@ -147,8 +147,10 @@ async def analisar(
     grafico: str = Form(None),
     aba: str = Form(None),
     coluna_y: str = Form(None),
-    colunas_x: str | list[str] = Form(None),
+    coluna_x: str = Form(None),
     coluna_z: str = Form(None),
+    lista_y: str = Form(None),  # ✅ recebe direto do form
+    lista_x: str = Form(None),  # ✅ recebe direto do form
     subgrupo: str = Form(None),
     field: str = Form(None),
     field_conf: str = Form(None),
@@ -168,26 +170,23 @@ async def analisar(
         if df is None or df.empty:
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
-        # 🔧 Ajuste: interpretação correta de coluna_y e lista_y
-        lista_y_raw = request.form().get("lista_y")
-        lista_y = []
-        if lista_y_raw:
-            if isinstance(lista_y_raw, str):
-                lista_y = [x.strip() for x in lista_y_raw.split(",")]
-            else:
-                lista_y = [x.strip() for x in lista_y_raw]
+        # 🔧 Processa lista_y
+        lista_y_processada = []
+        if lista_y:
+            lista_y_processada = [x.strip() for x in lista_y.split(",")]
 
-        lista_x = []
-        if colunas_x:
-            if isinstance(colunas_x, str):
-                lista_x = [x.strip() for x in colunas_x.split(",")]
-            else:
-                for item in colunas_x:
-                    lista_x.extend([x.strip() for x in item.split(",")])
+        # 🔧 Processa lista_x
+        lista_x_processada = []
+        if lista_x:
+            lista_x_processada = [x.strip() for x in lista_x.split(",")]
+
+        # 🔧 Processa coluna_z
         lista_z = [coluna_z.strip()] if coluna_z else []
+
         subgrupo_val = subgrupo.strip() if subgrupo else None
 
-        colunas_usadas = lista_y + lista_x + lista_z
+        # 🔧 Concatena colunas usadas
+        colunas_usadas = lista_y_processada + lista_x_processada + lista_z
         if subgrupo_val:
             colunas_usadas.append(subgrupo_val)
 
@@ -204,12 +203,12 @@ async def analisar(
 
             disponiveis = {
                 "df": df,
-                "coluna_y": lista_y[0] if lista_y else None,
-                "coluna_x": lista_x[0] if lista_x else None,
+                "coluna_y": lista_y_processada[0] if lista_y_processada else None,
+                "coluna_x": lista_x_processada[0] if lista_x_processada else None,
                 "coluna_z": lista_z[0] if lista_z else None,
                 "Data": Data,
-                "lista_y": lista_y,
-                "lista_x": lista_x,
+                "lista_y": lista_y_processada,
+                "lista_x": lista_x_processada,
                 "lista_z": lista_z,
                 "subgrupo": subgrupo_val,
                 "field": field,
@@ -230,12 +229,12 @@ async def analisar(
 
             disponiveis = {
                 "df": df,
-                "coluna_y": lista_y[0] if lista_y else None,
-                "coluna_x": lista_x[0] if lista_x else None,
+                "coluna_y": lista_y_processada[0] if lista_y_processada else None,
+                "coluna_x": lista_x_processada[0] if lista_x_processada else None,
                 "coluna_z": lista_z[0] if lista_z else None,
                 "Data": Data,
-                "lista_y": lista_y,
-                "lista_x": lista_x,
+                "lista_y": lista_y_processada,
+                "lista_x": lista_x_processada,
                 "lista_z": lista_z,
                 "subgrupo": subgrupo_val,
                 "field": field,
@@ -247,7 +246,7 @@ async def analisar(
 
             permitidos = CONFIG_ANALISES.get(grafico.strip(), ["df", "coluna_y"])
             args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
-            # 🔧 Filtra apenas os parâmetros aceitos pela função do gráfico
+
             import inspect
             params_aceitos = inspect.signature(funcao_grafico).parameters
             args_filtrados = {k: v for k, v in args_to_pass.items() if k in params_aceitos}
