@@ -238,9 +238,13 @@ async def analisar(
             resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
 
         if grafico:
+
+            print("🛠️ DEBUG GRAFICOS.keys():", list(GRAFICOS.keys()))
+            print("🛠️ DEBUG grafico solicitado:", grafico.strip())
             funcao_grafico = GRAFICOS.get(grafico.strip())
             if not funcao_grafico:
                 return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
+
 
             disponiveis = {
                 "df": df,
