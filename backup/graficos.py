@@ -87,6 +87,52 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
 
     return "", imagem_base64
 
+def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+
+    if isinstance(coluna_y, list):
+        coluna_y = coluna_y[0] if coluna_y else None
+
+    if not coluna_y or coluna_y not in df.columns:
+        return None
+
+    # 🔧 Aplicar estilo Minitab se desejar
+    aplicar_estilo_minitab()
+
+    plt.figure(figsize=(10, 6))
+    sns.histplot(
+        df[coluna_y].dropna(),
+        bins=10,
+        kde=True,
+        stat="density",
+        alpha=0.4,
+        color=cor,
+        edgecolor="black"
+    )
+    plt.xlabel(coluna_y if not titulo_x else titulo_x, fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
+    
+    # ✅ Usa título_grafico se informado, senão mantém padrão
+    plt.title(titulo_grafico if titulo_grafico else "Histograma com Curva de Densidade", fontsize=int(tamanho_fonte))
+    
+    plt.xticks(rotation=int(inclinacao_x))
+    plt.yticks(rotation=int(inclinacao_y))
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close()
+
+    return imagem_base64
+
+
+
+
 
 def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
@@ -591,6 +637,7 @@ def gerar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z):
 
 GRAFICOS = {
     "Histograma": gerar_histograma,
+    "Histograma Personalizado": personalizar_histograma,
     "Pareto": gerar_pareto,
     "Setores (Pizza)": gerar_pizza,
     "Barras": gerar_barras,
