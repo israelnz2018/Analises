@@ -213,11 +213,26 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, cor="#000000", titulo_x="",
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
+    # ✅ DEBUG ARGUMENTOS RECEBIDOS
+    print("🛠️ DEBUG personalizar_pareto - argumentos recebidos:")
+    print("   coluna_x:", coluna_x)
+    print("   coluna_y:", coluna_y)
+    print("   cor:", cor)
+    print("   titulo_x:", titulo_x)
+    print("   titulo_y:", titulo_y)
+    print("   titulo_grafico:", titulo_grafico)
+    print("   tamanho_fonte:", tamanho_fonte)
+    print("   inclinacao_x:", inclinacao_x)
+    print("   inclinacao_y:", inclinacao_y)
+    print("   espessura:", espessura)
+
     aplicar_estilo_minitab()
 
     if not coluna_x or coluna_x not in df.columns:
+        print("❌ coluna_x não encontrada no DataFrame.")
         return None
     if coluna_y and coluna_y not in df.columns:
+        print("❌ coluna_y não encontrada no DataFrame.")
         return None
 
     plt.figure(figsize=(10, 6))
@@ -228,6 +243,9 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, cor="#000000", titulo_x="",
         contagem = df[coluna_x].value_counts().sort_values(ascending=False)
 
     acumulado = contagem.cumsum() / contagem.sum() * 100
+
+    # 🔧 DEBUG CONTAGEM
+    print("🛠️ DEBUG personalizar_pareto - contagem.head():", contagem.head())
 
     # Barras Pareto
     ax = contagem.plot(kind="bar", color=cor, edgecolor="black")
@@ -256,7 +274,10 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, cor="#000000", titulo_x="",
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
+    print("✅ DEBUG personalizar_pareto - imagem_base64 gerada com sucesso")
+
     return imagem_base64
+
 
 
 
