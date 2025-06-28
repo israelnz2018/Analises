@@ -609,7 +609,41 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
 
     return imagem_base64
 
-  def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+    from suporte import aplicar_estilo_minitab
+
+    if not coluna_y or coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
+
+    if not coluna_x or coluna_x not in df.columns:
+        return "❌ A coluna X informada não foi encontrada no arquivo.", None
+
+    aplicar_estilo_minitab()
+    plt.figure(figsize=(10, 6))
+
+    if subgrupo and subgrupo in df.columns:
+        sns.scatterplot(x=coluna_x, y=coluna_y, hue=subgrupo, data=df)
+        plt.title(f"Dispersão de {coluna_y} por {coluna_x} (Subgrupo: {subgrupo})")
+    else:
+        sns.scatterplot(x=coluna_x, y=coluna_y, data=df)
+        plt.title(f"Dispersão de {coluna_y} por {coluna_x}")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    return "", imagem_base64
+
+
+def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -640,6 +674,7 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return imagem_base64
+
   
 def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
     import matplotlib.pyplot as plt
