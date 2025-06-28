@@ -169,7 +169,14 @@ async def analisar(
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
         # 🔧 Ajuste: interpretação correta de coluna_y e lista_y
-        lista_y = [coluna_y.strip()] if coluna_y else []
+        lista_y_raw = request.form().get("lista_y")
+        lista_y = []
+        if lista_y_raw:
+            if isinstance(lista_y_raw, str):
+                lista_y = [x.strip() for x in lista_y_raw.split(",")]
+            else:
+                lista_y = [x.strip() for x in lista_y_raw]
+
         lista_x = []
         if colunas_x:
             if isinstance(colunas_x, str):
