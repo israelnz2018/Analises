@@ -137,6 +137,26 @@ DICIONARIO_TERMOS = {
     "field_LIE": "Valor do limite inferior de engenharia"
 }
 
+print("🔍 DEBUG COMPLETO - INÍCIO 🔍")
+print("📂 Nome do arquivo recebido:", arquivo.filename)
+print("📑 Aba solicitada:", aba)
+print("🧾 Colunas no DataFrame:", df.columns.tolist())
+print("➡ coluna_y recebida:", coluna_y)
+print("➡ lista_y recebida:", lista_y)
+print("➡ coluna_x recebida:", colunas_x)
+print("➡ lista_x recebida:", lista_x)
+print("➡ coluna_z recebida:", coluna_z)
+print("➡ lista_z recebida:", lista_z)
+print("➡ subgrupo recebido:", subgrupo_val)
+print("➡ field:", field)
+print("➡ field_conf:", field_conf)
+print("➡ field_dist:", field_dist)
+print("➡ field_LSE:", field_LSE)
+print("➡ field_LIE:", field_LIE)
+print("➡ Data:", Data)
+print("🔧 ferramenta:", ferramenta)
+print("🔧 grafico:", grafico)
+print("🔍 DEBUG COMPLETO - FIM 🔍")
 
 
 @app.post("/analise")
