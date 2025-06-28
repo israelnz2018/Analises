@@ -137,6 +137,9 @@ DICIONARIO_TERMOS = {
     "field_LIE": "Valor do limite inferior de engenharia"
 }
 
+# ✅ Variável global para armazenar df atual
+df_global = None
+
 @app.post("/analise")
 async def analisar(
     request: Request,
@@ -300,8 +303,6 @@ async def analisar(
 @app.post("/personalizar-grafico")
 async def personalizar_grafico(
     request: Request,
-    arquivo: UploadFile = File(None),
-    aba: str = Form(None),
     grafico: str = Form(None),
     coluna_y: str = Form(None),
     coluna_x: str = Form(None),
@@ -325,9 +326,12 @@ async def personalizar_grafico(
     espessura: str = Form(None)
 ):
     try:
+        global df_global
+        if df_global is None:
+            return JSONResponse({"erro": "Nenhum DataFrame carregado. Gere o gráfico primeiro."}, status_code=400)
+
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
         print("🎨 Gráfico solicitado:", grafico)
-        print("📂 Aba:", aba)
         print("➡ coluna_y:", coluna_y)
         print("➡ coluna_x:", coluna_x)
         print("➡ coluna_z:", coluna_z)
@@ -344,11 +348,6 @@ async def personalizar_grafico(
         print("➡ espessura:", espessura)
         print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
 
-        df = None
-        if arquivo:
-            from leitura import ler_arquivo
-            df = await ler_arquivo(arquivo, aba)
-
         # trata listas
         lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
         lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
@@ -360,7 +359,7 @@ async def personalizar_grafico(
         import inspect
         params_aceitos = inspect.signature(funcao_grafico).parameters
         args_to_pass = {k: v for k, v in {
-            "df": df,
+            "df": df_global,
             "coluna_y": coluna_y,
             "coluna_x": coluna_x,
             "coluna_z": coluna_z,
@@ -397,5 +396,4 @@ async def personalizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
-
 
