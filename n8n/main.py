@@ -299,7 +299,6 @@ async def analisar(
 
 @app.post("/personalizar-grafico")
 async def personalizar_grafico(
-    request: Request,
     grafico: str = Form(None),
     cor: str = Form(None),
     titulo_x: str = Form(None),
@@ -329,6 +328,8 @@ async def personalizar_grafico(
 
         import inspect
         params_aceitos = inspect.signature(funcao_grafico).parameters
+
+        # 🔧 Monta apenas os argumentos aceitos pela função do gráfico
         args_to_pass = {k: v for k, v in {
             "cor": cor,
             "titulo_x": titulo_x,
@@ -340,6 +341,7 @@ async def personalizar_grafico(
             "espessura": espessura
         }.items() if k in params_aceitos}
 
+        # 🖼️ Gera o gráfico com personalização
         imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
 
         return {
@@ -347,9 +349,11 @@ async def personalizar_grafico(
         }
 
     except Exception as e:
+        import traceback
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao personalizar gráfico.",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
