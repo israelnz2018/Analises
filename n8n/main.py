@@ -147,8 +147,8 @@ async def analisar(
     coluna_y: str = Form(None),
     coluna_x: str = Form(None),
     coluna_z: str = Form(None),
-    lista_y: str = Form(None),  # ✅ recebe direto do form
-    lista_x: str = Form(None),  # ✅ recebe direto do form
+    lista_y: str = Form(None),
+    lista_x: str = Form(None),
     subgrupo: str = Form(None),
     field: str = Form(None),
     field_conf: str = Form(None),
@@ -218,9 +218,9 @@ async def analisar(
 
             disponiveis = {
                 "df": df,
-                "coluna_y": lista_y_processada[0] if lista_y_processada else None,
-                "coluna_x": lista_x_processada[0] if lista_x_processada else None,
-                "coluna_z": lista_z[0] if lista_z else None,
+                "coluna_y": coluna_y.strip() if coluna_y else None,  # ✅ garante coluna_y como string única
+                "coluna_x": coluna_x.strip() if coluna_x else None,
+                "coluna_z": coluna_z.strip() if coluna_z else None,
                 "Data": Data,
                 "lista_y": lista_y_processada,
                 "lista_x": lista_x_processada,
@@ -244,9 +244,9 @@ async def analisar(
 
             disponiveis = {
                 "df": df,
-                "coluna_y": lista_y_processada[0] if lista_y_processada else None,
-                "coluna_x": lista_x_processada[0] if lista_x_processada else None,
-                "coluna_z": lista_z[0] if lista_z else None,
+                "coluna_y": coluna_y.strip() if coluna_y else None,
+                "coluna_x": coluna_x.strip() if coluna_x else None,
+                "coluna_z": coluna_z.strip() if coluna_z else None,
                 "Data": Data,
                 "lista_y": lista_y_processada,
                 "lista_x": lista_x_processada,
