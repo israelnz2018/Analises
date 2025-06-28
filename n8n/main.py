@@ -299,7 +299,22 @@ async def analisar(
 
 @app.post("/personalizar-grafico")
 async def personalizar_grafico(
+    request: Request,
+    arquivo: UploadFile = File(None),
+    aba: str = Form(None),
     grafico: str = Form(None),
+    coluna_y: str = Form(None),
+    coluna_x: str = Form(None),
+    coluna_z: str = Form(None),
+    subgrupo: str = Form(None),
+    field: str = Form(None),
+    field_conf: str = Form(None),
+    field_dist: str = Form(None),
+    field_LSE: str = Form(None),
+    field_LIE: str = Form(None),
+    Data: str = Form(None),
+    lista_y: str = Form(None),
+    lista_x: str = Form(None),
     cor: str = Form(None),
     titulo_x: str = Form(None),
     titulo_y: str = Form(None),
@@ -312,6 +327,13 @@ async def personalizar_grafico(
     try:
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
         print("🎨 Gráfico solicitado:", grafico)
+        print("📂 Aba:", aba)
+        print("➡ coluna_y:", coluna_y)
+        print("➡ coluna_x:", coluna_x)
+        print("➡ coluna_z:", coluna_z)
+        print("➡ subgrupo:", subgrupo)
+        print("➡ lista_y:", lista_y)
+        print("➡ lista_x:", lista_x)
         print("➡ cor:", cor)
         print("➡ titulo_x:", titulo_x)
         print("➡ titulo_y:", titulo_y)
@@ -322,15 +344,35 @@ async def personalizar_grafico(
         print("➡ espessura:", espessura)
         print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
 
+        df = None
+        if arquivo:
+            from leitura import ler_arquivo
+            df = await ler_arquivo(arquivo, aba)
+
+        # trata listas
+        lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
+        lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
+
         funcao_grafico = GRAFICOS.get(grafico.strip())
         if not funcao_grafico:
-            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
+            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
 
         import inspect
         params_aceitos = inspect.signature(funcao_grafico).parameters
-
-        # 🔧 Monta apenas os argumentos aceitos pela função do gráfico
         args_to_pass = {k: v for k, v in {
+            "df": df,
+            "coluna_y": coluna_y,
+            "coluna_x": coluna_x,
+            "coluna_z": coluna_z,
+            "subgrupo": subgrupo,
+            "field": field,
+            "field_conf": field_conf,
+            "field_dist": field_dist,
+            "field_LSE": field_LSE,
+            "field_LIE": field_LIE,
+            "Data": Data,
+            "lista_y": lista_y_processada,
+            "lista_x": lista_x_processada,
             "cor": cor,
             "titulo_x": titulo_x,
             "titulo_y": titulo_y,
@@ -341,7 +383,6 @@ async def personalizar_grafico(
             "espessura": espessura
         }.items() if k in params_aceitos}
 
-        # 🖼️ Gera o gráfico com personalização
         imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
 
         return {
@@ -356,4 +397,5 @@ async def personalizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
 
