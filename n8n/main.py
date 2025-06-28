@@ -300,8 +300,6 @@ async def analisar(
 @app.post("/personalizar-grafico")
 async def personalizar_grafico(
     request: Request,
-    arquivo: UploadFile = File(None),
-    aba: str = Form(None),
     grafico: str = Form(None),
     coluna_y: str = Form(None),
     coluna_x: str = Form(None),
@@ -323,24 +321,10 @@ async def personalizar_grafico(
     espessura: str = Form(None)
 ):
     try:
-        if not arquivo:
-            return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
-
         # 🔍 DEBUG INICIO
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
-        print("📂 Nome do arquivo recebido:", arquivo.filename)
-        print("📑 Aba solicitada:", aba)
         print("🎨 Gráfico solicitado:", grafico)
         print("➡ coluna_y:", coluna_y)
-        print("➡ coluna_x:", coluna_x)
-        print("➡ coluna_z:", coluna_z)
-        print("➡ subgrupo:", subgrupo)
-        print("➡ field:", field)
-        print("➡ field_conf:", field_conf)
-        print("➡ field_dist:", field_dist)
-        print("➡ field_LSE:", field_LSE)
-        print("➡ field_LIE:", field_LIE)
-        print("➡ Data:", Data)
         print("➡ cor:", cor)
         print("➡ titulo_x:", titulo_x)
         print("➡ titulo_y:", titulo_y)
@@ -351,10 +335,7 @@ async def personalizar_grafico(
         print("➡ espessura:", espessura)
         print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
 
-        from leitura import ler_arquivo  # ✅ garante import dentro da função se necessário
-        df = await ler_arquivo(arquivo, aba)
-        if df is None or df.empty:
-            return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
+        df = None  # Personalização não requer df
 
         # 🔍 Busca a função do gráfico personalizado diretamente no dicionário
         funcao_grafico = GRAFICOS.get(grafico.strip())
@@ -362,6 +343,7 @@ async def personalizar_grafico(
             return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
 
         # 🔧 Filtra apenas os parâmetros aceitos pela função do gráfico
+        import inspect
         params_aceitos = inspect.signature(funcao_grafico).parameters
         args_to_pass = {k: v for k, v in {
             "df": df,
@@ -393,6 +375,7 @@ async def personalizar_grafico(
         }
 
     except Exception as e:
+        import traceback
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao personalizar gráfico.",
