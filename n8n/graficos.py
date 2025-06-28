@@ -128,8 +128,7 @@ def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close()
 
-    print("🛠️ DEBUG personalizar_pareto - contagem.head():", contagem.head())
-    print("🛠️ DEBUG personalizar_pareto - imagem gerada com sucesso")
+
 
     return imagem_base64
 
