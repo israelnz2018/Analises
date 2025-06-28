@@ -287,7 +287,8 @@ async def analisar(
             "colunas_utilizadas": colunas_usadas
         }
 
-    @app.post("/personalizar-grafico")
+    
+@app.post("/personalizar-grafico")
 async def personalizar_grafico(
     request: Request,
     arquivo: UploadFile = File(None),
@@ -341,6 +342,7 @@ async def personalizar_grafico(
         print("➡ espessura:", espessura)
         print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
 
+        from leitura import ler_arquivo  # ✅ garante import dentro da função se necessário
         df = await ler_arquivo(arquivo, aba)
         if df is None or df.empty:
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
@@ -351,7 +353,6 @@ async def personalizar_grafico(
             return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
 
         # 🔧 Filtra apenas os parâmetros aceitos pela função do gráfico
-        import inspect
         params_aceitos = inspect.signature(funcao_grafico).parameters
         args_to_pass = {k: v for k, v in {
             "df": df,
