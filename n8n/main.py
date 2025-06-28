@@ -295,6 +295,8 @@ async def personalizar_grafico(
     coluna_y: str = Form(None),
     coluna_x: str = Form(None),
     coluna_z: str = Form(None),
+    lista_y: str = Form(None),
+    lista_x: str = Form(None),
     subgrupo: str = Form(None),
     field: str = Form(None),
     field_conf: str = Form(None),
@@ -315,15 +317,33 @@ async def personalizar_grafico(
         if not arquivo:
             return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
 
-        # 🔍 DEBUG INICIO
+        # 🔧 Processa lista_y
+        lista_y_processada = []
+        if lista_y:
+            lista_y_processada = [x.strip() for x in lista_y.split(",")]
+
+        # 🔧 Processa lista_x
+        lista_x_processada = []
+        if lista_x:
+            lista_x_processada = [x.strip() for x in lista_x.split(",")]
+
+        # 🔧 Processa coluna_z
+        lista_z = [coluna_z.strip()] if coluna_z else []
+
+        subgrupo_val = subgrupo.strip() if subgrupo else None
+
+        # ✅ PRINT DEBUG COMPLETO
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
         print("📂 Nome do arquivo recebido:", arquivo.filename)
         print("📑 Aba solicitada:", aba)
         print("🎨 Gráfico solicitado:", grafico)
         print("➡ coluna_y:", coluna_y)
+        print("➡ lista_y:", lista_y_processada)
         print("➡ coluna_x:", coluna_x)
+        print("➡ lista_x:", lista_x_processada)
         print("➡ coluna_z:", coluna_z)
-        print("➡ subgrupo:", subgrupo)
+        print("➡ lista_z:", lista_z)
+        print("➡ subgrupo:", subgrupo_val)
         print("➡ field:", field)
         print("➡ field_conf:", field_conf)
         print("➡ field_dist:", field_dist)
@@ -354,10 +374,13 @@ async def personalizar_grafico(
         params_aceitos = inspect.signature(funcao_grafico).parameters
         args_to_pass = {k: v for k, v in {
             "df": df,
-            "coluna_y": coluna_y,
-            "coluna_x": coluna_x,
-            "coluna_z": coluna_z,
-            "subgrupo": subgrupo,
+            "coluna_y": coluna_y.strip() if coluna_y else None,
+            "coluna_x": coluna_x.strip() if coluna_x else None,
+            "coluna_z": coluna_z.strip() if coluna_z else None,
+            "lista_y": lista_y_processada,
+            "lista_x": lista_x_processada,
+            "lista_z": lista_z,
+            "subgrupo": subgrupo_val,
             "field": field,
             "field_conf": field_conf,
             "field_dist": field_dist,
