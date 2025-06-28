@@ -112,8 +112,8 @@ def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="
         color=cor,
         edgecolor="black"
     )
-    plt.xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y else "Densidade", fontsize=int(tamanho_fonte))
+    plt.xlabel(coluna_y if not titulo_x else titulo_x, fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
     plt.title("Histograma com Curva de Densidade", fontsize=int(tamanho_fonte))
     plt.xticks(rotation=int(inclinacao_x))
     plt.yticks(rotation=int(inclinacao_y))
