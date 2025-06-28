@@ -384,14 +384,20 @@ async def personalizar_grafico(
         # 🖼️ Chama a função do gráfico com os parâmetros filtrados
         imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
 
+        if imagem_grafico_isolado_base64 is None:
+            return JSONResponse({"erro": f"O gráfico {grafico} não retornou imagem."}, status_code=400)
+
         return {
             "grafico_isolado_base64": imagem_grafico_isolado_base64
         }
 
     except Exception as e:
+        import traceback
         tb = traceback.format_exc()
+        print("❌ ERRO INTERNO PERSONALIZAR-GRAFICO:", tb)
         return JSONResponse({
             "erro": "Erro interno ao personalizar gráfico.",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
