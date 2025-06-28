@@ -351,6 +351,8 @@ async def personalizar_grafico(
 
         # 🔍 Busca a função do gráfico personalizado diretamente no dicionário
         funcao_grafico = GRAFICOS.get(grafico.strip())
+        print("🛠️ DEBUG GRAFICOS.keys():", list(GRAFICOS.keys()))
+        print("🛠️ DEBUG grafico solicitado:", grafico.strip())
         if not funcao_grafico:
             return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
 
