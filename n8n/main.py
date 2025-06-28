@@ -301,16 +301,6 @@ async def analisar(
 async def personalizar_grafico(
     request: Request,
     grafico: str = Form(None),
-    coluna_y: str = Form(None),
-    coluna_x: str = Form(None),
-    coluna_z: str = Form(None),
-    subgrupo: str = Form(None),
-    field: str = Form(None),
-    field_conf: str = Form(None),
-    field_dist: str = Form(None),
-    field_LSE: str = Form(None),
-    field_LIE: str = Form(None),
-    Data: str = Form(None),
     cor: str = Form(None),
     titulo_x: str = Form(None),
     titulo_y: str = Form(None),
@@ -321,10 +311,8 @@ async def personalizar_grafico(
     espessura: str = Form(None)
 ):
     try:
-        # 🔍 DEBUG INICIO
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
         print("🎨 Gráfico solicitado:", grafico)
-        print("➡ coluna_y:", coluna_y)
         print("➡ cor:", cor)
         print("➡ titulo_x:", titulo_x)
         print("➡ titulo_y:", titulo_y)
@@ -335,28 +323,13 @@ async def personalizar_grafico(
         print("➡ espessura:", espessura)
         print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
 
-        df = None  # Personalização não requer df
-
-        # 🔍 Busca a função do gráfico personalizado diretamente no dicionário
         funcao_grafico = GRAFICOS.get(grafico.strip())
         if not funcao_grafico:
             return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
 
-        # 🔧 Filtra apenas os parâmetros aceitos pela função do gráfico
         import inspect
         params_aceitos = inspect.signature(funcao_grafico).parameters
         args_to_pass = {k: v for k, v in {
-            "df": df,
-            "coluna_y": coluna_y,
-            "coluna_x": coluna_x,
-            "coluna_z": coluna_z,
-            "subgrupo": subgrupo,
-            "field": field,
-            "field_conf": field_conf,
-            "field_dist": field_dist,
-            "field_LSE": field_LSE,
-            "field_LIE": field_LIE,
-            "Data": Data,
             "cor": cor,
             "titulo_x": titulo_x,
             "titulo_y": titulo_y,
@@ -367,7 +340,6 @@ async def personalizar_grafico(
             "espessura": espessura
         }.items() if k in params_aceitos}
 
-        # 🖼️ Chama a função do gráfico com os parâmetros filtrados
         imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
 
         return {
@@ -375,7 +347,6 @@ async def personalizar_grafico(
         }
 
     except Exception as e:
-        import traceback
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao personalizar gráfico.",
