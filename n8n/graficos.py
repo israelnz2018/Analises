@@ -87,7 +87,7 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
 
     return "", imagem_base64
 
-def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -114,7 +114,10 @@ def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="
     )
     plt.xlabel(coluna_y if not titulo_x else titulo_x, fontsize=int(tamanho_fonte))
     plt.ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
-    plt.title("Histograma com Curva de Densidade", fontsize=int(tamanho_fonte))
+    
+    # ✅ Usa título_grafico se informado, senão mantém padrão
+    plt.title(titulo_grafico if titulo_grafico else "Histograma com Curva de Densidade", fontsize=int(tamanho_fonte))
+    
     plt.xticks(rotation=int(inclinacao_x))
     plt.yticks(rotation=int(inclinacao_y))
     plt.tight_layout()
@@ -126,6 +129,7 @@ def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="
     plt.close()
 
     return imagem_base64
+
 
 
 
