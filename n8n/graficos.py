@@ -207,6 +207,76 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
 
 
+def personalizar_pareto(df, coluna_x, coluna_y=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from suporte import aplicar_estilo_minitab
+
+    # ✅ DEBUG ARGUMENTOS RECEBIDOS
+    print("🛠️ DEBUG personalizar_pareto - argumentos recebidos:")
+    print("   coluna_x:", coluna_x)
+    print("   coluna_y:", coluna_y)
+    print("   cor:", cor)
+    print("   titulo_x:", titulo_x)
+    print("   titulo_y:", titulo_y)
+    print("   titulo_grafico:", titulo_grafico)
+    print("   tamanho_fonte:", tamanho_fonte)
+    print("   inclinacao_x:", inclinacao_x)
+    print("   inclinacao_y:", inclinacao_y)
+    print("   espessura:", espessura)
+
+    aplicar_estilo_minitab()
+
+    if not coluna_x or coluna_x not in df.columns:
+        print("❌ coluna_x não encontrada no DataFrame.")
+        return None
+    if coluna_y and coluna_y not in df.columns:
+        print("❌ coluna_y não encontrada no DataFrame.")
+        return None
+
+    plt.figure(figsize=(10, 6))
+
+    if coluna_y:
+        contagem = df.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
+    else:
+        contagem = df[coluna_x].value_counts().sort_values(ascending=False)
+
+    acumulado = contagem.cumsum() / contagem.sum() * 100
+
+    # 🔧 DEBUG CONTAGEM
+    print("🛠️ DEBUG personalizar_pareto - contagem.head():", contagem.head())
+
+    # Barras Pareto
+    ax = contagem.plot(kind="bar", color=cor, edgecolor="black")
+
+    # Curva acumulada
+    ax2 = ax.twinx()
+    ax2.plot(acumulado.index, acumulado.values, color="red", marker="o", linewidth=espessura)
+    ax2.set_ylim(0, 110)
+
+    # Percentuais na curva
+    for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
+        ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
+
+    # Personalização dos textos
+    ax.set_xlabel(titulo_x if titulo_x else coluna_x, fontsize=int(tamanho_fonte))
+    ax.set_ylabel(titulo_y if titulo_y else "Frequência / Soma", fontsize=int(tamanho_fonte))
+    ax.set_title(titulo_grafico if titulo_grafico else f"Pareto - {coluna_x}", fontsize=int(tamanho_fonte))
+
+    plt.xticks(rotation=int(inclinacao_x))
+    plt.yticks(rotation=int(inclinacao_y))
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    print("✅ DEBUG personalizar_pareto - imagem_base64 gerada com sucesso")
+
+    return imagem_base64
 
 
 
