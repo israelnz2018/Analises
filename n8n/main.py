@@ -230,7 +230,7 @@ async def analisar(
 
             disponiveis = {
                 "df": df,
-                "coluna_y": coluna_y.strip() if coluna_y else None,  # ✅ garante coluna_y como string única
+                "coluna_y": coluna_y.strip() if coluna_y else None,
                 "coluna_x": coluna_x.strip() if coluna_x else None,
                 "coluna_z": coluna_z.strip() if coluna_z else None,
                 "Data": Data,
@@ -287,7 +287,16 @@ async def analisar(
             "colunas_utilizadas": colunas_usadas
         }
 
-    
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao processar a análise.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
+
+
 @app.post("/personalizar-grafico")
 async def personalizar_grafico(
     request: Request,
