@@ -283,6 +283,10 @@ async def analisar(
 
             imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
 
+        # ✅ Atualiza a variável global com o DataFrame carregado
+        global df_global
+        df_global = df
+
         return {
             "analise": resultado_texto,
             "grafico_base64": imagem_analise_base64 or [],
