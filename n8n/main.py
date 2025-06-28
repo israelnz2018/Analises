@@ -303,6 +303,8 @@ async def analisar(
 @app.post("/personalizar-grafico")
 async def personalizar_grafico(
     request: Request,
+    arquivo: UploadFile = File(None),
+    aba: str = Form(None),
     grafico: str = Form(None),
     coluna_y: str = Form(None),
     coluna_x: str = Form(None),
@@ -327,17 +329,10 @@ async def personalizar_grafico(
 ):
     try:
         global df_global
-        if df_global is None:
-            return JSONResponse({"erro": "Nenhum DataFrame carregado. Gere o gráfico primeiro."}, status_code=400)
 
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
         print("🎨 Gráfico solicitado:", grafico)
         print("➡ coluna_y:", coluna_y)
-        print("➡ coluna_x:", coluna_x)
-        print("➡ coluna_z:", coluna_z)
-        print("➡ subgrupo:", subgrupo)
-        print("➡ lista_y:", lista_y)
-        print("➡ lista_x:", lista_x)
         print("➡ cor:", cor)
         print("➡ titulo_x:", titulo_x)
         print("➡ titulo_y:", titulo_y)
@@ -348,7 +343,12 @@ async def personalizar_grafico(
         print("➡ espessura:", espessura)
         print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
 
-        # trata listas
+        # ✅ Usa df_global já carregado anteriormente
+        df = df_global
+        if df is None or df.empty:
+            return JSONResponse({"erro": "Nenhum DataFrame carregado. Gere o gráfico primeiro."}, status_code=400)
+
+        # ✅ Processa listas
         lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
         lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
 
@@ -359,7 +359,7 @@ async def personalizar_grafico(
         import inspect
         params_aceitos = inspect.signature(funcao_grafico).parameters
         args_to_pass = {k: v for k, v in {
-            "df": df_global,
+            "df": df,
             "coluna_y": coluna_y,
             "coluna_x": coluna_x,
             "coluna_z": coluna_z,
@@ -396,4 +396,3 @@ async def personalizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
-
