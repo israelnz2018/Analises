@@ -238,14 +238,9 @@ async def analisar(
             resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
 
         if grafico:
-
-           
             funcao_grafico = GRAFICOS.get(grafico.strip())
-            print("🛠️ DEBUG GRAFICOS.keys():", list(GRAFICOS.keys()))
-            print("🛠️ DEBUG grafico solicitado:", grafico.strip())
             if not funcao_grafico:
                 return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
-
 
             disponiveis = {
                 "df": df,
@@ -351,8 +346,6 @@ async def personalizar_grafico(
 
         # 🔍 Busca a função do gráfico personalizado diretamente no dicionário
         funcao_grafico = GRAFICOS.get(grafico.strip())
-        print("🛠️ DEBUG GRAFICOS.keys():", list(GRAFICOS.keys()))
-        print("🛠️ DEBUG grafico solicitado:", grafico.strip())
         if not funcao_grafico:
             return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
 
@@ -384,20 +377,14 @@ async def personalizar_grafico(
         # 🖼️ Chama a função do gráfico com os parâmetros filtrados
         imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
 
-        if imagem_grafico_isolado_base64 is None:
-            return JSONResponse({"erro": f"O gráfico {grafico} não retornou imagem."}, status_code=400)
-
         return {
             "grafico_isolado_base64": imagem_grafico_isolado_base64
         }
 
     except Exception as e:
-        import traceback
         tb = traceback.format_exc()
-        print("❌ ERRO INTERNO PERSONALIZAR-GRAFICO:", tb)
         return JSONResponse({
             "erro": "Erro interno ao personalizar gráfico.",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
-
