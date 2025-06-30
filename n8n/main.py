@@ -263,66 +263,77 @@ async def analisar(
             ultimo_resultado_texto = resultado_texto
 
 
-            # ✅ SE TIVER PERGUNTA: chama o agente IA sobre a análise
-            if pergunta:
-                from agente import perguntar_ia
-                resposta_ia = perguntar_ia(pergunta, resultado_texto)
+           # ✅ SE TIVER PERGUNTA: chama o agente IA sobre a análise ou gráfico
+global ultimo_resultado_texto  # garante uso da variável global
 
-        if grafico:
-            funcao_grafico = GRAFICOS.get(grafico.strip())
-            if not funcao_grafico:
-                return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
+if ferramenta:
+    funcao = ANALISES.get(ferramenta.strip())
+    if not funcao:
+        return JSONResponse({"erro": f"Análise {ferramenta} desconhecida."}, status_code=400)
 
-            disponiveis = {
-                "df": df,
-                "coluna_y": coluna_y.strip() if coluna_y else None,
-                "coluna_x": coluna_x.strip() if coluna_x else None,
-                "coluna_z": coluna_z.strip() if coluna_z else None,
-                "Data": Data,
-                "lista_y": lista_y_processada,
-                "lista_x": lista_x_processada,
-                "lista_z": lista_z,
-                "subgrupo": subgrupo_val,
-                "field": field,
-                "field_conf": field_conf,
-                "field_dist": field_dist,
-                "field_LSE": field_LSE,
-                "field_LIE": field_LIE
-            }
+    disponiveis = {
+        "df": df,
+        "coluna_y": coluna_y.strip() if coluna_y else None,
+        "coluna_x": coluna_x.strip() if coluna_x else None,
+        "coluna_z": coluna_z.strip() if coluna_z else None,
+        "Data": Data,
+        "lista_y": lista_y_processada,
+        "lista_x": lista_x_processada,
+        "lista_z": lista_z,
+        "subgrupo": subgrupo_val,
+        "field": field,
+        "field_conf": field_conf,
+        "field_dist": field_dist,
+        "field_LSE": field_LSE,
+        "field_LIE": field_LIE
+    }
 
-            permitidos = CONFIG_ANALISES.get(grafico.strip(), ["df", "coluna_y"])
-            args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
+    permitidos = CONFIG_ANALISES.get(ferramenta.strip(), ["df"])
+    args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
+    resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
 
-            import inspect
-            params_aceitos = inspect.signature(funcao_grafico).parameters
-            args_filtrados = {k: v for k, v in args_to_pass.items() if k in params_aceitos}
+    ultimo_resultado_texto = resultado_texto  # ✅ atualiza global
 
-            imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
+    if pergunta:
+        from agente import perguntar_ia
+        resposta_ia = perguntar_ia(pergunta, ultimo_resultado_texto)
 
-            # ✅ SE TIVER PERGUNTA: chama o agente IA sobre o gráfico
-            if pergunta:
-                from agente import perguntar_ia
-                resposta_ia = perguntar_ia(pergunta, "resultado_texto")  # simples prompt sobre gráfico
+if grafico:
+    funcao_grafico = GRAFICOS.get(grafico.strip())
+    if not funcao_grafico:
+        return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
 
-        # ✅ Atualiza a variável global com o DataFrame carregado
-        global df_global
-        df_global = df
+    disponiveis = {
+        "df": df,
+        "coluna_y": coluna_y.strip() if coluna_y else None,
+        "coluna_x": coluna_x.strip() if coluna_x else None,
+        "coluna_z": coluna_z.strip() if coluna_z else None,
+        "Data": Data,
+        "lista_y": lista_y_processada,
+        "lista_x": lista_x_processada,
+        "lista_z": lista_z,
+        "subgrupo": subgrupo_val,
+        "field": field,
+        "field_conf": field_conf,
+        "field_dist": field_dist,
+        "field_LSE": field_LSE,
+        "field_LIE": field_LIE
+    }
 
-        return {
-            "analise": resultado_texto,
-            "grafico_base64": imagem_analise_base64 or [],
-            "grafico_isolado_base64": imagem_grafico_isolado_base64,
-            "colunas_utilizadas": colunas_usadas,
-            "resposta_ia": resposta_ia   # ✅ inclui resposta do agente IA no retorno
-        }
+    permitidos = CONFIG_ANALISES.get(grafico.strip(), ["df", "coluna_y"])
+    args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
 
-    except Exception as e:
-        tb = traceback.format_exc()
-        return JSONResponse({
-            "erro": "Erro interno ao processar a análise.",
-            "detalhe": str(e),
-            "traceback": tb
-        }, status_code=500)
+    import inspect
+    params_aceitos = inspect.signature(funcao_grafico).parameters
+    args_filtrados = {k: v for k, v in args_to_pass.items() if k in params_aceitos}
+
+    imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
+
+    ultimo_resultado_texto = f"Gráfico gerado: {grafico}"  # ✅ atualiza global com descrição do gráfico
+
+    if pergunta:
+        from agente import perguntar_ia
+        resposta_ia = perguntar_ia(pergunta, ultimo_resultado_texto)
 
 @app.post("/personalizar-grafico")
 async def personalizar_grafico(
