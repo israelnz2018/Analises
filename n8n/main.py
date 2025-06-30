@@ -1,15 +1,16 @@
-# main.py - atualizado 01/07/2025
+# Atualizacao forçada - 27/06/2025
 
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware  
 import traceback
 import os
+from fastapi import Form
 import base64
 import io
 import matplotlib.pyplot as plt
 
-# ✅ Importa agente IA com memória curta
+# 🧠 Importa o agente de IA
 from agente import perguntar_ia
 
 # Tentativa segura de importação dos módulos 
@@ -28,10 +29,13 @@ except ImportError as e:
 # Iniciar app
 app = FastAPI()
 
-# Middleware CORS
+# Middleware de CORS atualizado para incluir seu novo domínio
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # ajuste se necessário
+    allow_origins=[
+        "https://educacaopelotrabalho-production.up.railway.app",
+        "https://app.educacaopelotrabalho.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -41,7 +45,7 @@ app.add_middleware(
 @app.options("/{path:path}")
 async def preflight_handler(path: str):
     response = Response()
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Origin"] = ",".join(allowed_origins)
     response.headers["Access-Control-Allow-Methods"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "*"
     return response
@@ -55,11 +59,36 @@ ANALISES.update(ANALISES_PRED if 'ANALISES_PRED' in locals() else {})
 ANALISES.update(ANALISES_PROC if 'ANALISES_PROC' in locals() else {})
 ANALISES.update(ANALISES_DIVERSAS if 'ANALISES_DIVERSAS' in locals() else {})
 
-# ✅ Variável global para armazenar último resultado
-ultimo_resultado = {
-    "analise": None,
-    "grafico": None
-}
+# ✅ Variáveis globais para armazenar última análise e último gráfico
+ultima_analise = None
+ultimo_grafico = None
+
+@app.post("/pergunta")
+async def pergunta_ia(request: Request):
+    try:
+        dados = await request.json()
+        pergunta = dados.get("prompt", "").strip()
+        if not pergunta:
+            return JSONResponse({"erro": "Nenhuma pergunta fornecida."}, status_code=400)
+
+        # Prioridade: usa última análise se existir, senão último gráfico
+        contexto = ultima_analise if ultima_analise else ultimo_grafico
+        if not contexto:
+            return JSONResponse({"erro": "Nenhuma análise ou gráfico anterior encontrado para contexto."}, status_code=400)
+
+        resposta = perguntar_ia(pergunta, contexto)
+        return {"resposta": resposta}
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao processar a pergunta.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
+# ✅ Variável global para armazenar df atual
+df_global = None
 
 @app.post("/analise")
 async def analisar(
@@ -82,8 +111,6 @@ async def analisar(
     Data: str = Form(None)
 ):
     try:
-        global ultimo_resultado
-
         if not arquivo:
             return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
 
@@ -91,12 +118,34 @@ async def analisar(
         if df is None or df.empty:
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
-        # Processa listas
-        lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
-        lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
+        # 🔧 Processa lista_y
+        if lista_y:
+            if isinstance(lista_y, str):
+                lista_y_processada = [x.strip() for x in lista_y.split(",")] if "," in lista_y else [lista_y.strip()]
+            elif isinstance(lista_y, list):
+                lista_y_processada = [x.strip() for x in lista_y]
+            else:
+                lista_y_processada = []
+        else:
+            lista_y_processada = []
+
+        # 🔧 Processa lista_x
+        if lista_x:
+            if isinstance(lista_x, str):
+                lista_x_processada = [x.strip() for x in lista_x.split(",")] if "," in lista_x else [lista_x.strip()]
+            elif isinstance(lista_x, list):
+                lista_x_processada = [x.strip() for x in lista_x]
+            else:
+                lista_x_processada = []
+        else:
+            lista_x_processada = []
+
+        # 🔧 Processa coluna_z
         lista_z = [coluna_z.strip()] if coluna_z else []
+
         subgrupo_val = subgrupo.strip() if subgrupo else None
 
+        # 🔧 Concatena colunas usadas
         colunas_usadas = lista_y_processada + lista_x_processada + lista_z
         if subgrupo_val:
             colunas_usadas.append(subgrupo_val)
@@ -127,10 +176,13 @@ async def analisar(
                 "field_LIE": field_LIE
             }
 
-            resultado_texto, imagem_analise_base64 = funcao(**disponiveis)
+            permitidos = CONFIG_ANALISES.get(ferramenta.strip(), ["df"])
+            args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
+            resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
 
-            # ✅ Salva no último resultado
-            ultimo_resultado["analise"] = resultado_texto
+            # ✅ Atualiza variável global de última análise
+            global ultima_analise
+            ultima_analise = resultado_texto
 
         if grafico:
             funcao_grafico = GRAFICOS.get(grafico.strip())
@@ -154,10 +206,19 @@ async def analisar(
                 "field_LIE": field_LIE
             }
 
-            imagem_grafico_isolado_base64 = funcao_grafico(**disponiveis)
+            import inspect
+            params_aceitos = inspect.signature(funcao_grafico).parameters
+            args_filtrados = {k: v for k, v in disponiveis.items() if k in params_aceitos}
 
-            # ✅ Salva no último resultado
-            ultimo_resultado["grafico"] = "[gráfico isolado gerado]"
+            imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
+
+            # ✅ Atualiza variável global de último gráfico
+            global ultimo_grafico
+            ultimo_grafico = "[gráfico isolado gerado]"
+
+        # ✅ Atualiza a variável global com o DataFrame carregado
+        global df_global
+        df_global = df
 
         return {
             "analise": resultado_texto,
@@ -170,34 +231,6 @@ async def analisar(
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao processar a análise.",
-            "detalhe": str(e),
-            "traceback": tb
-        }, status_code=500)
-
-# ✅ Novo endpoint para perguntas ao agente IA
-@app.post("/pergunta")
-async def pergunta_agente(
-    pergunta: str = Form(...),
-    tipo: str = Form(...)  # "analise" ou "grafico"
-):
-    try:
-        global ultimo_resultado
-
-        if tipo not in ["analise", "grafico"]:
-            return JSONResponse({"erro": "Tipo inválido. Use 'analise' ou 'grafico'."}, status_code=400)
-
-        contexto = ultimo_resultado.get(tipo)
-        if not contexto:
-            return JSONResponse({"erro": f"Nenhum {tipo} disponível para responder."}, status_code=400)
-
-        resposta = perguntar_ia(pergunta, tipo)
-
-        return {"resposta": resposta}
-
-    except Exception as e:
-        tb = traceback.format_exc()
-        return JSONResponse({
-            "erro": "Erro interno ao consultar agente IA.",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
