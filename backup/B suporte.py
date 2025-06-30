@@ -48,5 +48,3 @@ def aplicar_estilo_minitab():
         "legend.frameon": False
     })
     plt.grid(True)
-
-# 🔹 Você pode colocar outras funções de suporte aqui se quiser no futuro
