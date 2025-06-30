@@ -9,6 +9,8 @@ from fastapi import Form
 import base64
 import io
 import matplotlib.pyplot as plt
+from fastapi import FastAPI, Form
+from firebase_utils import gerar_link_reset_e_enviar
 
 # Tentativa segura de importação dos módulos 
 try:
@@ -400,3 +402,16 @@ async def personalizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
+
+@app.post("/reset-senha")
+async def reset_senha(email: str = Form(...)):
+    """
+    Endpoint para gerar link de reset de senha
+    e enviar email bonito para o usuário.
+    """
+    sucesso = gerar_link_reset_e_enviar(email)
+    if sucesso:
+        return {"mensagem": "📧 Email de reset enviado com sucesso."}
+    else:
+        return {"mensagem": "❌ Falha ao enviar email de reset."}
