@@ -12,3 +12,5 @@ openai
 jinja2
 fitter
 requests
+firebase-admin
+
