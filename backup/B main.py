@@ -9,8 +9,7 @@ from fastapi import Form
 import base64
 import io
 import matplotlib.pyplot as plt
-from fastapi import FastAPI, Form
-from firebase_utils import gerar_link_reset_e_enviar
+
 
 # Tentativa segura de importação dos módulos 
 try:
@@ -28,19 +27,18 @@ except ImportError as e:
 # Iniciar app
 app = FastAPI()
 
-# Middleware de CORS seguro com variável ambiente opcional
-allowed_origins = os.getenv(
-    "CORS_ORIGINS", 
-    "https://educacaopelotrabalho-production.up.railway.app"
-).split(",")
-
+# Middleware de CORS atualizado para incluir seu novo domínio
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=[
+        "https://educacaopelotrabalho-production.up.railway.app",
+        "https://app.educacaopelotrabalho.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
+
 
 # Responde preflight OPTIONS universalmente
 @app.options("/{path:path}")
@@ -402,17 +400,3 @@ async def personalizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
-
-
-from firebase_utils import gerar_link_reset_e_enviar
-
-@app.post("/reset-senha")
-async def reset_senha(email: str = Form(...)):
-    """
-    Gera link de reset de senha e envia email bonito.
-    """
-    sucesso = gerar_link_reset_e_enviar(email)
-    if sucesso:
-        return {"mensagem": "📧 Email de reset enviado com sucesso."}
-    else:
-        return {"mensagem": "❌ Falha ao enviar email de reset."}
