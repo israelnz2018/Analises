@@ -316,3 +316,100 @@ async def analisar(
             "traceback": tb
         }, status_code=500)
 
+@app.post("/personalizar-grafico")
+async def personalizar_grafico(
+    request: Request,
+    arquivo: UploadFile = File(None),
+    aba: str = Form(None),
+    grafico: str = Form(None),
+    coluna_y: str = Form(None),
+    coluna_x: str = Form(None),
+    coluna_z: str = Form(None),
+    subgrupo: str = Form(None),
+    field: str = Form(None),
+    field_conf: str = Form(None),
+    field_dist: str = Form(None),
+    field_LSE: str = Form(None),
+    field_LIE: str = Form(None),
+    Data: str = Form(None),
+    lista_y: str = Form(None),
+    lista_x: str = Form(None),
+    cor: str = Form(None),
+    titulo_x: str = Form(None),
+    titulo_y: str = Form(None),
+    titulo_grafico: str = Form(None),
+    tamanho_fonte: str = Form(None),
+    inclinacao_x: str = Form(None),
+    inclinacao_y: str = Form(None),
+    espessura: str = Form(None)
+):
+    try:
+        global df_global
+
+        print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
+        print("🎨 Gráfico solicitado:", grafico)
+        print("➡ coluna_y:", coluna_y)
+        print("➡ cor:", cor)
+        print("➡ titulo_x:", titulo_x)
+        print("➡ titulo_y:", titulo_y)
+        print("➡ titulo_grafico:", titulo_grafico)
+        print("➡ tamanho_fonte:", tamanho_fonte)
+        print("➡ inclinacao_x:", inclinacao_x)
+        print("➡ inclinacao_y:", inclinacao_y)
+        print("➡ espessura:", espessura)
+        print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
+
+        # ✅ Usa df_global já carregado anteriormente
+        df = df_global
+        if df is None or df.empty:
+            return JSONResponse({"erro": "Nenhum DataFrame carregado. Gere o gráfico primeiro."}, status_code=400)
+
+        # ✅ Processa listas
+        lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
+        lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
+
+        funcao_grafico = GRAFICOS.get(grafico.strip())
+        if not funcao_grafico:
+            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
+
+        import inspect
+        params_aceitos = inspect.signature(funcao_grafico).parameters
+        args_to_pass = {k: v for k, v in {
+            "df": df,
+            "coluna_y": coluna_y,
+            "coluna_x": coluna_x,
+            "coluna_z": coluna_z,
+            "subgrupo": subgrupo,
+            "field": field,
+            "field_conf": field_conf,
+            "field_dist": field_dist,
+            "field_LSE": field_LSE,
+            "field_LIE": field_LIE,
+            "Data": Data,
+            "lista_y": lista_y_processada,
+            "lista_x": lista_x_processada,
+            "cor": cor,
+            "titulo_x": titulo_x,
+            "titulo_y": titulo_y,
+            "titulo_grafico": titulo_grafico,
+            "tamanho_fonte": tamanho_fonte,
+            "inclinacao_x": inclinacao_x,
+            "inclinacao_y": inclinacao_y,
+            "espessura": espessura
+        }.items() if k in params_aceitos}
+
+        imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
+
+        return {
+            "grafico_isolado_base64": imagem_grafico_isolado_base64
+        }
+
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao personalizar gráfico.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
