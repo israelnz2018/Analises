@@ -413,3 +413,28 @@ async def personalizar_grafico(
             "traceback": tb
         }, status_code=500)
 
+@app.post("/pergunta")
+async def pergunta(request: Request, pergunta: str = Form(...), tipo: str = Form(...)):
+    try:
+        from agente import perguntar_ia
+
+        # 🔧 Seleciona o texto base dependendo do tipo
+        if tipo == "analise":
+            texto_base = "Última análise realizada no sistema."
+        elif tipo == "grafico":
+            texto_base = "Último gráfico gerado no sistema."
+        else:
+            return JSONResponse({"erro": "Tipo de pergunta inválido."}, status_code=400)
+
+        # ✅ Chama o agente IA
+        resposta = perguntar_ia(pergunta, texto_base)
+
+        return {"resposta": resposta}
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao processar a pergunta.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
