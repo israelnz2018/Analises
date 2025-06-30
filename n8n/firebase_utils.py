@@ -6,7 +6,8 @@ from email_reset import enviar_email_reset  # ajuste o nome do arquivo se necess
 try:
     firebase_admin.get_app()
 except ValueError:
-    cred = credentials.Certificate("firebase_service_account.json")
+    cred = credentials.Certificate("n8n/firebase_service_account.json")
+")
     firebase_admin.initialize_app(cred)
 
 
