@@ -27,19 +27,18 @@ except ImportError as e:
 # Iniciar app
 app = FastAPI()
 
-# Middleware de CORS seguro com variável ambiente opcional
-allowed_origins = os.getenv(
-    "CORS_ORIGINS", 
-    "https://educacaopelotrabalho-production.up.railway.app"
-).split(",")
-
+# Middleware de CORS atualizado para incluir seu novo domínio
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=[
+        "https://educacaopelotrabalho-production.up.railway.app",
+        "https://app.educacaopelotrabalho.com"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
+
 
 # Responde preflight OPTIONS universalmente
 @app.options("/{path:path}")
