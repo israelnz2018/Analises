@@ -302,7 +302,7 @@ async def analisar(
             # ✅ SE TIVER PERGUNTA: chama o agente IA sobre o gráfico
             if pergunta:
                 from agente import perguntar_ia
-                resposta_ia = perguntar_ia(pergunta, "Segue o gráfico gerado.")  # simples prompt sobre gráfico
+                resposta_ia = perguntar_ia(pergunta, "resultado_texto")  # simples prompt sobre gráfico
 
         # ✅ Atualiza a variável global com o DataFrame carregado
         global df_global
