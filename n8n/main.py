@@ -1,5 +1,3 @@
-# Atualizacao forçada - 27/06/2025
-
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware  
@@ -9,6 +7,13 @@ from fastapi import Form
 import base64
 import io
 import matplotlib.pyplot as plt
+
+
+# ✅ Variável global para armazenar df atual
+df_global = None
+
+# ✅ Variável global para armazenar última análise
+ultimo_resultado_texto = ""
 
 
 # Tentativa segura de importação dos módulos 
@@ -254,6 +259,9 @@ async def analisar(
             permitidos = CONFIG_ANALISES.get(ferramenta.strip(), ["df"])
             args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
             resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
+            global ultimo_resultado_texto
+            ultimo_resultado_texto = resultado_texto
+
 
             # ✅ SE TIVER PERGUNTA: chama o agente IA sobre a análise
             if pergunta:
@@ -417,16 +425,15 @@ async def personalizar_grafico(
 async def pergunta(request: Request, pergunta: str = Form(...), tipo: str = Form(...)):
     try:
         from agente import perguntar_ia
+        global ultimo_resultado_texto
 
-        # 🔧 Seleciona o texto base dependendo do tipo
         if tipo == "analise":
-            texto_base = "Última análise realizada no sistema."
+            texto_base = ultimo_resultado_texto or "Nenhuma análise encontrada."
         elif tipo == "grafico":
             texto_base = "Último gráfico gerado no sistema."
         else:
             return JSONResponse({"erro": "Tipo de pergunta inválido."}, status_code=400)
 
-        # ✅ Chama o agente IA
         resposta = perguntar_ia(pergunta, texto_base)
 
         return {"resposta": resposta}
@@ -438,3 +445,4 @@ async def pergunta(request: Request, pergunta: str = Form(...), tipo: str = Form
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
