@@ -2,13 +2,15 @@
 
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware 
+from fastapi.middleware.cors import CORSMiddleware  
 import traceback
 import os
 from fastapi import Form
 import base64
 import io
 import matplotlib.pyplot as plt
+from fastapi import FastAPI, Form
+from firebase_utils import gerar_link_reset_e_enviar
 
 # Tentativa segura de importação dos módulos 
 try:
@@ -137,6 +139,9 @@ DICIONARIO_TERMOS = {
     "field_LIE": "Valor do limite inferior de engenharia"
 }
 
+# ✅ Variável global para armazenar df atual
+df_global = None
+
 @app.post("/analise")
 async def analisar(
     request: Request,
@@ -166,14 +171,26 @@ async def analisar(
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
         # 🔧 Processa lista_y
-        lista_y_processada = []
         if lista_y:
-            lista_y_processada = [x.strip() for x in lista_y.split(",")]
+            if isinstance(lista_y, str):
+                lista_y_processada = [x.strip() for x in lista_y.split(",")] if "," in lista_y else [lista_y.strip()]
+            elif isinstance(lista_y, list):
+                lista_y_processada = [x.strip() for x in lista_y]
+            else:
+                lista_y_processada = []
+        else:
+            lista_y_processada = []
 
         # 🔧 Processa lista_x
-        lista_x_processada = []
         if lista_x:
-            lista_x_processada = [x.strip() for x in lista_x.split(",")]
+            if isinstance(lista_x, str):
+                lista_x_processada = [x.strip() for x in lista_x.split(",")] if "," in lista_x else [lista_x.strip()]
+            elif isinstance(lista_x, list):
+                lista_x_processada = [x.strip() for x in lista_x]
+            else:
+                lista_x_processada = []
+        else:
+            lista_x_processada = []
 
         # 🔧 Processa coluna_z
         lista_z = [coluna_z.strip()] if coluna_z else []
@@ -218,7 +235,7 @@ async def analisar(
 
             disponiveis = {
                 "df": df,
-                "coluna_y": coluna_y.strip() if coluna_y else None,  # ✅ garante coluna_y como string única
+                "coluna_y": coluna_y.strip() if coluna_y else None,
                 "coluna_x": coluna_x.strip() if coluna_x else None,
                 "coluna_z": coluna_z.strip() if coluna_z else None,
                 "Data": Data,
@@ -268,6 +285,10 @@ async def analisar(
 
             imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
 
+        # ✅ Atualiza a variável global com o DataFrame carregado
+        global df_global
+        df_global = df
+
         return {
             "analise": resultado_texto,
             "grafico_base64": imagem_analise_base64 or [],
@@ -275,8 +296,6 @@ async def analisar(
             "colunas_utilizadas": colunas_usadas
         }
 
-    except ValueError as e:
-        return JSONResponse({"erro": str(e)}, status_code=400)
     except Exception as e:
         tb = traceback.format_exc()
         return JSONResponse({
@@ -284,6 +303,7 @@ async def analisar(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
 
 
 @app.post("/personalizar-grafico")
@@ -302,6 +322,8 @@ async def personalizar_grafico(
     field_LSE: str = Form(None),
     field_LIE: str = Form(None),
     Data: str = Form(None),
+    lista_y: str = Form(None),
+    lista_x: str = Form(None),
     cor: str = Form(None),
     titulo_x: str = Form(None),
     titulo_y: str = Form(None),
@@ -312,24 +334,11 @@ async def personalizar_grafico(
     espessura: str = Form(None)
 ):
     try:
-        if not arquivo:
-            return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
+        global df_global
 
-        # 🔍 DEBUG INICIO
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
-        print("📂 Nome do arquivo recebido:", arquivo.filename)
-        print("📑 Aba solicitada:", aba)
         print("🎨 Gráfico solicitado:", grafico)
         print("➡ coluna_y:", coluna_y)
-        print("➡ coluna_x:", coluna_x)
-        print("➡ coluna_z:", coluna_z)
-        print("➡ subgrupo:", subgrupo)
-        print("➡ field:", field)
-        print("➡ field_conf:", field_conf)
-        print("➡ field_dist:", field_dist)
-        print("➡ field_LSE:", field_LSE)
-        print("➡ field_LIE:", field_LIE)
-        print("➡ Data:", Data)
         print("➡ cor:", cor)
         print("➡ titulo_x:", titulo_x)
         print("➡ titulo_y:", titulo_y)
@@ -340,16 +349,19 @@ async def personalizar_grafico(
         print("➡ espessura:", espessura)
         print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
 
-        df = await ler_arquivo(arquivo, aba)
+        # ✅ Usa df_global já carregado anteriormente
+        df = df_global
         if df is None or df.empty:
-            return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
+            return JSONResponse({"erro": "Nenhum DataFrame carregado. Gere o gráfico primeiro."}, status_code=400)
 
-        # 🔍 Busca a função do gráfico personalizado diretamente no dicionário
+        # ✅ Processa listas
+        lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
+        lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
+
         funcao_grafico = GRAFICOS.get(grafico.strip())
         if not funcao_grafico:
-            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado no dicionário GRAFICOS."}, status_code=400)
+            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
 
-        # 🔧 Filtra apenas os parâmetros aceitos pela função do gráfico
         import inspect
         params_aceitos = inspect.signature(funcao_grafico).parameters
         args_to_pass = {k: v for k, v in {
@@ -364,6 +376,8 @@ async def personalizar_grafico(
             "field_LSE": field_LSE,
             "field_LIE": field_LIE,
             "Data": Data,
+            "lista_y": lista_y_processada,
+            "lista_x": lista_x_processada,
             "cor": cor,
             "titulo_x": titulo_x,
             "titulo_y": titulo_y,
@@ -374,7 +388,6 @@ async def personalizar_grafico(
             "espessura": espessura
         }.items() if k in params_aceitos}
 
-        # 🖼️ Chama a função do gráfico com os parâmetros filtrados
         imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
 
         return {
@@ -382,9 +395,24 @@ async def personalizar_grafico(
         }
 
     except Exception as e:
+        import traceback
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao personalizar gráfico.",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
+
+from firebase_utils import gerar_link_reset_e_enviar
+
+@app.post("/reset-senha")
+async def reset_senha(email: str = Form(...)):
+    """
+    Gera link de reset de senha e envia email bonito.
+    """
+    sucesso = gerar_link_reset_e_enviar(email)
+    if sucesso:
+        return {"mensagem": "📧 Email de reset enviado com sucesso."}
+    else:
+        return {"mensagem": "❌ Falha ao enviar email de reset."}
