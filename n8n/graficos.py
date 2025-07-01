@@ -362,11 +362,12 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
 
     aplicar_estilo_minitab()
 
-    # Verificações básicas
     if not coluna_x or coluna_x not in df.columns:
         return None
+
     if coluna_y and coluna_y not in df.columns:
         coluna_y = None
+
     if subgrupo and subgrupo not in df.columns:
         subgrupo = None
 
@@ -376,12 +377,43 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
 
     imagens_base64 = []
 
-    # Função auxiliar para criar pizza única
-    def criar_pizza(sub_df, titulo):
+    if subgrupo:
+        subgrupos = dados[subgrupo].dropna().unique()
+        if len(subgrupos) != 2:
+            return None
+
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6))
+        for ax, sub in zip(axs, subgrupos):
+            dados_sub = dados[dados[subgrupo] == sub]
+            if coluna_y:
+                soma = dados_sub.groupby(coluna_x)[coluna_y].sum()
+            else:
+                soma = dados_sub[coluna_x].value_counts()
+
+            if soma.empty or soma.sum() == 0:
+                ax.axis('off')
+                ax.set_title(f"{sub} (Sem dados)")
+                continue
+
+            soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, ax=ax)
+            ax.set_ylabel("")
+            titulo = titulo_grafico if titulo_grafico else f"Pizza de {coluna_x} ({sub})"
+            ax.set_title(titulo, fontsize=int(tamanho_fonte))
+
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        plt.close()
+        return imagem_base64
+
+    else:
         if coluna_y:
-            soma = sub_df.groupby(coluna_x)[coluna_y].sum()
+            soma = dados.groupby(coluna_x)[coluna_y].sum()
         else:
-            soma = sub_df[coluna_x].value_counts()
+            soma = dados[coluna_x].value_counts()
 
         if soma.empty or soma.sum() == 0:
             return None
@@ -389,6 +421,7 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
         plt.figure(figsize=(8, 6))
         soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
         plt.ylabel("")
+        titulo = titulo_grafico if titulo_grafico else f"Pizza de {coluna_x}"
         plt.title(titulo, fontsize=int(tamanho_fonte))
         plt.tight_layout()
 
@@ -397,30 +430,8 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
-
         return imagem_base64
 
-    # Se houver subgrupo, cria uma pizza para cada grupo
-    if subgrupo:
-        grupos = dados[subgrupo].unique()
-        for grupo in grupos:
-            sub_df = dados[dados[subgrupo] == grupo]
-            titulo = f"{titulo_grafico} ({grupo})" if titulo_grafico else f"Pizza de {coluna_x} ({grupo})"
-            img = criar_pizza(sub_df, titulo)
-            if img:
-                imagens_base64.append(img)
-    else:
-        titulo = titulo_grafico if titulo_grafico else f"Pizza de {coluna_x}"
-        img = criar_pizza(dados, titulo)
-        if img:
-            imagens_base64.append(img)
-
-    # Retorna lista de imagens se houver subgrupo, ou imagem única
-    if not imagens_base64:
-        return None
-    if len(imagens_base64) == 1:
-        return imagens_base64[0]
-    return imagens_base64
 
 
 
