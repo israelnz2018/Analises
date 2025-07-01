@@ -172,11 +172,11 @@ async def analisar(
 ):
     try:
         if not arquivo:
-            return JSONResponse({"erro": "Nenhum arquivo recebido."}, status_code=400)
+            return JSONResponse({"erro": "Nenhum arquivo recebido.", "analise": ""}, status_code=400)
 
         df = await ler_arquivo(arquivo, aba)
         if df is None or df.empty:
-            return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
+            return JSONResponse({"erro": "Arquivo vazio ou aba inválida.", "analise": ""}, status_code=400)
 
         # 🔧 Processa lista_y
         lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
@@ -227,7 +227,7 @@ async def analisar(
         if ferramenta:
             funcao = ANALISES.get(ferramenta.strip())
             if not funcao:
-                return JSONResponse({"erro": f"Análise {ferramenta} desconhecida."}, status_code=400)
+                return JSONResponse({"erro": f"Análise {ferramenta} desconhecida.", "analise": ""}, status_code=400)
 
             disponiveis = {
                 "df": df,
@@ -252,13 +252,55 @@ async def analisar(
 
             ultimo_resultado_texto = resultado_texto  # ✅ atualiza global
 
+        if grafico:
+            funcao_grafico = GRAFICOS.get(grafico.strip())
+            if not funcao_grafico:
+                return JSONResponse({"erro": f"Gráfico {grafico} não encontrado.", "analise": ""}, status_code=400)
+
+            disponiveis = {
+                "df": df,
+                "coluna_y": coluna_y.strip() if coluna_y else None,
+                "coluna_x": coluna_x.strip() if coluna_x else None,
+                "coluna_z": coluna_z.strip() if coluna_z else None,
+                "Data": Data,
+                "lista_y": lista_y_processada,
+                "lista_x": lista_x_processada,
+                "lista_z": lista_z,
+                "subgrupo": subgrupo_val,
+                "field": field,
+                "field_conf": field_conf,
+                "field_dist": field_dist,
+                "field_LSE": field_LSE,
+                "field_LIE": field_LIE
+            }
+
+            permitidos = CONFIG_ANALISES.get(grafico.strip(), ["df", "coluna_y"])
+            args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
+
+            import inspect
+            params_aceitos = inspect.signature(funcao_grafico).parameters
+            args_filtrados = {k: v for k, v in args_to_pass.items() if k in params_aceitos}
+
+            imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
+
+            ultimo_resultado_texto = f"Gráfico gerado: {grafico}"  # ✅ atualiza global com descrição do gráfico
+
+        return JSONResponse({
+            "analise": resultado_texto,
+            "grafico_base64": imagem_analise_base64,
+            "grafico_isolado_base64": imagem_grafico_isolado_base64,
+            "resposta_ia": resposta_ia
+        })
+
     except Exception as e:
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao processar a análise.",
+            "analise": "",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
 
     # ✅ SE TIVER PERGUNTA: chama o agente IA sobre a análise ou gráfico
     if ferramenta:
