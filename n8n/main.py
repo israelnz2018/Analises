@@ -408,6 +408,7 @@ async def personalizar_grafico(
     try:
         global df_global
         from graficos import GRAFICOS
+        import inspect  # ✅ necessário para signature
 
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
         print("🎨 Gráfico solicitado:", grafico)
@@ -422,12 +423,10 @@ async def personalizar_grafico(
         print("➡ espessura:", espessura)
         print("======================= FIM DEBUG /PERSONALIZAR-GRAFICO ==========================\n")
 
-        # ✅ Usa df_global já carregado anteriormente
         df = df_global
         if df is None or df.empty:
             return JSONResponse({"erro": "Nenhum DataFrame carregado. Gere o gráfico primeiro."}, status_code=400)
 
-        # ✅ Processa listas
         lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
         lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
 
@@ -437,9 +436,7 @@ async def personalizar_grafico(
 
         params_aceitos = inspect.signature(funcao_grafico).parameters
 
-        # ✅ Ajuste de inclinação:
-        # Se tiver duas colunas (y e y), aplica inclinação apenas no eixo y da esquerda.
-        # Se não tiver eixos (ex: pizza), ignora inclinação.
+        # ✅ Inclinação: aplica sempre se o eixo existir, ignora se não existir
         inclinacao_x_valida = inclinacao_x if coluna_x else "0"
         inclinacao_y_valida = inclinacao_y if coluna_y else "0"
 
@@ -474,12 +471,14 @@ async def personalizar_grafico(
         }
 
     except Exception as e:
+        import traceback
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao personalizar gráfico.",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
 
 @app.post("/pergunta")
 async def pergunta(request: Request, pergunta: str = Form(...), tipo: str = Form(...)):
