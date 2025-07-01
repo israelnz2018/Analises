@@ -8,6 +8,12 @@ import base64
 import io
 import matplotlib.pyplot as plt
 
+# ✅ Variável global para armazenar df atual
+df_global = None
+
+# ✅ Variável global para armazenar última análise ou gráfico
+ultimo_resultado_texto = ""
+
 
 # Tentativa segura de importação dos módulos 
 try:
@@ -42,7 +48,9 @@ app.add_middleware(
 @app.options("/{path:path}")
 async def preflight_handler(path: str):
     response = Response()
-    response.headers["Access-Control-Allow-Origin"] = ",".join(allowed_origins)
+    response.headers["Access-Control-Allow-Origin"] = "https://app.educacaopelotrabalho.com, https://educacaopelotrabalho-production.up.railway.app"
+
+
     response.headers["Access-Control-Allow-Methods"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "*"
     return response
@@ -138,6 +146,9 @@ DICIONARIO_TERMOS = {
 # ✅ Variável global para armazenar df atual
 df_global = None
 
+# ✅ Variável global para armazenar última análise ou gráfico
+ultimo_resultado_texto = ""
+
 @app.post("/analise")
 async def analisar(
     request: Request,
@@ -168,26 +179,10 @@ async def analisar(
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida."}, status_code=400)
 
         # 🔧 Processa lista_y
-        if lista_y:
-            if isinstance(lista_y, str):
-                lista_y_processada = [x.strip() for x in lista_y.split(",")] if "," in lista_y else [lista_y.strip()]
-            elif isinstance(lista_y, list):
-                lista_y_processada = [x.strip() for x in lista_y]
-            else:
-                lista_y_processada = []
-        else:
-            lista_y_processada = []
+        lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
 
         # 🔧 Processa lista_x
-        if lista_x:
-            if isinstance(lista_x, str):
-                lista_x_processada = [x.strip() for x in lista_x.split(",")] if "," in lista_x else [lista_x.strip()]
-            elif isinstance(lista_x, list):
-                lista_x_processada = [x.strip() for x in lista_x]
-            else:
-                lista_x_processada = []
-        else:
-            lista_x_processada = []
+        lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
 
         # 🔧 Processa coluna_z
         lista_z = [coluna_z.strip()] if coluna_z else []
@@ -219,13 +214,15 @@ async def analisar(
         print("➡ Data:", Data)
         print("🔧 ferramenta:", ferramenta)
         print("🔧 grafico:", grafico)
-        print("➡ pergunta:", pergunta)  # ✅ debug pergunta
+        print("➡ pergunta:", pergunta)
         print("======================= FIM DEBUG /ANALISE ==========================\n")
 
         resultado_texto = ""
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
-        resposta_ia = None   # ✅ para armazenar resposta do agente IA
+        resposta_ia = None
+
+        global ultimo_resultado_texto
 
         if ferramenta:
             funcao = ANALISES.get(ferramenta.strip())
@@ -252,8 +249,17 @@ async def analisar(
             permitidos = CONFIG_ANALISES.get(ferramenta.strip(), ["df"])
             args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
             resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
-            global ultimo_resultado_texto
-            ultimo_resultado_texto = resultado_texto
+
+            ultimo_resultado_texto = resultado_texto  # ✅ atualiza global
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao processar a análise.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
 
 
 
