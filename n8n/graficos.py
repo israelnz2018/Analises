@@ -263,8 +263,8 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, cor="#000000", titulo_x="",
     ax.set_ylabel(titulo_y if titulo_y else "Frequência / Soma", fontsize=int(tamanho_fonte))
     ax.set_title(titulo_grafico if titulo_grafico else f"Pareto - {coluna_x}", fontsize=int(tamanho_fonte))
 
-    plt.xticks(rotation=int(inclinacao_x))
-    plt.yticks(rotation=int(inclinacao_y))
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=int(inclinacao_x))
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=int(inclinacao_y))
     plt.tight_layout()
 
     buf = BytesIO()
