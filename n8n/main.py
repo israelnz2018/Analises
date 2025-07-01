@@ -175,6 +175,9 @@ async def analisar(
             return JSONResponse({"erro": "Nenhum arquivo recebido.", "analise": ""}, status_code=400)
 
         df = await ler_arquivo(arquivo, aba)
+        global df_global
+        df_global = df
+
         if df is None or df.empty:
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida.", "analise": ""}, status_code=400)
 
