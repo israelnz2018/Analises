@@ -165,15 +165,16 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
         plt.close()
         return imagem_base64
 
-
 def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
+    # ➡️ Aplica estilo Minitab
     aplicar_estilo_minitab()
 
+    # ✅ Validações iniciais
     if not coluna_x or coluna_x not in df.columns:
         return "❌ A coluna X informada não foi encontrada no arquivo.", None
     if coluna_y and coluna_y not in df.columns:
@@ -182,6 +183,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
         return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
 
     try:
+        # ➡️ Função interna para plotar Pareto
         def plotar(dados, titulo, ax):
             if coluna_y:
                 contagem = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
@@ -206,13 +208,18 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
             for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
                 ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
 
+        # ➡️ Se houver subgrupo
         if subgrupo:
             colunas = [coluna_x, subgrupo] + ([coluna_y] if coluna_y else [])
             dados = df[colunas].dropna()
+
+            # 🛠️ DEBUG subgrupos
+            subgrupos = dados[subgrupo].dropna().unique()
+            print("DEBUG subgrupos encontrados:", subgrupos)
+
             if dados.empty:
                 return "❌ Dados insuficientes para gerar o gráfico.", None
 
-            subgrupos = dados[subgrupo].dropna().unique()
             if len(subgrupos) != 2:
                 return f"❌ O gráfico espera exatamente 2 categorias no subgrupo e encontrou {len(subgrupos)}.", None
 
@@ -220,6 +227,10 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
+
+                # 🛠️ DEBUG dados por subgrupo
+                print(f"DEBUG dados_sub ({sub}) shape:", dados_sub.shape)
+
                 plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
 
         else:
@@ -231,16 +242,22 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
             plotar(dados, f"Pareto - {coluna_x}", ax)
 
         plt.tight_layout()
+
+        # ➡️ Salva em base64
         buf = BytesIO()
         fig.savefig(buf, format="png")
         plt.close(fig)
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
+        # 🛠️ DEBUG final
+        print("✅ DEBUG gerar_pareto - imagem gerada com sucesso")
+
         return "", imagem_base64
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None
+
 
 
 
