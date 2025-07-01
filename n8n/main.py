@@ -9,21 +9,6 @@ import io
 import matplotlib.pyplot as plt
 
 
-try:
-    # outros comandos aqui
-    global ultimo_resultado_texto
-    ultimo_resultado_texto = resultado_texto
-
-except Exception as e:
-    tb = traceback.format_exc()
-    return JSONResponse({
-        "erro": "Erro interno ao processar a análise.",
-        "detalhe": str(e),
-        "traceback": tb
-    }, status_code=500)
-
-
-
 # Tentativa segura de importação dos módulos 
 try:
     from leitura import ler_arquivo
@@ -269,6 +254,7 @@ async def analisar(
             resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
             global ultimo_resultado_texto
             ultimo_resultado_texto = resultado_texto
+
 
 
            # ✅ SE TIVER PERGUNTA: chama o agente IA sobre a análise ou gráfico
