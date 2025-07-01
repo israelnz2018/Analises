@@ -291,7 +291,7 @@ if ferramenta:
     args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
     resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
 
-    global ultimo_resultado_texto
+
     ultimo_resultado_texto = resultado_texto  # ✅ atualiza global
 
     if pergunta:
@@ -329,7 +329,7 @@ if grafico:
 
     imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
 
-    global ultimo_resultado_texto
+    
     ultimo_resultado_texto = f"Gráfico gerado: {grafico}"  # ✅ atualiza global com descrição do gráfico
 
     if pergunta:
