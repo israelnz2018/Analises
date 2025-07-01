@@ -263,8 +263,6 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
 
 
-
-
 def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
@@ -287,6 +285,9 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
             contagem = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
         else:
             contagem = dados[coluna_x].value_counts().sort_values(ascending=False)
+
+        if contagem.empty:
+            return None
 
         acumulado = contagem.cumsum() / contagem.sum() * 100
 
@@ -314,12 +315,17 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
         plt.close(fig)
         return imagem_base64
 
-    dados = df.dropna(subset=[coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else []))
+    # ➡️ Filtra dados válidos
+    colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
+    dados = df.dropna(subset=colunas_necessarias)
     if dados.empty:
         return None
 
     if subgrupo:
         subgrupos = dados[subgrupo].unique()
+        if len(subgrupos) != 2:
+            return None  # apenas se houver exatamente 2 categorias
+
         for sub in subgrupos:
             dados_sub = dados[dados[subgrupo] == sub]
             titulo = titulo_grafico if titulo_grafico else f"Pareto - {coluna_x} ({sub})"
@@ -337,6 +343,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     if len(imagens_base64) == 1:
         return imagens_base64[0]
     return imagens_base64
+
 
 
 
