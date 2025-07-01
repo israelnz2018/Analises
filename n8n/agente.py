@@ -40,22 +40,16 @@ def recuperar_ultimas_conversas(tipo: str, limite: int = 5):
     return [r[0] for r in resultados][::-1]  # retorna na ordem cronológica
 
 # ✅ Função principal de pergunta IA
-def perguntar_ia(pergunta: str, tipo: str) -> str:
-    # Recupera contexto anterior
-    contexto = recuperar_ultimas_conversas(tipo, limite=5)
-
-    # Monta prompt completo
+def perguntar_ia(pergunta: str, texto_analise: str) -> str:
+    # 🔧 Usa diretamente a última análise recebida como contexto principal
     prompt = (
-        "Você é um analista estatístico especialista em análises de dados reais.\n"
-        "Aqui está o histórico recente de análises ou gráficos gerados pelo sistema:\n\n"
-    )
-    for idx, item in enumerate(contexto, 1):
-        prompt += f"[{idx}] {item}\n\n"
-
-    prompt += (
-        f"Pergunta do aluno: {pergunta}\n\n"
-        "Responda de forma direta, interpretando tecnicamente os resultados apresentados, "
-        "sem explicações genéricas de estatística. Fale como um analista responderia a um engenheiro de processos."
+        "Você é um analista estatístico especialista em análises de dados reais.\n\n"
+        "Aqui estão os resultados da última análise realizada pelo sistema:\n\n"
+        f"{texto_analise}\n\n"
+        "Baseado nestes resultados, responda de forma direta e técnica à pergunta do aluno, "
+        "interpretando os dados apresentados sem explicações genéricas de estatística. "
+        "Fale como um analista responderia a um engenheiro de processos.\n\n"
+        f"Pergunta do aluno: {pergunta}"
     )
 
     # Chama OpenAI
@@ -71,10 +65,11 @@ def perguntar_ia(pergunta: str, tipo: str) -> str:
 
     resposta_final = resposta.choices[0].message.content
 
-    # Salva pergunta e resposta no histórico
-    salvar_conversa(tipo, f"Pergunta: {pergunta}\nResposta: {resposta_final}")
+    # 🔧 Opcional: salvar pergunta e resposta no histórico (ajuste se quiser manter histórico separado)
+    salvar_conversa("analise", f"Pergunta: {pergunta}\nResposta: {resposta_final}")
 
     return resposta_final
+
 
 
 
