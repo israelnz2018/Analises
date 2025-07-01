@@ -376,7 +376,7 @@ async def analisar(
             resposta_ia = perguntar_ia(pergunta, ultimo_resultado_texto)
 
 
-@app.post("/personalizar-grafico")
+@router.post("/personalizar-grafico")
 async def personalizar_grafico(
     request: Request,
     arquivo: UploadFile = File(None),
@@ -405,6 +405,7 @@ async def personalizar_grafico(
 ):
     try:
         global df_global
+        from graficos import GRAFICOS
 
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
         print("🎨 Gráfico solicitado:", grafico)
@@ -432,8 +433,14 @@ async def personalizar_grafico(
         if not funcao_grafico:
             return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
 
-        import inspect
         params_aceitos = inspect.signature(funcao_grafico).parameters
+
+        # ✅ Ajuste de inclinação:
+        # Se tiver duas colunas (x e y), aplica inclinação apenas no eixo X.
+        # Se não tiver eixos (ex: pizza), ignora inclinação.
+        inclinacao_x_valida = inclinacao_x if coluna_x else "0"
+        inclinacao_y_valida = inclinacao_y if coluna_y and not coluna_x else "0"
+
         args_to_pass = {k: v for k, v in {
             "df": df,
             "coluna_y": coluna_y,
@@ -453,8 +460,8 @@ async def personalizar_grafico(
             "titulo_y": titulo_y,
             "titulo_grafico": titulo_grafico,
             "tamanho_fonte": tamanho_fonte,
-            "inclinacao_x": inclinacao_x,
-            "inclinacao_y": inclinacao_y,
+            "inclinacao_x": inclinacao_x_valida,
+            "inclinacao_y": inclinacao_y_valida,
             "espessura": espessura
         }.items() if k in params_aceitos}
 
@@ -465,7 +472,6 @@ async def personalizar_grafico(
         }
 
     except Exception as e:
-        import traceback
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao personalizar gráfico.",
