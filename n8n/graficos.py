@@ -87,11 +87,12 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
 
     return "", imagem_base64
 
-def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
     from io import BytesIO
+    from suporte import aplicar_estilo_minitab
 
     if isinstance(coluna_y, list):
         coluna_y = coluna_y[0] if coluna_y else None
@@ -99,38 +100,71 @@ def personalizar_histograma(df, coluna_y, cor="#000000", titulo_x="", titulo_y="
     if not coluna_y or coluna_y not in df.columns:
         return None
 
-    # 🔧 Aplicar estilo Minitab se desejar
     aplicar_estilo_minitab()
 
-    plt.figure(figsize=(10, 6))
-    sns.histplot(
-        df[coluna_y].dropna(),
-        bins=10,
-        kde=True,
-        stat="density",
-        alpha=0.4,
-        color=cor,
-        edgecolor="black"
-    )
-    plt.xlabel(coluna_y if not titulo_x else titulo_x, fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
-    
-    # ✅ Usa título_grafico se informado, senão mantém padrão
-    plt.title(titulo_grafico if titulo_grafico else "Histograma com Curva de Densidade", fontsize=int(tamanho_fonte))
-    
-    plt.xticks(rotation=int(inclinacao_x))
-    plt.yticks(rotation=int(inclinacao_y))
-    plt.tight_layout()
+    imagens_base64 = []
 
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close()
+    if subgrupo and subgrupo in df.columns:
+        dados = df[[coluna_y, subgrupo]].dropna()
+        if dados.empty:
+            return None
 
+        subgrupos = dados[subgrupo].unique()
+        fig, axs = plt.subplots(1, len(subgrupos), figsize=(8 * len(subgrupos), 5), sharey=True)
+        if len(subgrupos) == 1:
+            axs = [axs]
 
+        for ax, sub in zip(axs, subgrupos):
+            sns.histplot(
+                dados[dados[subgrupo] == sub][coluna_y],
+                bins=10,
+                kde=True,
+                stat="density",
+                alpha=0.4,
+                color=cor,
+                edgecolor="black",
+                ax=ax
+            )
+            titulo = titulo_grafico if titulo_grafico else f"Histograma - {sub}"
+            ax.set_title(titulo, fontsize=int(tamanho_fonte))
+            ax.set_xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
+            ax.set_ylabel(titulo_y if titulo_y else "Densidade", fontsize=int(tamanho_fonte))
+            ax.tick_params(axis='x', rotation=int(inclinacao_x))
 
-    return imagem_base64
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        plt.close()
+        return imagem_base64
+
+    else:
+        plt.figure(figsize=(10, 6))
+        sns.histplot(
+            df[coluna_y].dropna(),
+            bins=10,
+            kde=True,
+            stat="density",
+            alpha=0.4,
+            color=cor,
+            edgecolor="black"
+        )
+        titulo = titulo_grafico if titulo_grafico else "Histograma com Curva de Densidade"
+        plt.title(titulo, fontsize=int(tamanho_fonte))
+        plt.xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
+        plt.ylabel(titulo_y if titulo_y else "Densidade", fontsize=int(tamanho_fonte))
+        plt.xticks(rotation=int(inclinacao_x))
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        plt.close()
+        return imagem_base64
+
 
 
 
