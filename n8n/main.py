@@ -396,14 +396,14 @@ async def personalizar_grafico(
     Data: str = Form(None),
     lista_y: str = Form(None),
     lista_x: str = Form(None),
-    cor: str = Form(None),
-    titulo_x: str = Form(None),
-    titulo_y: str = Form(None),
-    titulo_grafico: str = Form(None),
-    tamanho_fonte: str = Form(None),
-    inclinacao_x: str = Form(None),
-    inclinacao_y: str = Form(None),
-    espessura: str = Form(None)
+    cor: str = Form(""),  # 🔧 define valor padrão vazio
+    titulo_x: str = Form(""),
+    titulo_y: str = Form(""),
+    titulo_grafico: str = Form(""),
+    tamanho_fonte: str = Form(""),
+    inclinacao_x: str = Form(""),
+    inclinacao_y: str = Form(""),
+    espessura: str = Form("")
 ):
     try:
         global df_global
@@ -437,9 +437,8 @@ async def personalizar_grafico(
         params_aceitos = inspect.signature(funcao_grafico).parameters
 
         # ✅ Inclinação: aplica sempre se o eixo existir, ignora se não existir
-        inclinacao_x_valida = inclinacao_x
-        inclinacao_y_valida = inclinacao_y
-
+        inclinacao_x_valida = inclinacao_x or ""
+        inclinacao_y_valida = inclinacao_y or ""
 
         args_to_pass = {k: v for k, v in {
             "df": df,
@@ -455,14 +454,14 @@ async def personalizar_grafico(
             "Data": Data,
             "lista_y": lista_y_processada,
             "lista_x": lista_x_processada,
-            "cor": cor,
-            "titulo_x": titulo_x,
-            "titulo_y": titulo_y,
-            "titulo_grafico": titulo_grafico,
-            "tamanho_fonte": tamanho_fonte,
+            "cor": cor or "",
+            "titulo_x": titulo_x or "",
+            "titulo_y": titulo_y or "",
+            "titulo_grafico": titulo_grafico or "",
+            "tamanho_fonte": tamanho_fonte or "",
             "inclinacao_x": inclinacao_x_valida,
             "inclinacao_y": inclinacao_y_valida,
-            "espessura": espessura
+            "espessura": espessura or ""
         }.items() if k in params_aceitos}
 
         imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
@@ -479,6 +478,7 @@ async def personalizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
 
 
 @app.post("/pergunta")
