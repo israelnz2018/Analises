@@ -438,10 +438,10 @@ async def personalizar_grafico(
         params_aceitos = inspect.signature(funcao_grafico).parameters
 
         # ✅ Ajuste de inclinação:
-        # Se tiver duas colunas (x e y), aplica inclinação apenas no eixo X.
+        # Se tiver duas colunas (y e y), aplica inclinação apenas no eixo y da esquerda.
         # Se não tiver eixos (ex: pizza), ignora inclinação.
         inclinacao_x_valida = inclinacao_x if coluna_x else "0"
-        inclinacao_y_valida = inclinacao_y if coluna_y and not coluna_x else "0"
+        inclinacao_y_valida = inclinacao_y if coluna_y else "0"
 
         args_to_pass = {k: v for k, v in {
             "df": df,
