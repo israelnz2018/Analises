@@ -168,7 +168,6 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
 
 
 
-
 def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
     import base64
@@ -216,7 +215,6 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
                 return "❌ Dados insuficientes para gerar o gráfico.", None
 
             subgrupos = dados[subgrupo].dropna().unique()
-
             fig, axs = plt.subplots(1, len(subgrupos), figsize=(8 * len(subgrupos), 5), sharey=True)
             if len(subgrupos) == 1:
                 axs = [axs]
@@ -224,6 +222,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
                 plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
+
         else:
             dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
             if dados.empty:
@@ -243,6 +242,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None
+
 
 
 
