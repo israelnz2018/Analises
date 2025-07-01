@@ -54,7 +54,7 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
                 dados[dados[subgrupo] == sub][coluna_y],
                 bins=10,
                 kde=True,
-                stat="density",
+                stat="Frequencia",
                 alpha=0.4,
                 color="steelblue",
                 edgecolor="black",
@@ -194,7 +194,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
             acumulado = contagem.cumsum() / contagem.sum() * 100
             contagem.plot(kind="bar", ax=ax, color="C0")
-            ax.set_ylabel("Frequência / Soma")
+            ax.set_ylabel("Frequência")
             ax.set_title(titulo)
 
             ax2 = ax.twinx()
@@ -240,76 +240,79 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
         return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None
 
 
-def personalizar_pareto(df, coluna_x, coluna_y=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
-    # ✅ DEBUG ARGUMENTOS RECEBIDOS
-    print("🛠️ DEBUG personalizar_pareto - argumentos recebidos:")
-    print("   coluna_x:", coluna_x)
-    print("   coluna_y:", coluna_y)
-    print("   cor:", cor)
-    print("   titulo_x:", titulo_x)
-    print("   titulo_y:", titulo_y)
-    print("   titulo_grafico:", titulo_grafico)
-    print("   tamanho_fonte:", tamanho_fonte)
-    print("   inclinacao_x:", inclinacao_x)
-    print("   inclinacao_y:", inclinacao_y)
-    print("   espessura:", espessura)
-
     aplicar_estilo_minitab()
 
     if not coluna_x or coluna_x not in df.columns:
-        print("❌ coluna_x não encontrada no DataFrame.")
         return None
     if coluna_y and coluna_y not in df.columns:
-        print("❌ coluna_y não encontrada no DataFrame.")
+        coluna_y = None
+    if subgrupo and subgrupo not in df.columns:
+        subgrupo = None
+
+    imagens_base64 = []
+
+    def plotar(dados, titulo):
+        if coluna_y:
+            contagem = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
+        else:
+            contagem = dados[coluna_x].value_counts().sort_values(ascending=False)
+
+        acumulado = contagem.cumsum() / contagem.sum() * 100
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        contagem.plot(kind="bar", ax=ax, color=cor, edgecolor="black")
+        ax.set_xlabel(titulo_x if titulo_x else coluna_x, fontsize=int(tamanho_fonte))
+        ax.set_ylabel(titulo_y if titulo_y else "Frequência / Soma", fontsize=int(tamanho_fonte))
+        ax.set_title(titulo, fontsize=int(tamanho_fonte))
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=int(inclinacao_x))
+
+        ax2 = ax.twinx()
+        ax2.plot(acumulado.index, acumulado.values, color="red", marker="o")
+        ax2.set_ylabel("Acumulado (%)", fontsize=int(tamanho_fonte))
+        ax2.set_ylim(0, 110)
+
+        for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
+            ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
+
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        plt.close(fig)
+        return imagem_base64
+
+    dados = df.dropna(subset=[coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else []))
+    if dados.empty:
         return None
 
-    plt.figure(figsize=(10, 6))
-
-    if coluna_y:
-        contagem = df.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
+    if subgrupo:
+        subgrupos = dados[subgrupo].unique()
+        for sub in subgrupos:
+            dados_sub = dados[dados[subgrupo] == sub]
+            titulo = titulo_grafico if titulo_grafico else f"Pareto - {coluna_x} ({sub})"
+            img = plotar(dados_sub, titulo)
+            if img:
+                imagens_base64.append(img)
     else:
-        contagem = df[coluna_x].value_counts().sort_values(ascending=False)
+        titulo = titulo_grafico if titulo_grafico else f"Pareto - {coluna_x}"
+        img = plotar(dados, titulo)
+        if img:
+            imagens_base64.append(img)
 
-    acumulado = contagem.cumsum() / contagem.sum() * 100
+    if not imagens_base64:
+        return None
+    if len(imagens_base64) == 1:
+        return imagens_base64[0]
+    return imagens_base64
 
-    # 🔧 DEBUG CONTAGEM
-    print("🛠️ DEBUG personalizar_pareto - contagem.head():", contagem.head())
-
-    # Barras Pareto
-    ax = contagem.plot(kind="bar", color=cor, edgecolor="black")
-
-    # Curva acumulada
-    ax2 = ax.twinx()
-    ax2.plot(acumulado.index, acumulado.values, color="red", marker="o", linewidth=espessura)
-    ax2.set_ylim(0, 110)
-
-    # Percentuais na curva
-    for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
-        ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
-
-    # Personalização dos textos
-    ax.set_xlabel(titulo_x if titulo_x else coluna_x, fontsize=int(tamanho_fonte))
-    ax.set_ylabel(titulo_y if titulo_y else "Frequência / Soma", fontsize=int(tamanho_fonte))
-    ax.set_title(titulo_grafico if titulo_grafico else f"Pareto - {coluna_x}", fontsize=int(tamanho_fonte))
-
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=int(inclinacao_x))
-    ax.set_xticklabels(ax.get_xticklabels(), rotation=int(inclinacao_y))
-    plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    plt.close()
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-
-    print("✅ DEBUG personalizar_pareto - imagem_base64 gerada com sucesso")
-
-    return imagem_base64
 
 
 
