@@ -212,10 +212,11 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
                 return "❌ Dados insuficientes para gerar o gráfico.", None
 
             subgrupos = dados[subgrupo].unique()
-            if len(subgrupos) != 2:
-                return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
 
-            fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
+            fig, axs = plt.subplots(1, len(subgrupos), figsize=(8 * len(subgrupos), 5), sharey=True)
+            if len(subgrupos) == 1:
+                axs = [axs]
+
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
                 plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
@@ -238,6 +239,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None
+
 
 
 def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
