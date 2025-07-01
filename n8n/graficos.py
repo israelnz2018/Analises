@@ -354,7 +354,7 @@ def gerar_pizza(df, coluna_x, coluna_y=None, subgrupo=None):
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico: {str(e)}", None
 
-def personalizar_pizza(df, coluna_x, coluna_y=None, cor="#000000", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_pizza(df, coluna_x, coluna_y=None, titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
@@ -380,11 +380,9 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, cor="#000000", titulo_grafic
         return None
 
     plt.figure(figsize=(8, 6))
-    soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, colors=[cor]*len(soma))
+    soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
     plt.ylabel("")
     plt.title(titulo_grafico if titulo_grafico else f"Pizza de {coluna_x}", fontsize=int(tamanho_fonte))
-    plt.xticks(rotation=int(inclinacao_x))
-    plt.yticks(rotation=int(inclinacao_y))
     plt.tight_layout()
 
     buf = BytesIO()
@@ -394,6 +392,7 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, cor="#000000", titulo_grafic
     plt.close()
 
     return imagem_base64
+
 
 
 def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
