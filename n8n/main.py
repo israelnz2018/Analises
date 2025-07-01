@@ -437,8 +437,9 @@ async def personalizar_grafico(
         params_aceitos = inspect.signature(funcao_grafico).parameters
 
         # ✅ Inclinação: aplica sempre se o eixo existir, ignora se não existir
-        inclinacao_x_valida = inclinacao_x if coluna_x else "0"
-        inclinacao_y_valida = inclinacao_y if coluna_y else "0"
+        inclinacao_x_valida = inclinacao_x
+        inclinacao_y_valida = inclinacao_y
+
 
         args_to_pass = {k: v for k, v in {
             "df": df,
