@@ -46,22 +46,27 @@ def perguntar_ia(pergunta: str, tipo: str) -> str:
 
     # Monta prompt completo
     prompt = (
-        "Você é um assistente estatístico especializado. "
-        "Aqui está o histórico recente:\n\n"
+        "Você é um analista estatístico especialista em análises de dados reais.\n"
+        "Aqui está o histórico recente de análises ou gráficos gerados pelo sistema:\n\n"
     )
     for idx, item in enumerate(contexto, 1):
         prompt += f"[{idx}] {item}\n\n"
 
-    prompt += f"Pergunta do aluno: {pergunta}\n\n"
-    prompt += "Responda de forma prática, clara e objetiva, sem linguagem técnica excessiva."
+    prompt += (
+        f"Pergunta do aluno: {pergunta}\n\n"
+        "Responda de forma direta, interpretando tecnicamente os resultados apresentados, "
+        "sem explicações genéricas de estatística. Fale como um analista responderia a um engenheiro de processos."
+    )
 
     # Chama OpenAI
     resposta = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "Você é um especialista em estatística e análise de gráficos."},
+            {"role": "system", "content": "Você é um analista estatístico especialista em análises de processos."},
             {"role": "user", "content": prompt}
-        ]
+        ],
+        temperature=0.2,
+        max_tokens=500
     )
 
     resposta_final = resposta.choices[0].message.content
@@ -70,5 +75,6 @@ def perguntar_ia(pergunta: str, tipo: str) -> str:
     salvar_conversa(tipo, f"Pergunta: {pergunta}\nResposta: {resposta_final}")
 
     return resposta_final
+
 
 
