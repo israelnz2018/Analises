@@ -169,7 +169,6 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
 
 
 
-
 def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
     import base64
@@ -192,6 +191,11 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
             else:
                 contagem = dados[coluna_x].value_counts().sort_values(ascending=False)
 
+            if contagem.empty:
+                ax.axis('off')
+                ax.set_title(f"{titulo} - Sem dados")
+                return
+
             acumulado = contagem.cumsum() / contagem.sum() * 100
             contagem.plot(kind="bar", ax=ax, color="C0")
             ax.set_ylabel("Frequência")
@@ -211,7 +215,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
             if dados.empty:
                 return "❌ Dados insuficientes para gerar o gráfico.", None
 
-            subgrupos = dados[subgrupo].unique()
+            subgrupos = dados[subgrupo].dropna().unique()
 
             fig, axs = plt.subplots(1, len(subgrupos), figsize=(8 * len(subgrupos), 5), sharey=True)
             if len(subgrupos) == 1:
@@ -239,6 +243,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None
+
 
 
 
