@@ -49,6 +49,7 @@ def perguntar_ia(pergunta: str, texto_analise: str) -> str:
         "Baseado nestes resultados, responda de forma direta e técnica à pergunta do aluno, "
         "interpretando os dados apresentados sem explicações genéricas de estatística. "
         "Fale como um analista responderia a um engenheiro de processos.\n\n"
+        "Se necessrio, recomende o uso de alguma ferramenta grafica ou estatistica adicional par auxiliar o aluno.\n\n"
         f"Pergunta do aluno: {pergunta}"
     )
 
