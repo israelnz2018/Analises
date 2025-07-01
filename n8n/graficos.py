@@ -20,72 +20,83 @@ def salvar_grafico():
     return img_base64 
 
 
-
 def gerar_histograma(df, coluna_y, subgrupo=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
     from io import BytesIO
+    from suporte import aplicar_estilo_minitab
 
-    # Garante que coluna_y seja string
+    # Aplica estilo Minitab
+    aplicar_estilo_minitab()
+
+    # Garante que coluna_y seja string única
     if isinstance(coluna_y, list):
         coluna_y = coluna_y[0] if coluna_y else None
 
+    # Validação coluna Y
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    aplicar_estilo_minitab()
+    try:
+        if subgrupo:
+            if subgrupo not in df.columns:
+                return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
 
-    if subgrupo:
-        if subgrupo not in df.columns:
-            return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
+            dados = df[[coluna_y, subgrupo]].dropna()
+            if dados.empty:
+                return "❌ Dados insuficientes para gerar o gráfico.", None
 
-        dados = df[[coluna_y, subgrupo]].dropna()
-        if dados.empty:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
+            subgrupos = dados[subgrupo].unique()
+            if len(subgrupos) != 2:
+                return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
 
-        subgrupos = dados[subgrupo].unique()
-        if len(subgrupos) != 2:
-            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
+            fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
+            for ax, sub in zip(axs, subgrupos):
+                sns.histplot(
+                    dados[dados[subgrupo] == sub][coluna_y],
+                    bins=10,
+                    kde=True,
+                    stat="count",  # ✅ corrigido para valor aceito
+                    alpha=0.4,
+                    color="steelblue",
+                    edgecolor="black",
+                    ax=ax
+                )
+                ax.set_title(f"Histograma - {sub}")
+                ax.set_xlabel(coluna_y)
+                ax.set_ylabel("Frequência")  # ✅ label em português
 
-        fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
-        for ax, sub in zip(axs, subgrupos):
+            plt.tight_layout()
+
+        else:
+            plt.figure(figsize=(10, 6))
             sns.histplot(
-                dados[dados[subgrupo] == sub][coluna_y],
+                df[coluna_y].dropna(),
                 bins=10,
                 kde=True,
-                stat="Frequencia",
+                stat="count",  # ✅ corrigido para valor aceito
                 alpha=0.4,
                 color="steelblue",
-                edgecolor="black",
-                ax=ax
+                edgecolor="black"
             )
-            ax.set_title(f"Histograma - {sub}")
-            ax.set_xlabel(coluna_y)
-            ax.set_ylabel("Densidade")
-    else:
-        plt.figure(figsize=(10, 6))
-        sns.histplot(
-            df[coluna_y].dropna(),
-            bins=10,
-            kde=True,
-            stat="density",
-            alpha=0.4,
-            color="steelblue",
-            edgecolor="black"
-        )
-        plt.xlabel(coluna_y)
-        plt.ylabel("Densidade")
-        plt.title("Histograma com Curva de Densidade")
-        plt.tight_layout()
+            plt.xlabel(coluna_y)
+            plt.ylabel("Frequência")  # ✅ label em português
+            plt.title("Histograma com Curva de Densidade")
+            plt.tight_layout()
 
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close()
+        # Salva imagem
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        plt.close()
 
-    return "", imagem_base64
+        return "", imagem_base64
+
+    except Exception as e:
+        return f"❌ Erro ao gerar o histograma: {str(e)}", None
+
 
 def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
