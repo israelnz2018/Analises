@@ -376,7 +376,7 @@ async def analisar(
             resposta_ia = perguntar_ia(pergunta, ultimo_resultado_texto)
 
 
-@router.post("/personalizar-grafico")
+@app.post("/personalizar-grafico")
 async def personalizar_grafico(
     request: Request,
     arquivo: UploadFile = File(None),
