@@ -9,11 +9,18 @@ import io
 import matplotlib.pyplot as plt
 
 
-# ✅ Variável global para armazenar df atual
-df_global = None
+try:
+    # outros comandos aqui
+    global ultimo_resultado_texto
+    ultimo_resultado_texto = resultado_texto
 
-# ✅ Variável global para armazenar última análise
-ultimo_resultado_texto = ""
+except Exception as e:
+    tb = traceback.format_exc()
+    return JSONResponse({
+        "erro": "Erro interno ao processar a análise.",
+        "detalhe": str(e),
+        "traceback": tb
+    }, status_code=500)
 
 
 
