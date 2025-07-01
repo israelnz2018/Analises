@@ -16,6 +16,7 @@ df_global = None
 ultimo_resultado_texto = ""
 
 
+
 # Tentativa segura de importação dos módulos 
 try:
     from leitura import ler_arquivo
