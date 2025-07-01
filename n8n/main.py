@@ -483,7 +483,18 @@ async def pergunta(request: Request, pergunta: str = Form(...), tipo: str = Form
         else:
             return JSONResponse({"erro": "Tipo de pergunta inválido."}, status_code=400)
 
-        resposta = perguntar_ia(pergunta, texto_base)
+        # 🔧 Novo: cria prompt completo unindo análise + pergunta
+        prompt_completo = f"""
+        Esta é a última análise ou gráfico gerado pelo sistema:
+
+        {texto_base}
+
+        Agora responda a seguinte pergunta do aluno, considerando as informações acima:
+
+        {pergunta}
+        """
+
+        resposta = perguntar_ia(pergunta, prompt_completo)
 
         return {"resposta": resposta}
 
@@ -494,4 +505,5 @@ async def pergunta(request: Request, pergunta: str = Form(...), tipo: str = Form
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
 
