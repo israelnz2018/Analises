@@ -725,8 +725,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
-
-def personalizar_boxplot(df, lista_y, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -738,26 +737,60 @@ def personalizar_boxplot(df, lista_y, cor="#000000", titulo_x="", titulo_y="", t
     if not lista_y or any(y not in df.columns for y in lista_y):
         return None
 
-    dados = df[lista_y].dropna()
+    if subgrupo and subgrupo not in df.columns:
+        subgrupo = None
+
+    colunas_necessarias = lista_y + ([subgrupo] if subgrupo else [])
+    dados = df[colunas_necessarias].dropna()
     if dados.empty:
         return None
 
-    plt.figure(figsize=(10, 6))
-    sns.boxplot(data=dados, orient="v", color=cor)
-    plt.xlabel(titulo_x if titulo_x else "Variáveis", fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y else "Valores", fontsize=int(tamanho_fonte))
-    plt.title(titulo_grafico if titulo_grafico else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
-    plt.xticks(rotation=int(inclinacao_x))
-    plt.yticks(rotation=int(inclinacao_y))
-    plt.tight_layout()
+    if subgrupo:
+        subgrupos = dados[subgrupo].dropna().unique()
+        if len(subgrupos) != 2:
+            return None
 
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    plt.close()
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
 
-    return imagem_base64
+        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
+            dados_sub = dados[dados[subgrupo] == sub]
+
+            if dados_sub.empty:
+                ax.axis('off')
+                ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=int(tamanho_fonte))
+                continue
+
+            sns.boxplot(data=dados_sub[lista_y], orient="v", color=cor, ax=ax)
+            ax.set_xlabel(titulo_x if titulo_x.strip() != "" else "Variáveis", fontsize=int(tamanho_fonte))
+            ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
+            ax.tick_params(axis='x', rotation=int(inclinacao_x))
+            ax.tick_params(axis='y', rotation=int(inclinacao_y))
+
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close(fig)
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        return imagem_base64
+
+    else:
+        plt.figure(figsize=(10, 6))
+        sns.boxplot(data=dados[lista_y], orient="v", color=cor)
+        plt.xlabel(titulo_x if titulo_x.strip() != "" else "Variáveis", fontsize=int(tamanho_fonte))
+        plt.title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
+        plt.xticks(rotation=int(inclinacao_x))
+        plt.yticks(rotation=int(inclinacao_y))
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close()
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        return imagem_base64
+
 
     
 def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
