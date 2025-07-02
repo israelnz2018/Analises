@@ -727,7 +727,6 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     return "", imagem_base64
 
 
-
 def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -744,11 +743,11 @@ def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_gr
         colunas_validas = df.select_dtypes(include="number").columns.tolist()
 
     if not colunas_validas:
-        return {"erro": "❌ Nenhuma coluna numérica encontrada no arquivo.", "grafico": None}
+        return None  # 🔧 Retorna None se não houver colunas válidas
 
     dados = df[colunas_validas].dropna()
     if dados.empty:
-        return {"erro": "❌ Dados insuficientes para gerar o gráfico.", "grafico": None}
+        return None  # 🔧 Retorna None se não houver dados
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -770,7 +769,9 @@ def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_gr
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
 
-    return {"erro": None, "grafico": imagem_base64}
+    # 🔧 Retorna apenas o base64 puro (string), sem dicionário
+    return imagem_base64
+
 
 
 
