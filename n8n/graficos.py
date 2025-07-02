@@ -590,7 +590,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
 
     return "", imagem_base64
 
-def personalizar_barras(df, coluna_x, coluna_y=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
@@ -601,35 +601,78 @@ def personalizar_barras(df, coluna_x, coluna_y=None, cor="#000000", titulo_x="",
     if not coluna_x or coluna_x not in df.columns:
         return None
     if coluna_y and coluna_y not in df.columns:
-        return None
+        coluna_y = None
+    if subgrupo and subgrupo not in df.columns:
+        subgrupo = None
 
-    dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
+    # ➡️ Filtra dados válidos
+    colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
+    dados = df.dropna(subset=colunas_necessarias)
     if dados.empty:
         return None
 
-    if coluna_y:
-        contagem = dados.groupby(coluna_x)[coluna_y].sum()
-        ylabel = titulo_y if titulo_y else "Soma de Y"
+    if subgrupo:
+        subgrupos = dados[subgrupo].dropna().unique()
+        if len(subgrupos) != 2:
+            return None  # apenas se houver exatamente 2 categorias
+
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+
+        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
+            dados_sub = dados[dados[subgrupo] == sub]
+
+            if coluna_y:
+                contagem = dados_sub.groupby(coluna_x)[coluna_y].sum()
+                ylabel = titulo_y if titulo_y.strip() != "" else "Soma de Y"
+            else:
+                contagem = dados_sub[coluna_x].value_counts()
+                ylabel = titulo_y if titulo_y.strip() != "" else "Frequência"
+
+            if contagem.empty:
+                ax.axis('off')
+                ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=int(tamanho_fonte))
+                continue
+
+            contagem.plot(kind="bar", color=cor, edgecolor="black", ax=ax)
+            ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+            ax.set_ylabel(ylabel, fontsize=int(tamanho_fonte))
+            ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
+            ax.tick_params(axis='x', rotation=int(inclinacao_x))
+            ax.tick_params(axis='y', rotation=int(inclinacao_y))
+
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close(fig)
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        return imagem_base64
+
     else:
-        contagem = dados[coluna_x].value_counts()
-        ylabel = titulo_y if titulo_y else "Frequência"
+        if coluna_y:
+            contagem = dados.groupby(coluna_x)[coluna_y].sum()
+            ylabel = titulo_y if titulo_y.strip() != "" else "Soma de Y"
+        else:
+            contagem = dados[coluna_x].value_counts()
+            ylabel = titulo_y if titulo_y.strip() != "" else "Frequência"
 
-    plt.figure(figsize=(10, 6))
-    contagem.plot(kind="bar", color=cor, edgecolor="black")
-    plt.xlabel(titulo_x if titulo_x else coluna_x, fontsize=int(tamanho_fonte))
-    plt.ylabel(ylabel, fontsize=int(tamanho_fonte))
-    plt.title(titulo_grafico if titulo_grafico else f"Barras de {coluna_x}", fontsize=int(tamanho_fonte))
-    plt.xticks(rotation=int(inclinacao_x))
-    plt.yticks(rotation=int(inclinacao_y))
-    plt.tight_layout()
+        plt.figure(figsize=(10, 6))
+        contagem.plot(kind="bar", color=cor, edgecolor="black")
+        plt.xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+        plt.ylabel(ylabel, fontsize=int(tamanho_fonte))
+        plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Barras de {coluna_x}", fontsize=int(tamanho_fonte))
+        plt.xticks(rotation=int(inclinacao_x))
+        plt.yticks(rotation=int(inclinacao_y))
+        plt.tight_layout()
 
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    plt.close()
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        plt.close()
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        return imagem_base64
 
-    return imagem_base64
 
 
 def gerar_boxplot(df, lista_y, subgrupo=None):
