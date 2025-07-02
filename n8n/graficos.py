@@ -728,7 +728,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
 
 
-def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -737,34 +737,40 @@ def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_y="", titulo_gra
 
     aplicar_estilo_minitab()
 
-    # Usa todas as colunas numéricas automaticamente
-    lista_y = df.select_dtypes(include="number").columns.tolist()
-    if not lista_y:
-        return None
+    # ✅ Usa lista_y informada ou todas numéricas como fallback
+    if lista_y:
+        colunas_validas = [col for col in lista_y if col in df.columns]
+    else:
+        colunas_validas = df.select_dtypes(include="number").columns.tolist()
 
-    dados = df[lista_y].dropna()
+    if not colunas_validas:
+        return {"erro": "❌ Nenhuma coluna numérica encontrada no arquivo.", "grafico": None}
+
+    dados = df[colunas_validas].dropna()
     if dados.empty:
-        return None
+        return {"erro": "❌ Dados insuficientes para gerar o gráfico.", "grafico": None}
 
-    plt.figure(figsize=(10, 6))
-    sns.boxplot(data=dados, orient="v", color=cor)
+    fig, ax = plt.subplots(figsize=(10, 6))
 
-    plt.xlabel(titulo_x if titulo_x.strip() != "" else "", fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y.strip() != "" else "Valor", fontsize=int(tamanho_fonte))
-    plt.title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
-    plt.xticks(rotation=int(inclinacao_x))
-    plt.yticks(rotation=int(inclinacao_y))
+    if len(colunas_validas) == 1:
+        sns.boxplot(y=colunas_validas[0], data=dados, color=cor, ax=ax)
+        ax.set_ylabel(colunas_validas[0], fontsize=int(tamanho_fonte))
+    else:
+        sns.boxplot(data=dados[colunas_validas], orient="v", color=cor, ax=ax)
+        ax.set_ylabel("Variáveis", fontsize=int(tamanho_fonte))
+
+    ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
+
     plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
-    plt.close()
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    return imagem_base64
+    plt.close(fig)
 
-
-
+    return {"erro": None, "grafico": imagem_base64}
 
 
 
