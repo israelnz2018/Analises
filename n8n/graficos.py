@@ -726,45 +726,41 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64
 
-def personalizar_boxplot(df, lista_y, **kwargs):
+
+def personalizar_boxplot(df, **kwargs):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
-    print("🔎 [DEBUG] Iniciando personalizar_boxplot")
-    print(f"📌 lista_y (recebido): {lista_y}")
+    print("🔎 [DEBUG] Iniciando personalizar_boxplot (somente tamanho fonte)")
 
-    # ✅ Normaliza lista_y
-    if isinstance(lista_y, str):
-        lista_y = [y.strip() for y in lista_y.split(",") if y.strip()]
-    elif not isinstance(lista_y, list):
-        lista_y = []
+    # ✅ Usa coluna fixa para teste
+    colunas_df = df.columns.tolist()
+    if not colunas_df:
+        print("❌ [DEBUG] Nenhuma coluna disponível no DataFrame")
+        return None
 
-    print(f"📌 lista_y (após normalização): {lista_y}")
+    coluna_teste = colunas_df[0]
+    print(f"✅ [DEBUG] Usando coluna teste: {coluna_teste}")
 
     aplicar_estilo_minitab()
 
-    # ✅ Verifica lista_y
-    if not lista_y or any(y not in df.columns for y in lista_y):
-        print("❌ [DEBUG] lista_y inválida ou coluna não encontrada")
-        print("🔧 [DEBUG] Colunas disponíveis no DataFrame:", df.columns.tolist())
-        return None
-
-    # 🔎 Filtra dados válidos
-    dados = df[lista_y].dropna()
+    dados = df[[coluna_teste]].dropna()
     print(f"🔎 [DEBUG] Dados filtrados shape: {dados.shape}")
 
     if dados.empty:
         print("❌ [DEBUG] Dados filtrados estão vazios")
         return None
 
-    # ✅ Gera o boxplot simples apenas com Y
+    # ✅ Ajusta tamanho da fonte fixo (exemplo: 14)
     plt.figure(figsize=(10, 6))
-    sns.boxplot(data=dados, orient="v")
-    plt.ylabel("Variáveis")
-    plt.title(f"Boxplot de {', '.join(lista_y)}")
+    sns.boxplot(y=coluna_teste, data=dados)
+    plt.ylabel(coluna_teste, fontsize=14)
+    plt.title(f"Boxplot de {coluna_teste}", fontsize=14)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
     plt.tight_layout()
 
     buf = BytesIO()
@@ -772,8 +768,9 @@ def personalizar_boxplot(df, lista_y, **kwargs):
     plt.close()
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    print("✅ [DEBUG] Gráfico gerado com sucesso")
+    print("✅ [DEBUG] Gráfico gerado com sucesso (tamanho fonte alterado)")
     return imagem_base64
+
 
 
 
