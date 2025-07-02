@@ -684,49 +684,42 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     import seaborn as sns
     import base64
     from io import BytesIO
-
-    if not lista_y or any(y not in df.columns for y in lista_y):
-        return "❌ Uma ou mais colunas Y informadas não foram encontradas no arquivo.", None
-
-    if subgrupo and subgrupo not in df.columns:
-        return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
+    from suporte import aplicar_estilo_minitab
 
     aplicar_estilo_minitab()
 
-    if subgrupo:
-        dados = df[lista_y + [subgrupo]].dropna()
-        subgrupos = dados[subgrupo].unique()
+    if not lista_y or any(y not in df.columns for y in lista_y):
+        return "❌ Uma ou mais colunas Y informadas não foram encontradas no arquivo.", None, {}
 
-        if len(subgrupos) != 2:
-            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
+    dados = df[lista_y].dropna()
+    if dados.empty:
+        return "❌ Dados insuficientes para gerar o gráfico.", None, {}
 
-        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-
-        for ax, sub in zip(axs, subgrupos):
-            dados_sub = dados[dados[subgrupo] == sub]
-            sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax)
-            ax.set_title(f"Boxplot ({sub})")
-
-        plt.tight_layout()
-
+    fig, ax = plt.subplots(figsize=(10, 6))
+    if len(lista_y) == 1:
+        sns.boxplot(y=lista_y[0], data=dados, ax=ax)
     else:
-        dados = df[lista_y].dropna()
-        if dados.empty:
-            return "❌ Dados insuficientes para gerar o gráfico.", None
-        plt.figure(figsize=(10, 6))
-        sns.boxplot(data=dados, orient="v")
-        plt.title("Boxplot de variáveis contínuas")
-        plt.tight_layout()
+        sns.boxplot(data=dados[lista_y], orient="v", ax=ax)
+
+    ax.set_title("Boxplot de variáveis contínuas")
+    plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
-    plt.close()
+    plt.close(fig)
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    return "", imagem_base64
+    # 🔧 Retorna também as colunas usadas
+    info_colunas = {
+        "lista_y": lista_y,
+        "subgrupo": subgrupo
+    }
 
-def personalizar_boxplot(df, coluna_original, titulo_grafico="", tamanho_fonte=12):
+    return "", imagem_base64, info_colunas
+
+
+def personalizar_boxplot(df, info_colunas, titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -735,19 +728,25 @@ def personalizar_boxplot(df, coluna_original, titulo_grafico="", tamanho_fonte=1
 
     aplicar_estilo_minitab()
 
-    if coluna_original not in df.columns:
-        return None  # 🔧 Se a coluna não existir, retorna None
+    lista_y = info_colunas.get("lista_y")
+    if not lista_y:
+        return None
 
-    dados = df[[coluna_original]].dropna()
+    colunas_validas = [col for col in lista_y if col in df.columns]
+    if not colunas_validas:
+        return None
+
+    dados = df[colunas_validas].dropna()
     if dados.empty:
-        return None  # 🔧 Sem dados válidos
+        return None
 
     fig, ax = plt.subplots(figsize=(10, 6))
+    if len(colunas_validas) == 1:
+        sns.boxplot(y=colunas_validas[0], data=dados, ax=ax)
+    else:
+        sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
 
-    # 🔧 Plota somente a coluna original (garantido)
-    sns.boxplot(y=coluna_original, data=dados, ax=ax)
-
-    # 🔧 Personaliza título principal e tamanho da fonte
+    # 🔧 Personaliza apenas o título e tamanho da fonte
     ax.set_title(
         titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas",
         fontsize=int(tamanho_fonte)
@@ -757,12 +756,12 @@ def personalizar_boxplot(df, coluna_original, titulo_grafico="", tamanho_fonte=1
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
+    plt.close(fig)
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close(fig)
 
-    # 🔧 Retorna apenas base64 puro
     return imagem_base64
+
 
 
 
