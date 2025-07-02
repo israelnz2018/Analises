@@ -727,7 +727,6 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     return "", imagem_base64
 
 
-
 def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -736,9 +735,15 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     from suporte import aplicar_estilo_minitab
 
     print("🔎 [DEBUG] Iniciando personalizar_boxplot")
-    print(f"📌 lista_y: {lista_y}")
+    print(f"📌 lista_y (antes): {lista_y}")
     print(f"📌 subgrupo: {subgrupo}")
     print(f"📌 cor: {cor}, titulo_x: {titulo_x}, titulo_y: {titulo_y}, titulo_grafico: {titulo_grafico}, tamanho_fonte: {tamanho_fonte}, inclinacao_x: {inclinacao_x}")
+
+    # ✅ Converte string única em lista
+    if isinstance(lista_y, str):
+        lista_y = [lista_y]
+
+    print(f"📌 lista_y (após conversão): {lista_y}")
 
     aplicar_estilo_minitab()
 
@@ -829,6 +834,7 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         print("✅ [DEBUG] Gráfico de múltiplos Ys gerado com sucesso")
         return imagem_base64
+
 
     
 def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
