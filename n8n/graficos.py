@@ -105,12 +105,15 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
+    # ➡️ Ajusta coluna_y se vier como lista
     if isinstance(coluna_y, list):
         coluna_y = coluna_y[0] if coluna_y else None
 
+    # ➡️ Validação coluna_y
     if not coluna_y or coluna_y not in df.columns:
         return None
 
+    # ➡️ Aplica estilo Minitab
     aplicar_estilo_minitab()
 
     imagens_base64 = []
@@ -130,16 +133,22 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
                 dados[dados[subgrupo] == sub][coluna_y],
                 bins=10,
                 kde=True,
-                stat="density",
+                stat="count",  # ✅ corrigido para valor aceito pelo Seaborn
                 alpha=0.4,
                 color=cor,
                 edgecolor="black",
                 ax=ax
             )
-            titulo = titulo_grafico if titulo_grafico else f"Histograma - {sub}"
+
+            # ➡️ Título corrigido por subgrupo
+            if titulo_grafico and titulo_grafico.strip() != "":
+                titulo = f"{titulo_grafico} ({sub})"
+            else:
+                titulo = f"Histograma - {sub}"
+
             ax.set_title(titulo, fontsize=int(tamanho_fonte))
             ax.set_xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
-            ax.set_ylabel(titulo_y if titulo_y else "Densidade", fontsize=int(tamanho_fonte))
+            ax.set_ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
             ax.tick_params(axis='x', rotation=int(inclinacao_x))
 
         plt.tight_layout()
@@ -157,15 +166,18 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
             df[coluna_y].dropna(),
             bins=10,
             kde=True,
-            stat="density",
+            stat="count",  # ✅ corrigido para valor aceito
             alpha=0.4,
             color=cor,
             edgecolor="black"
         )
-        titulo = titulo_grafico if titulo_grafico else "Histograma com Curva de Densidade"
+
+        # ➡️ Título para gráfico único
+        titulo = titulo_grafico if titulo_grafico and titulo_grafico.strip() != "" else "Histograma com Curva de Densidade"
+
         plt.title(titulo, fontsize=int(tamanho_fonte))
         plt.xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
-        plt.ylabel(titulo_y if titulo_y else "Densidade", fontsize=int(tamanho_fonte))
+        plt.ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
         plt.xticks(rotation=int(inclinacao_x))
         plt.tight_layout()
 
@@ -175,6 +187,7 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
         return imagem_base64
+
 
 def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
