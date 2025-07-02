@@ -526,12 +526,13 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
 
 
 
-
-
 def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
+    from suporte import aplicar_estilo_minitab
+
+    aplicar_estilo_minitab()
 
     if not coluna_x or coluna_x not in df.columns:
         return "❌ A coluna X informada não foi encontrada no arquivo.", None
@@ -542,8 +543,6 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
     if subgrupo and subgrupo not in df.columns:
         return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
 
-    aplicar_estilo_minitab()
-
     if subgrupo:
         dados = df[[coluna_x, coluna_y, subgrupo]].dropna() if coluna_y else df[[coluna_x, subgrupo]].dropna()
         subgrupos = dados[subgrupo].unique()
@@ -551,35 +550,39 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
         if len(subgrupos) != 2:
             return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
 
+        # ➡️ Garante mesmo índice em ambos os gráficos
+        categorias = sorted(dados[coluna_x].dropna().unique())
+
         fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
 
         for ax, sub in zip(axs, subgrupos):
             dados_sub = dados[dados[subgrupo] == sub]
+
             if coluna_y:
-                contagem = dados_sub.groupby(coluna_x)[coluna_y].sum()
-                contagem.plot(kind="bar", ax=ax)
-                ax.set_ylabel("Soma de Y")
+                contagem = dados_sub.groupby(coluna_x)[coluna_y].sum().reindex(categorias, fill_value=0)
             else:
-                contagem = dados_sub[coluna_x].value_counts()
-                contagem.plot(kind="bar", ax=ax)
-                ax.set_ylabel("Frequência")
+                contagem = dados_sub[coluna_x].value_counts().reindex(categorias, fill_value=0)
+
+            contagem.plot(kind="bar", ax=ax)
+            ax.set_ylabel("Frequência")
             ax.set_title(f"Barras de {coluna_x} ({sub})")
             ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
 
-        plt.tight_layout() 
+        plt.tight_layout()
 
     else:
         dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
+
         if coluna_y:
             contagem = dados.groupby(coluna_x)[coluna_y].sum()
-            contagem.plot(kind="bar", figsize=(10,6))
-            plt.ylabel("Soma de Y")
         else:
             contagem = dados[coluna_x].value_counts()
-            contagem.plot(kind="bar", figsize=(10,6))
-            plt.ylabel("Frequência")
+
+        plt.figure(figsize=(10,6))
+        contagem.plot(kind="bar")
+        plt.ylabel("Frequência")  # ➡️ Sempre frequência agora
         plt.title(f"Barras de {coluna_x}")
-        plt.xticks(rotation=90)  # <<< Aqui está o ajuste
+        plt.xticks(rotation=90)
         plt.tight_layout()
 
     buf = BytesIO()
@@ -589,6 +592,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
+
 
 def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
     import matplotlib.pyplot as plt
