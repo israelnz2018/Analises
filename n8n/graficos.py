@@ -735,18 +735,18 @@ def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_gr
 
     aplicar_estilo_minitab()
 
-    # ✅ Usa lista_y informada ou todas numéricas como fallback
-    if lista_y:
-        colunas_validas = [col for col in lista_y if col in df.columns]
-    else:
-        colunas_validas = df.select_dtypes(include="number").columns.tolist()
+    # ✅ Usa apenas lista_y informada
+    if not lista_y:
+        return None  # 🔧 Se não enviar lista_y, retorna None imediatamente
+
+    colunas_validas = [col for col in lista_y if col in df.columns]
 
     if not colunas_validas:
-        return None  # 🔧 Retorna None se não houver colunas válidas
+        return None  # 🔧 Nenhuma coluna válida
 
     dados = df[colunas_validas].dropna()
     if dados.empty:
-        return None  # 🔧 Retorna None se não houver dados
+        return None  # 🔧 Sem dados válidos
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -756,7 +756,7 @@ def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_gr
     else:
         sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
 
-    # 🔧 Personaliza apenas o título principal e tamanho da fonte
+    # 🔧 Personaliza apenas título principal e tamanho da fonte
     ax.set_title(
         titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas",
         fontsize=int(tamanho_fonte)
@@ -770,12 +770,8 @@ def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_gr
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
 
-    # 🔧 Retorna apenas o base64 puro (string), sem dicionário
+    # 🔧 Retorna apenas base64 puro
     return imagem_base64
-
-
-
-
 
 
 
