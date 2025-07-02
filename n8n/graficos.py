@@ -737,11 +737,26 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     print(f"📌 lista_y (recebido): {lista_y}")
     print(f"📌 subgrupo: {subgrupo}")
 
-    aplicar_estilo_minitab()
-
-    # ✅ Converte lista_y para lista se vier string única
+    # ✅ Normaliza lista_y
     if isinstance(lista_y, str):
-        lista_y = [lista_y]
+        lista_y = [y.strip() for y in lista_y.split(",") if y.strip()]
+    elif not isinstance(lista_y, list):
+        lista_y = []
+
+    print(f"📌 lista_y (após normalização): {lista_y}")
+
+    # ✅ Validação segura para tamanho_fonte e inclinacao_x
+    try:
+        tamanho_fonte = int(tamanho_fonte)
+    except:
+        tamanho_fonte = 12
+
+    try:
+        inclinacao_x = int(inclinacao_x)
+    except:
+        inclinacao_x = 0
+
+    aplicar_estilo_minitab()
 
     # ✅ Verifica lista_y
     if not lista_y or any(y not in df.columns for y in lista_y):
@@ -763,22 +778,25 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         print("❌ [DEBUG] Dados filtrados estão vazios")
         return None
 
-    # ✅ Caso com subgrupo (copiado do gerar_boxplot)
+    # ✅ Caso com subgrupo
     if subgrupo:
         subgrupos = dados[subgrupo].dropna().unique()
         print(f"🔎 [DEBUG] Subgrupos encontrados: {subgrupos}")
 
-        if len(subgrupos) != 2:
-            print(f"❌ [DEBUG] Subgrupo não possui exatamente 2 categorias. Encontrado: {len(subgrupos)}")
-            return None
+        fig, axs = plt.subplots(1, len(subgrupos), figsize=(16, 6), sharey=True)
 
-        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
-
-        for ax, sub in zip(axs, subgrupos):
+        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
             dados_sub = dados[dados[subgrupo] == sub]
-            sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax)
-            ax.set_title(f"{titulo_grafico} ({sub})", fontsize=int(tamanho_fonte))
-            ax.tick_params(axis='x', rotation=int(inclinacao_x))
+            print(f"🔎 [DEBUG] Subgrupo {sub}, dados shape: {dados_sub.shape}")
+
+            if dados_sub.empty:
+                ax.axis('off')
+                ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=tamanho_fonte)
+                continue
+
+            sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax, color=cor)
+            ax.set_title(f"{sub}", fontsize=tamanho_fonte)
+            ax.tick_params(axis='x', rotation=inclinacao_x)
 
         plt.tight_layout()
 
@@ -786,21 +804,22 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     elif len(lista_y) == 1:
         plt.figure(figsize=(10, 6))
         sns.boxplot(y=lista_y[0], data=dados, color=cor)
-        plt.xlabel(titulo_x, fontsize=int(tamanho_fonte))
-        plt.ylabel(titulo_y if titulo_y else lista_y[0], fontsize=int(tamanho_fonte))
-        plt.title(titulo_grafico if titulo_grafico else f"Boxplot de {lista_y[0]}", fontsize=int(tamanho_fonte))
-        plt.xticks(rotation=int(inclinacao_x))
+        plt.xlabel(titulo_x, fontsize=tamanho_fonte)
+        plt.ylabel(titulo_y if titulo_y.strip() != "" else lista_y[0], fontsize=tamanho_fonte)
+        plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {lista_y[0]}", fontsize=tamanho_fonte)
+        plt.xticks(rotation=inclinacao_x)
         plt.tight_layout()
 
-    # ✅ Caso sem subgrupo e múltiplos Ys ➔ apenas título e tamanho da fonte
+    # ✅ Caso sem subgrupo e múltiplos Ys ➔ apenas atualiza tamanho do título Y e título geral
     else:
         plt.figure(figsize=(10, 6))
         sns.boxplot(data=dados[lista_y], orient="v")
-        plt.ylabel(titulo_y if titulo_y else "Variáveis", fontsize=int(tamanho_fonte))
-        plt.title(titulo_grafico if titulo_grafico else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
-        plt.xticks(rotation=int(inclinacao_x))
+        plt.ylabel(titulo_y if titulo_y.strip() != "" else "Variáveis", fontsize=tamanho_fonte)
+        plt.title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=tamanho_fonte)
+        plt.xticks(rotation=inclinacao_x)
         plt.tight_layout()
 
+    # 🔄 Converte em base64
     buf = BytesIO()
     plt.savefig(buf, format="png")
     plt.close()
@@ -808,6 +827,7 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     print("✅ [DEBUG] Gráfico gerado com sucesso")
     return imagem_base64
+
 
 
 
