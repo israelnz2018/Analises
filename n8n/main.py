@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import inspect
 
 
-# ✅ Variável global para armazenar df atual
+# ✅ Variável global para armazenar df atual 
 df_global = None
 
 # ✅ Variável global para armazenar última análise ou gráfico
