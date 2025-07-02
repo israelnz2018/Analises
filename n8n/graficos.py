@@ -727,46 +727,32 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     return "", imagem_base64
 
 
-def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
+def personalizar_boxplot(df, tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
-    print("🔎 [DEBUG] Iniciando personalizar_boxplot")
-    print(f"📌 lista_y (recebido): {lista_y}")
-    print(f"➡ cor: {cor}")
-    print(f"➡ titulo_x: {titulo_x}")
-    print(f"➡ titulo_grafico: {titulo_grafico}")
-    print(f"➡ tamanho_fonte: {tamanho_fonte}")
-
     aplicar_estilo_minitab()
 
-    # ✅ Verifica lista_y internamente
-    if not lista_y or any(y not in df.columns for y in lista_y):
-        print("❌ [DEBUG] lista_y inválida ou coluna não encontrada")
-        return {"erro": "❌ Coluna não encontrada ou lista_y vazia.", "grafico": None}
+    # ✅ Usa a primeira coluna numérica automaticamente
+    colunas_numericas = df.select_dtypes(include=['number']).columns
+    if len(colunas_numericas) == 0:
+        return {"erro": "❌ Nenhuma coluna numérica encontrada.", "grafico": None}
+
+    coluna_y = colunas_numericas[0]
 
     # 🔎 Filtra dados válidos
-    dados = df[lista_y].dropna()
-    print(f"🔎 [DEBUG] Dados filtrados shape: {dados.shape}")
-
+    dados = df[[coluna_y]].dropna()
     if dados.empty:
-        print("❌ [DEBUG] Dados filtrados estão vazios")
         return {"erro": "❌ Dados insuficientes para gerar o gráfico.", "grafico": None}
 
     plt.figure(figsize=(10, 6))
+    sns.boxplot(y=coluna_y, data=dados)
 
-    if len(lista_y) == 1:
-        sns.boxplot(y=lista_y[0], data=dados, color=cor)
-        plt.xlabel(titulo_x, fontsize=int(tamanho_fonte))
-        plt.ylabel(lista_y[0], fontsize=int(tamanho_fonte))
-        plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {lista_y[0]}", fontsize=int(tamanho_fonte))
-    else:
-        sns.boxplot(data=dados[lista_y], orient="v")
-        plt.ylabel("Variáveis", fontsize=int(tamanho_fonte))
-        plt.title("Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
+    plt.ylabel(coluna_y, fontsize=int(tamanho_fonte))
+    plt.title(f"Boxplot de {coluna_y}", fontsize=int(tamanho_fonte))
 
     plt.tight_layout()
 
@@ -775,10 +761,10 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     plt.close()
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    print("✅ [DEBUG] Gráfico gerado com sucesso")
 
     # ✅ Retorno padronizado
-    return {"erro": None, "grafico_isolado_base64": imagem_base64}
+    return {"erro": None, "grafico": imagem_base64}
+
 
 
 
