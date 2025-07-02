@@ -465,15 +465,13 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
     if dados.empty:
         return None
 
-    imagens_base64 = []
-
     if subgrupo:
         subgrupos = dados[subgrupo].dropna().unique()
         if len(subgrupos) != 2:
             return None
 
         fig, axs = plt.subplots(1, 2, figsize=(16, 6))
-        for ax, sub in zip(axs, subgrupos):
+        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
             dados_sub = dados[dados[subgrupo] == sub]
             if coluna_y:
                 soma = dados_sub.groupby(coluna_x)[coluna_y].sum()
@@ -482,13 +480,14 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
 
             if soma.empty or soma.sum() == 0:
                 ax.axis('off')
-                ax.set_title(f"{sub} (Sem dados)")
+                ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=int(tamanho_fonte))
                 continue
 
             soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, ax=ax)
             ax.set_ylabel("")
-            titulo = titulo_grafico if titulo_grafico else f"Pizza de {coluna_x} ({sub})"
-            ax.set_title(titulo, fontsize=int(tamanho_fonte))
+
+            # ➡️ Títulos fixos Grupo 1 e Grupo 2, ignorando o campo titulo_grafico
+            ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
 
         plt.tight_layout()
 
@@ -511,7 +510,9 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
         plt.figure(figsize=(8, 6))
         soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
         plt.ylabel("")
-        titulo = titulo_grafico if titulo_grafico else f"Pizza de {coluna_x}"
+
+        # ➡️ Usa titulo_grafico se preenchido, senão padrão
+        titulo = titulo_grafico if titulo_grafico.strip() != "" else f"Pizza de {coluna_x}"
         plt.title(titulo, fontsize=int(tamanho_fonte))
         plt.tight_layout()
 
@@ -521,6 +522,7 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
         return imagem_base64
+
 
 
 
