@@ -1301,7 +1301,7 @@ GRAFICOS = {
     "Barras": gerar_barras,
     "Barras Personalizado": personalizar_barras,
     "BoxPlot": gerar_boxplot,
-    "BoxPlot Personalizado": personalizar_boxplot,
+    "Boxplot Personalizado": personalizar_boxplot,
     "Dispersão": gerar_dispersao,
     "Dispersão Personalizado": personalizar_dispersao,
     "Tendência": gerar_tendencia,
