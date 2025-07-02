@@ -726,8 +726,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64
 
-
-def personalizar_boxplot(df, lista_y, tamanho_fonte=12):
+def personalizar_boxplot(df, coluna_y, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -736,19 +735,20 @@ def personalizar_boxplot(df, lista_y, tamanho_fonte=12):
 
     aplicar_estilo_minitab()
 
-    # 🔎 Verifica se todas as colunas existem
-    if not lista_y or any(y not in df.columns for y in lista_y):
-        return {"erro": "❌ Uma ou mais colunas não encontradas.", "grafico": None}
+    # 🔎 Verifica se coluna_y existe
+    if coluna_y not in df.columns:
+        return {"erro": f"❌ Coluna {coluna_y} não encontrada.", "grafico": None}
 
-    dados = df[lista_y].dropna()
+    dados = df[[coluna_y]].dropna()
     if dados.empty:
-        return {"erro": "❌ Dados insuficientes.", "grafico": None}
+        return {"erro": "❌ Dados insuficientes para gerar o gráfico.", "grafico": None}
 
-    fig, ax = plt.subplots(figsize=(10,6))
-    sns.boxplot(data=dados[lista_y], orient="v", ax=ax)
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.boxplot(y=coluna_y, data=dados, color=cor, ax=ax)
 
-    ax.set_ylabel("Valores", fontsize=int(tamanho_fonte))
-    ax.set_title("Boxplot Múltiplo", fontsize=int(tamanho_fonte))
+    ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+    ax.set_ylabel(coluna_y, fontsize=int(tamanho_fonte))
+    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {coluna_y}", fontsize=int(tamanho_fonte))
 
     plt.tight_layout()
     buf = BytesIO()
@@ -758,6 +758,7 @@ def personalizar_boxplot(df, lista_y, tamanho_fonte=12):
     plt.close(fig)
 
     return imagem_base64
+
 
 
 
