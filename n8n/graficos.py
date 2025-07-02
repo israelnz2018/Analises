@@ -735,9 +735,13 @@ def personalizar_boxplot(df, coluna_y, cor="#000000", titulo_x="", titulo_grafic
 
     aplicar_estilo_minitab()
 
-    # 🔎 Verifica se coluna_y existe
-    if coluna_y not in df.columns:
-        return {"erro": f"❌ Coluna {coluna_y} não encontrada.", "grafico": None}
+    # ✅ Debug para rastrear problema
+    print("✅ [DEBUG] df.columns =", df.columns.tolist())
+    print("✅ [DEBUG] coluna_y recebida =", coluna_y)
+
+    # 🔎 Verifica se coluna_y foi enviada
+    if not coluna_y or coluna_y not in df.columns:
+        return {"erro": f"❌ Coluna '{coluna_y}' não encontrada.", "grafico": None}
 
     dados = df[[coluna_y]].dropna()
     if dados.empty:
@@ -746,7 +750,7 @@ def personalizar_boxplot(df, coluna_y, cor="#000000", titulo_x="", titulo_grafic
     fig, ax = plt.subplots(figsize=(10, 6))
     sns.boxplot(y=coluna_y, data=dados, color=cor, ax=ax)
 
-    ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+    ax.set_xlabel(titulo_x if titulo_x.strip() != "" else "", fontsize=int(tamanho_fonte))
     ax.set_ylabel(coluna_y, fontsize=int(tamanho_fonte))
     ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {coluna_y}", fontsize=int(tamanho_fonte))
 
@@ -758,6 +762,7 @@ def personalizar_boxplot(df, coluna_y, cor="#000000", titulo_x="", titulo_grafic
     plt.close(fig)
 
     return imagem_base64
+
 
 
 
