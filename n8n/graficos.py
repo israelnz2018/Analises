@@ -725,7 +725,10 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
-def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
+
+
+
+def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -734,38 +737,31 @@ def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_grafico="", tama
 
     aplicar_estilo_minitab()
 
-    # ✅ Usa todas as colunas numéricas automaticamente
+    # Usa todas as colunas numéricas automaticamente
     lista_y = df.select_dtypes(include="number").columns.tolist()
-
     if not lista_y:
-        return {"erro": "❌ Nenhuma coluna numérica encontrada no arquivo.", "grafico": None}
+        return None
 
     dados = df[lista_y].dropna()
     if dados.empty:
-        return {"erro": "❌ Dados insuficientes para gerar o gráfico.", "grafico": None}
+        return None
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(data=dados, orient="v", color=cor)
 
-    if len(lista_y) == 1:
-        sns.boxplot(y=lista_y[0], data=dados, color=cor, ax=ax)
-        ax.set_ylabel(lista_y[0], fontsize=int(tamanho_fonte))
-    else:
-        sns.boxplot(data=dados, orient="v", color=cor, ax=ax)
-        ax.set_ylabel("Variáveis", fontsize=int(tamanho_fonte))
-
-    ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
-    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
-
+    plt.xlabel(titulo_x if titulo_x.strip() != "" else "", fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y if titulo_y.strip() != "" else "Valor", fontsize=int(tamanho_fonte))
+    plt.title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
+    plt.xticks(rotation=int(inclinacao_x))
+    plt.yticks(rotation=int(inclinacao_y))
     plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
+    plt.close()
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close(fig)
-
-    return {"erro": None, "grafico": imagem_base64}
-
+    return imagem_base64
 
 
 
