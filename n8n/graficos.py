@@ -725,7 +725,8 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
-def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
+
+def personalizar_boxplot(df, coluna_original, titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -734,25 +735,19 @@ def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_grafico="", tama
 
     aplicar_estilo_minitab()
 
-    # 🔧 Usa todas as colunas numéricas atualmente carregadas
-    colunas_validas = df.select_dtypes(include="number").columns.tolist()
+    if coluna_original not in df.columns:
+        return None  # 🔧 Se a coluna não existir, retorna None
 
-    if not colunas_validas:
-        return None  # 🔧 Nenhuma coluna numérica válida
-
-    dados = df[colunas_validas].dropna()
+    dados = df[[coluna_original]].dropna()
     if dados.empty:
         return None  # 🔧 Sem dados válidos
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # 🔧 Plota todas as colunas como está atualmente
-    if len(colunas_validas) == 1:
-        sns.boxplot(y=colunas_validas[0], data=dados, ax=ax)
-    else:
-        sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
+    # 🔧 Plota somente a coluna original (garantido)
+    sns.boxplot(y=coluna_original, data=dados, ax=ax)
 
-    # 🔧 Personaliza apenas o título principal e o tamanho da fonte
+    # 🔧 Personaliza título principal e tamanho da fonte
     ax.set_title(
         titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas",
         fontsize=int(tamanho_fonte)
@@ -768,6 +763,8 @@ def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_grafico="", tama
 
     # 🔧 Retorna apenas base64 puro
     return imagem_base64
+
+
 
 
 
