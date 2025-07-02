@@ -116,8 +116,6 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
     # ➡️ Aplica estilo Minitab
     aplicar_estilo_minitab()
 
-    imagens_base64 = []
-
     if subgrupo and subgrupo in df.columns:
         dados = df[[coluna_y, subgrupo]].dropna()
         if dados.empty:
@@ -133,22 +131,27 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
                 dados[dados[subgrupo] == sub][coluna_y],
                 bins=10,
                 kde=True,
-                stat="count",  # ✅ corrigido para valor aceito pelo Seaborn
+                stat="count",
                 alpha=0.4,
                 color=cor,
                 edgecolor="black",
                 ax=ax
             )
 
-            # ➡️ Título corrigido por subgrupo
+            # ➡️ Título corrigido: se aluno preencher, usa o preenchido; senão, mostra apenas subgrupo
             if titulo_grafico and titulo_grafico.strip() != "":
-                titulo = f"{titulo_grafico} ({sub})"
+                titulo = titulo_grafico
             else:
-                titulo = f"Histograma - {sub}"
+                titulo = f"{sub}"
 
             ax.set_title(titulo, fontsize=int(tamanho_fonte))
-            ax.set_xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
-            ax.set_ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
+
+            # ➡️ X label: usa personalizado se preenchido, senão mantém coluna_y
+            ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+
+            # ➡️ Y label: usa personalizado se preenchido, senão mantém padrão "Frequência"
+            ax.set_ylabel(titulo_y if titulo_y.strip() != "" else "Frequência", fontsize=int(tamanho_fonte))
+
             ax.tick_params(axis='x', rotation=int(inclinacao_x))
 
         plt.tight_layout()
@@ -166,18 +169,18 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
             df[coluna_y].dropna(),
             bins=10,
             kde=True,
-            stat="count",  # ✅ corrigido para valor aceito
+            stat="count",
             alpha=0.4,
             color=cor,
             edgecolor="black"
         )
 
-        # ➡️ Título para gráfico único
+        # ➡️ Título gráfico único
         titulo = titulo_grafico if titulo_grafico and titulo_grafico.strip() != "" else "Histograma com Curva de Densidade"
 
         plt.title(titulo, fontsize=int(tamanho_fonte))
-        plt.xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
-        plt.ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
+        plt.xlabel(titulo_x if titulo_x.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+        plt.ylabel(titulo_y if titulo_y.strip() != "" else "Frequência", fontsize=int(tamanho_fonte))
         plt.xticks(rotation=int(inclinacao_x))
         plt.tight_layout()
 
@@ -187,6 +190,7 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
         return imagem_base64
+
 
 
 def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
