@@ -736,7 +736,11 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     print("🔧 [DEBUG] Iniciando personalizar_boxplot")
     aplicar_estilo_minitab()
 
-    print("🔧 [DEBUG] lista_y recebida:", lista_y)
+    # 🔧 Ajuste: converte string única em lista
+    if isinstance(lista_y, str):
+        lista_y = [lista_y]
+
+    print("🔧 [DEBUG] lista_y após ajuste:", lista_y)
     if not lista_y or any(y not in df.columns for y in lista_y):
         print("❌ [DEBUG] lista_y inválida ou coluna não encontrada")
         return None
@@ -824,7 +828,6 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         print("✅ [DEBUG] Imagem gerada com sucesso - caso múltiplos Ys sem subgrupo")
         return imagem_base64
-
 
 
     
