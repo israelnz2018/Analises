@@ -379,6 +379,63 @@ async def analisar(
             resposta_ia = perguntar_ia(pergunta, ultimo_resultado_texto)
 
 
+@app.post("/personalizar-boxplot")
+async def personalizar_boxplot_especifico(
+    request: Request,
+    lista_y: str = Form(None),
+    cor: str = Form("#000000"),
+    titulo_x: str = Form(""),
+    titulo_grafico: str = Form(""),
+    tamanho_fonte: str = Form("12")
+):
+    try:
+        global df_global
+        from graficos import personalizar_boxplot
+
+        if df_global is None or df_global.empty:
+            return JSONResponse({
+                "erro": "Nenhum DataFrame carregado. Gere o gráfico primeiro.",
+                "grafico_isolado_base64": None
+            }, status_code=400)
+
+        lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
+
+        # 🔧 Chama a função personalizar_boxplot com os parâmetros específicos
+        resultado = personalizar_boxplot(
+            df_global,
+            lista_y=lista_y_processada,
+            cor=cor,
+            titulo_x=titulo_x,
+            titulo_grafico=titulo_grafico,
+            tamanho_fonte=int(tamanho_fonte)
+        )
+
+        # 🔧 Verifica se houve erro
+        if resultado.get("erro"):
+            return JSONResponse({
+                "erro": resultado["erro"],
+                "grafico_isolado_base64": None
+            }, status_code=400)
+
+        # 🔧 Retorna imagem com prefixo data:image/png;base64,
+        grafico_base64 = resultado.get("grafico")
+        grafico_completo = f"data:image/png;base64,{grafico_base64}" if grafico_base64 else None
+
+        return {
+            "erro": None,
+            "grafico_isolado_base64": grafico_completo
+        }
+
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao personalizar boxplot.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
+
 @app.post("/personalizar-grafico")
 async def personalizar_grafico(
     request: Request,
