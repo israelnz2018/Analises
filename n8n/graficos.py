@@ -726,8 +726,6 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64
 
-
-
 def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -748,7 +746,7 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     if dados.empty:
         return None
 
-    # ➡️ Caso apenas 1 Y e sem subgrupo
+    # ➡️ Caso apenas 1 Y e sem subgrupo ➔ plota vertical com cor e todos os títulos
     if len(lista_y) == 1 and not subgrupo:
         plt.figure(figsize=(10, 6))
         sns.boxplot(y=lista_y[0], data=dados, color=cor)
@@ -765,9 +763,9 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         return imagem_base64
 
-    # ➡️ Caso múltiplos Ys ou subgrupo ➔ apenas tamanho fonte e inclinação, + Grupo 1/2
+    # ➡️ Caso múltiplos Ys ou subgrupo ➔ somente tamanho fonte e inclinação X, sem alterar Y
     if subgrupo:
-        subgrupos = dados[subgrupo].unique()
+        subgrupos = dados[subgrupo].dropna().unique()
         if len(subgrupos) != 2:
             return None
 
@@ -796,8 +794,9 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
 
     else:
         plt.figure(figsize=(10, 6))
-        sns.boxplot(data=dados[lista_y], orient="v")
-        plt.title("Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
+        sns.boxplot(data=dados[lista_y], orient="v", color=cor)
+        plt.title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
+        plt.xlabel(titulo_x if titulo_x.strip() != "" else "Variáveis", fontsize=int(tamanho_fonte))
         plt.xticks(rotation=int(inclinacao_x))
         plt.tight_layout()
 
@@ -807,8 +806,6 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         return imagem_base64
-
-
 
 
     
