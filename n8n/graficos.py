@@ -726,7 +726,6 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64
 
-
 def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -751,12 +750,12 @@ def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_gr
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    if len(colunas_validas) == 1:
+    # 🔧 Sempre plota apenas a primeira coluna, igual ao original
+    if len(colunas_validas) >= 1:
         sns.boxplot(y=colunas_validas[0], data=dados, color=cor, ax=ax)
         ax.set_ylabel(colunas_validas[0], fontsize=int(tamanho_fonte))
     else:
-        sns.boxplot(data=dados[colunas_validas], orient="v", color=cor, ax=ax)
-        ax.set_ylabel("Variáveis", fontsize=int(tamanho_fonte))
+        ax.text(0.5, 0.5, "Sem dados para exibir", ha='center')
 
     ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
     ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
@@ -771,14 +770,6 @@ def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_gr
 
     # 🔧 Retorna apenas o base64 puro (string), sem dicionário
     return imagem_base64
-
-
-
-
-
-
-
-
 
 
 
