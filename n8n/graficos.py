@@ -726,7 +726,6 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64
 
-
 def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -738,16 +737,11 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     print(f"📌 lista_y (recebido): {lista_y}")
     print(f"📌 subgrupo: {subgrupo}")
 
-    # ✅ Normaliza lista_y
-    if isinstance(lista_y, str):
-        # Se vier string única ou separada por vírgula
-        lista_y = [y.strip() for y in lista_y.split(",") if y.strip()]
-    elif not isinstance(lista_y, list):
-        lista_y = []
-
-    print(f"📌 lista_y (após normalização): {lista_y}")
-
     aplicar_estilo_minitab()
+
+    # ✅ Converte lista_y para lista se vier string única
+    if isinstance(lista_y, str):
+        lista_y = [lista_y]
 
     # ✅ Verifica lista_y
     if not lista_y or any(y not in df.columns for y in lista_y):
@@ -769,7 +763,7 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         print("❌ [DEBUG] Dados filtrados estão vazios")
         return None
 
-    # ✅ Caso com subgrupo
+    # ✅ Caso com subgrupo (copiado do gerar_boxplot)
     if subgrupo:
         subgrupos = dados[subgrupo].dropna().unique()
         print(f"🔎 [DEBUG] Subgrupos encontrados: {subgrupos}")
@@ -780,63 +774,41 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
 
         fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
 
-        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
+        for ax, sub in zip(axs, subgrupos):
             dados_sub = dados[dados[subgrupo] == sub]
-            print(f"🔎 [DEBUG] Subgrupo {sub}, dados shape: {dados_sub.shape}")
-
-            if dados_sub.empty:
-                ax.axis('off')
-                ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=int(tamanho_fonte))
-                continue
-
             sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax)
-            ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
+            ax.set_title(f"{titulo_grafico} ({sub})", fontsize=int(tamanho_fonte))
             ax.tick_params(axis='x', rotation=int(inclinacao_x))
 
         plt.tight_layout()
-
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        plt.close(fig)
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        print("✅ [DEBUG] Gráfico de subgrupo gerado com sucesso")
-        return imagem_base64
 
     # ✅ Caso sem subgrupo e apenas 1 Y ➔ personalização completa
     elif len(lista_y) == 1:
         plt.figure(figsize=(10, 6))
         sns.boxplot(y=lista_y[0], data=dados, color=cor)
-        plt.xlabel(titulo_x if titulo_x.strip() != "" else "", fontsize=int(tamanho_fonte))
-        plt.ylabel(titulo_y if titulo_y.strip() != "" else lista_y[0], fontsize=int(tamanho_fonte))
-        plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {lista_y[0]}", fontsize=int(tamanho_fonte))
+        plt.xlabel(titulo_x, fontsize=int(tamanho_fonte))
+        plt.ylabel(titulo_y if titulo_y else lista_y[0], fontsize=int(tamanho_fonte))
+        plt.title(titulo_grafico if titulo_grafico else f"Boxplot de {lista_y[0]}", fontsize=int(tamanho_fonte))
         plt.xticks(rotation=int(inclinacao_x))
         plt.tight_layout()
 
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        plt.close()
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        print("✅ [DEBUG] Gráfico de 1 Y gerado com sucesso")
-        return imagem_base64
-
-    # ✅ Caso sem subgrupo e múltiplos Ys ➔ apenas atualiza tamanho do título Y e título geral
+    # ✅ Caso sem subgrupo e múltiplos Ys ➔ apenas título e tamanho da fonte
     else:
         plt.figure(figsize=(10, 6))
         sns.boxplot(data=dados[lista_y], orient="v")
-        plt.ylabel(titulo_y if titulo_y.strip() != "" else "Variáveis", fontsize=int(tamanho_fonte))
-        plt.title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
+        plt.ylabel(titulo_y if titulo_y else "Variáveis", fontsize=int(tamanho_fonte))
+        plt.title(titulo_grafico if titulo_grafico else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
         plt.xticks(rotation=int(inclinacao_x))
         plt.tight_layout()
 
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        plt.close()
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        print("✅ [DEBUG] Gráfico de múltiplos Ys gerado com sucesso")
-        return imagem_base64
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    print("✅ [DEBUG] Gráfico gerado com sucesso")
+    return imagem_base64
+
 
 
 
