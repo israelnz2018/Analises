@@ -726,6 +726,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64
 
+
 def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -745,7 +746,7 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     # ✅ Verifica lista_y internamente
     if not lista_y or any(y not in df.columns for y in lista_y):
         print("❌ [DEBUG] lista_y inválida ou coluna não encontrada")
-        return None
+        return {"erro": "❌ Coluna não encontrada ou lista_y vazia.", "grafico": None}
 
     # 🔎 Filtra dados válidos
     dados = df[lista_y].dropna()
@@ -753,7 +754,7 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
 
     if dados.empty:
         print("❌ [DEBUG] Dados filtrados estão vazios")
-        return None
+        return {"erro": "❌ Dados insuficientes para gerar o gráfico.", "grafico": None}
 
     plt.figure(figsize=(10, 6))
 
@@ -775,7 +776,10 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     print("✅ [DEBUG] Gráfico gerado com sucesso")
-    return imagem_base64
+
+    # ✅ Retorno padronizado
+    return {"erro": None, "grafico": imagem_base64}
+
 
 
 
