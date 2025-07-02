@@ -105,6 +105,10 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
+    # ➡️ Função para verificar se o campo está preenchido de forma válida
+    def is_preenchido(valor, padrao):
+        return valor and valor.strip() != "" and valor.strip().lower() != padrao.lower()
+
     # ➡️ Ajusta coluna_y se vier como lista
     if isinstance(coluna_y, list):
         coluna_y = coluna_y[0] if coluna_y else None
@@ -126,7 +130,7 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
         if len(subgrupos) == 1:
             axs = [axs]
 
-        for ax, sub in zip(axs, subgrupos):
+        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
             sns.histplot(
                 dados[dados[subgrupo] == sub][coluna_y],
                 bins=10,
@@ -138,19 +142,17 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
                 ax=ax
             )
 
-            # ➡️ Título corrigido: se aluno preencher, usa o preenchido; senão, mostra apenas subgrupo
-            if titulo_grafico and titulo_grafico.strip() != "":
-                titulo = titulo_grafico
-            else:
-                titulo = f"{sub}"
-
+            # ➡️ Títulos fixos Grupo 1 e Grupo 2
+            titulo = f"Grupo {i+1}"
             ax.set_title(titulo, fontsize=int(tamanho_fonte))
 
             # ➡️ X label: usa personalizado se preenchido, senão mantém coluna_y
-            ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+            xlabel = titulo_x if is_preenchido(titulo_x, "Eixo X") else coluna_y
+            ax.set_xlabel(xlabel, fontsize=int(tamanho_fonte))
 
             # ➡️ Y label: usa personalizado se preenchido, senão mantém padrão "Frequência"
-            ax.set_ylabel(titulo_y if titulo_y.strip() != "" else "Frequência", fontsize=int(tamanho_fonte))
+            ylabel = titulo_y if is_preenchido(titulo_y, "Eixo Y") else "Frequência"
+            ax.set_ylabel(ylabel, fontsize=int(tamanho_fonte))
 
             ax.tick_params(axis='x', rotation=int(inclinacao_x))
 
@@ -176,11 +178,17 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
         )
 
         # ➡️ Título gráfico único
-        titulo = titulo_grafico if titulo_grafico and titulo_grafico.strip() != "" else "Histograma com Curva de Densidade"
-
+        titulo = titulo_grafico if is_preenchido(titulo_grafico, "Título do Gráfico") else "Histograma com Curva de Densidade"
         plt.title(titulo, fontsize=int(tamanho_fonte))
-        plt.xlabel(titulo_x if titulo_x.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
-        plt.ylabel(titulo_y if titulo_y.strip() != "" else "Frequência", fontsize=int(tamanho_fonte))
+
+        # ➡️ X label gráfico único
+        xlabel = titulo_x if is_preenchido(titulo_x, "Eixo X") else coluna_y
+        plt.xlabel(xlabel, fontsize=int(tamanho_fonte))
+
+        # ➡️ Y label gráfico único
+        ylabel = titulo_y if is_preenchido(titulo_y, "Eixo Y") else "Frequência"
+        plt.ylabel(ylabel, fontsize=int(tamanho_fonte))
+
         plt.xticks(rotation=int(inclinacao_x))
         plt.tight_layout()
 
@@ -190,6 +198,7 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
         return imagem_base64
+
 
 
 
