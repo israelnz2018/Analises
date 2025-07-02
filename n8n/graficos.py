@@ -778,7 +778,8 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     print("✅ [DEBUG] Gráfico gerado com sucesso")
 
     # ✅ Retorno padronizado
-    return {"erro": None, "grafico": imagem_base64}
+    return {"erro": None, "grafico_isolado_base64": imagem_base64}
+
 
 
 
