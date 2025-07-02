@@ -725,8 +725,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64
-
-def personalizar_boxplot(df, coluna_y, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
+def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -735,19 +734,27 @@ def personalizar_boxplot(df, coluna_y, cor="#000000", titulo_x="", titulo_grafic
 
     aplicar_estilo_minitab()
 
-    # Verifica se coluna_y existe no DataFrame
-    if not coluna_y or coluna_y not in df.columns:
-        return {"erro": f"❌ Coluna {coluna_y} não encontrada.", "grafico": None}
+    # ✅ Usa todas as colunas numéricas automaticamente
+    lista_y = df.select_dtypes(include="number").columns.tolist()
 
-    dados = df[[coluna_y]].dropna()
+    if not lista_y:
+        return {"erro": "❌ Nenhuma coluna numérica encontrada no arquivo.", "grafico": None}
+
+    dados = df[lista_y].dropna()
     if dados.empty:
         return {"erro": "❌ Dados insuficientes para gerar o gráfico.", "grafico": None}
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.boxplot(y=coluna_y, data=dados, color=cor, ax=ax)
+
+    if len(lista_y) == 1:
+        sns.boxplot(y=lista_y[0], data=dados, color=cor, ax=ax)
+        ax.set_ylabel(lista_y[0], fontsize=int(tamanho_fonte))
+    else:
+        sns.boxplot(data=dados, orient="v", color=cor, ax=ax)
+        ax.set_ylabel("Variáveis", fontsize=int(tamanho_fonte))
+
     ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
-    ax.set_ylabel(coluna_y, fontsize=int(tamanho_fonte))
-    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {coluna_y}", fontsize=int(tamanho_fonte))
+    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
 
     plt.tight_layout()
 
@@ -758,6 +765,7 @@ def personalizar_boxplot(df, coluna_y, cor="#000000", titulo_x="", titulo_grafic
     plt.close(fig)
 
     return {"erro": None, "grafico": imagem_base64}
+
 
 
 
