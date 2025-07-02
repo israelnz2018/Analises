@@ -297,9 +297,6 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
 
 
-
-
-
 def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
@@ -315,23 +312,22 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     if subgrupo and subgrupo not in df.columns:
         subgrupo = None
 
-    imagens_base64 = []
-
-    def plotar(dados, titulo):
+    def plotar(ax, dados, titulo):
         if coluna_y:
             contagem = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
         else:
             contagem = dados[coluna_x].value_counts().sort_values(ascending=False)
 
         if contagem.empty:
-            return None
+            ax.axis('off')
+            ax.set_title(f"{titulo} - Sem dados")
+            return
 
         acumulado = contagem.cumsum() / contagem.sum() * 100
 
-        fig, ax = plt.subplots(figsize=(10, 6))
         contagem.plot(kind="bar", ax=ax, color=cor, edgecolor="black")
-        ax.set_xlabel(titulo_x if titulo_x else coluna_x, fontsize=int(tamanho_fonte))
-        ax.set_ylabel(titulo_y if titulo_y else "Frequência / Soma", fontsize=int(tamanho_fonte))
+        ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+        ax.set_ylabel(titulo_y if titulo_y.strip() != "" else "Frequência / Soma", fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
         ax.set_xticklabels(ax.get_xticklabels(), rotation=int(inclinacao_x))
 
@@ -342,15 +338,6 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
 
         for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
             ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
-
-        plt.tight_layout()
-
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        plt.close(fig)
-        return imagem_base64
 
     # ➡️ Filtra dados válidos
     colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
@@ -363,29 +350,26 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
         if len(subgrupos) != 2:
             return None  # apenas se houver exatamente 2 categorias
 
-        for sub in subgrupos:
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+
+        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
             dados_sub = dados[dados[subgrupo] == sub]
-            titulo = titulo_grafico if titulo_grafico else f"Pareto - {coluna_x} ({sub})"
-            img = plotar(dados_sub, titulo)
-            if img:
-                imagens_base64.append(img)
+            titulo = f"Grupo {i+1}"
+            plotar(ax, dados_sub, titulo)
+
     else:
-        titulo = titulo_grafico if titulo_grafico else f"Pareto - {coluna_x}"
-        img = plotar(dados, titulo)
-        if img:
-            imagens_base64.append(img)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        titulo = titulo_grafico if titulo_grafico.strip() != "" else f"Pareto - {coluna_x}"
+        plotar(ax, dados, titulo)
 
-    if not imagens_base64:
-        return None
-    if len(imagens_base64) == 1:
-        return imagens_base64[0]
-    return imagens_base64
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close(fig)
 
-
-
-
-
-
+    return imagem_base64
 
 
 
