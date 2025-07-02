@@ -733,21 +733,30 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
+    print("🔧 [DEBUG] Iniciando personalizar_boxplot")
     aplicar_estilo_minitab()
 
+    print("🔧 [DEBUG] lista_y recebida:", lista_y)
     if not lista_y or any(y not in df.columns for y in lista_y):
+        print("❌ [DEBUG] lista_y inválida ou coluna não encontrada")
         return None
 
-    if subgrupo and subgrupo not in df.columns:
-        subgrupo = None
+    if subgrupo:
+        print("🔧 [DEBUG] subgrupo recebido:", subgrupo)
+        if subgrupo not in df.columns:
+            print("❌ [DEBUG] subgrupo não encontrado no DataFrame")
+            subgrupo = None
 
     colunas_necessarias = lista_y + ([subgrupo] if subgrupo else [])
+    print("🔧 [DEBUG] colunas_necessarias:", colunas_necessarias)
     dados = df[colunas_necessarias].dropna()
     if dados.empty:
+        print("❌ [DEBUG] Dados filtrados vazios após dropna")
         return None
 
     # ➡️ Caso apenas 1 Y e sem subgrupo ➔ plota vertical com cor e todos os títulos
     if len(lista_y) == 1 and not subgrupo:
+        print("🔧 [DEBUG] Caso 1 Y sem subgrupo")
         plt.figure(figsize=(10, 6))
         sns.boxplot(y=lista_y[0], data=dados, color=cor)
         plt.xlabel(titulo_x if titulo_x.strip() != "" else "", fontsize=int(tamanho_fonte))
@@ -761,20 +770,26 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         plt.close()
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        print("✅ [DEBUG] Imagem gerada com sucesso - caso 1 Y sem subgrupo")
         return imagem_base64
 
     # ➡️ Caso múltiplos Ys ou subgrupo ➔ somente tamanho fonte e inclinação X, sem alterar Y
     if subgrupo:
+        print("🔧 [DEBUG] Caso com subgrupo")
         subgrupos = dados[subgrupo].dropna().unique()
+        print("🔧 [DEBUG] subgrupos encontrados:", subgrupos)
         if len(subgrupos) != 2:
+            print(f"❌ [DEBUG] Esperado 2 subgrupos, encontrado {len(subgrupos)}")
             return None
 
         fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
 
         for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
             dados_sub = dados[dados[subgrupo] == sub]
+            print(f"🔧 [DEBUG] Subgrupo {sub} - dados_sub.shape:", dados_sub.shape)
 
             if dados_sub.empty:
+                print(f"❌ [DEBUG] Dados vazios para subgrupo {sub}")
                 ax.axis('off')
                 ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=int(tamanho_fonte))
                 continue
@@ -790,9 +805,11 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         plt.close(fig)
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        print("✅ [DEBUG] Imagem gerada com sucesso - caso subgrupo")
         return imagem_base64
 
     else:
+        print("🔧 [DEBUG] Caso múltiplos Ys sem subgrupo")
         plt.figure(figsize=(10, 6))
         sns.boxplot(data=dados[lista_y], orient="v", color=cor)
         plt.title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
@@ -805,7 +822,9 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         plt.close()
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        print("✅ [DEBUG] Imagem gerada com sucesso - caso múltiplos Ys sem subgrupo")
         return imagem_base64
+
 
 
     
