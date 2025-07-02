@@ -726,7 +726,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64
 
-def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
+def personalizar_boxplot(df, coluna_y, cor="#000000", titulo_x="", titulo_grafico="", tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -735,30 +735,30 @@ def personalizar_boxplot(df, cor="#000000", titulo_x="", titulo_grafico="", tama
 
     aplicar_estilo_minitab()
 
-    # 🔎 Selecione todas as colunas numéricas automaticamente
-    cols_numericas = df.select_dtypes(include='number').columns.tolist()
-    if not cols_numericas:
-        return {"erro": "❌ Nenhuma coluna numérica encontrada para gerar o boxplot.", "grafico": None}
+    # Verifica se coluna_y existe no DataFrame
+    if not coluna_y or coluna_y not in df.columns:
+        return {"erro": f"❌ Coluna {coluna_y} não encontrada.", "grafico": None}
 
-    dados = df[cols_numericas].dropna()
+    dados = df[[coluna_y]].dropna()
     if dados.empty:
         return {"erro": "❌ Dados insuficientes para gerar o gráfico.", "grafico": None}
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.boxplot(data=dados, orient="v", palette=[cor]*len(cols_numericas), ax=ax)
-
-    ax.set_xlabel(titulo_x if titulo_x.strip() != "" else "", fontsize=int(tamanho_fonte))
-    ax.set_ylabel("Valores", fontsize=int(tamanho_fonte))
-    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot das Variáveis", fontsize=int(tamanho_fonte))
+    sns.boxplot(y=coluna_y, data=dados, color=cor, ax=ax)
+    ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+    ax.set_ylabel(coluna_y, fontsize=int(tamanho_fonte))
+    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {coluna_y}", fontsize=int(tamanho_fonte))
 
     plt.tight_layout()
+
     buf = BytesIO()
     plt.savefig(buf, format="png")
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
 
-    return imagem_base64
+    return {"erro": None, "grafico": imagem_base64}
+
 
 
 
