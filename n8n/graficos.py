@@ -735,21 +735,24 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     from suporte import aplicar_estilo_minitab
 
     print("🔎 [DEBUG] Iniciando personalizar_boxplot")
-    print(f"📌 lista_y (antes): {lista_y}")
+    print(f"📌 lista_y (recebido): {lista_y}")
     print(f"📌 subgrupo: {subgrupo}")
-    print(f"📌 cor: {cor}, titulo_x: {titulo_x}, titulo_y: {titulo_y}, titulo_grafico: {titulo_grafico}, tamanho_fonte: {tamanho_fonte}, inclinacao_x: {inclinacao_x}")
 
-    # ✅ Converte string única em lista
+    # ✅ Normaliza lista_y
     if isinstance(lista_y, str):
-        lista_y = [lista_y]
+        # Se vier string única ou separada por vírgula
+        lista_y = [y.strip() for y in lista_y.split(",") if y.strip()]
+    elif not isinstance(lista_y, list):
+        lista_y = []
 
-    print(f"📌 lista_y (após conversão): {lista_y}")
+    print(f"📌 lista_y (após normalização): {lista_y}")
 
     aplicar_estilo_minitab()
 
     # ✅ Verifica lista_y
     if not lista_y or any(y not in df.columns for y in lista_y):
         print("❌ [DEBUG] lista_y inválida ou coluna não encontrada")
+        print("🔧 [DEBUG] Colunas disponíveis no DataFrame:", df.columns.tolist())
         return None
 
     # ✅ Verifica subgrupo
@@ -834,6 +837,7 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         print("✅ [DEBUG] Gráfico de múltiplos Ys gerado com sucesso")
         return imagem_base64
+
 
 
     
