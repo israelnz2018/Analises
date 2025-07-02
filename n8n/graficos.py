@@ -727,6 +727,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     return "", imagem_base64
 
 
+
 def personalizar_boxplot(df, tamanho_fonte=12):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -736,7 +737,7 @@ def personalizar_boxplot(df, tamanho_fonte=12):
 
     aplicar_estilo_minitab()
 
-    # ✅ Usa a primeira coluna numérica automaticamente
+    # 🔎 Seleciona automaticamente a primeira coluna numérica
     colunas_numericas = df.select_dtypes(include=['number']).columns
     if len(colunas_numericas) == 0:
         return {"erro": "❌ Nenhuma coluna numérica encontrada.", "grafico": None}
@@ -762,8 +763,8 @@ def personalizar_boxplot(df, tamanho_fonte=12):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
 
-    # ✅ Retorno padronizado
-    return {"erro": None, "grafico": imagem_base64}
+    # ✅ Retorna APENAS a string base64 direta, como os outros gráficos
+    return imagem_base64
 
 
 
