@@ -37,8 +37,9 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://educacaopelotrabalho-production.up.railway.app",
-        "https://app.educacaopelotrabalho.com"
+        "https://app.educacaopelotrabalho.com",
+        "https://educacaopelotrabalho-production.up.railway.app"
+    
     ],
     allow_credentials=True,
     allow_methods=["*"],
