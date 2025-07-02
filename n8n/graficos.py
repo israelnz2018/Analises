@@ -748,22 +748,23 @@ def personalizar_boxplot(df, tamanho_fonte=12):
     if dados.empty:
         return {"erro": "❌ Dados insuficientes para gerar o gráfico.", "grafico": None}
 
-    plt.figure(figsize=(10, 6))
-    sns.boxplot(y=coluna_y, data=dados)
+    # ✅ Cria figura e axes explicitamente
+    fig, ax = plt.subplots(figsize=(10, 6))
+    sns.boxplot(y=coluna_y, data=dados, ax=ax)
 
-    plt.ylabel(coluna_y, fontsize=int(tamanho_fonte))
-    plt.title(f"Boxplot de {coluna_y}", fontsize=int(tamanho_fonte))
+    ax.set_ylabel(coluna_y, fontsize=int(tamanho_fonte))
+    ax.set_title(f"Boxplot de {coluna_y}", fontsize=int(tamanho_fonte))
 
     plt.tight_layout()
-
     buf = BytesIO()
     plt.savefig(buf, format="png")
-    plt.close()
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close(fig)
 
     # ✅ Retorno padronizado
     return {"erro": None, "grafico": imagem_base64}
+
 
 
 
