@@ -750,15 +750,21 @@ def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_gr
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    # 🔧 Sempre plota apenas a primeira coluna, igual ao original
-    if len(colunas_validas) >= 1:
+    if len(colunas_validas) == 1:
+        # 🔧 Caso 1 coluna: personaliza tudo
         sns.boxplot(y=colunas_validas[0], data=dados, color=cor, ax=ax)
         ax.set_ylabel(colunas_validas[0], fontsize=int(tamanho_fonte))
+        ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
     else:
-        ax.text(0.5, 0.5, "Sem dados para exibir", ha='center')
+        # 🔧 Caso várias colunas: plota todas, personaliza só título e tamanho fonte
+        sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
+        ax.set_ylabel("Variáveis", fontsize=int(tamanho_fonte))
 
-    ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
-    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas", fontsize=int(tamanho_fonte))
+    # 🔧 Título principal sempre personalizado
+    ax.set_title(
+        titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas",
+        fontsize=int(tamanho_fonte)
+    )
 
     plt.tight_layout()
 
@@ -770,7 +776,6 @@ def personalizar_boxplot(df, lista_y=None, cor="#000000", titulo_x="", titulo_gr
 
     # 🔧 Retorna apenas o base64 puro (string), sem dicionário
     return imagem_base64
-
 
 
 
