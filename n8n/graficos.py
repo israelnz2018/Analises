@@ -727,7 +727,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     return "", imagem_base64
 
 
-def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
+def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=1):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -738,23 +738,30 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
     print(f"📌 lista_y (recebido): {lista_y}")
     print(f"📌 subgrupo: {subgrupo}")
 
-    # ✅ Normaliza lista_y com segurança extra
+    # 🔍 DEBUG DOS NOVOS PARAMETROS
+    print("➡ titulo_x:", titulo_x)
+    print("➡ titulo_y:", titulo_y)
+    print("➡ titulo_grafico:", titulo_grafico)
+    print("➡ tamanho_fonte:", tamanho_fonte)
+    print("➡ inclinacao_x:", inclinacao_x)
+    print("➡ inclinacao_y:", inclinacao_y)
+    print("➡ espessura:", espessura)
+
+    # ✅ Normaliza lista_y
     if isinstance(lista_y, str):
         lista_y = [y.strip() for y in lista_y.split(",") if y.strip()]
-    elif isinstance(lista_y, list):
-        lista_y = [y for y in lista_y if y and str(y).strip() != ""]
-    else:
+    elif not isinstance(lista_y, list):
         lista_y = []
 
-    print(f"📌 lista_y (após normalização segura): {lista_y}")
-
-    # 🔴 Se ainda vier vazia após limpeza, força erro claro
-    if not lista_y:
-        print("❌ [DEBUG] lista_y está vazia após normalização. Erro de parâmetro no frontend.")
-        print("🔧 [DEBUG] Colunas disponíveis no DataFrame:", df.columns.tolist())
-        return None
+    print(f"📌 lista_y (após normalização): {lista_y}")
 
     aplicar_estilo_minitab()
+
+    # ✅ Verifica lista_y
+    if not lista_y or any(y not in df.columns for y in lista_y):
+        print("❌ [DEBUG] lista_y inválida ou coluna não encontrada")
+        print("🔧 [DEBUG] Colunas disponíveis no DataFrame:", df.columns.tolist())
+        return None
 
     # ✅ Verifica subgrupo
     if subgrupo and subgrupo not in df.columns:
@@ -790,7 +797,7 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
                 ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=int(tamanho_fonte))
                 continue
 
-            sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax, color=cor)
+            sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax)
             ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
             ax.tick_params(axis='x', rotation=int(inclinacao_x))
 
@@ -838,6 +845,7 @@ def personalizar_boxplot(df, lista_y, subgrupo=None, cor="#000000", titulo_x="",
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         print("✅ [DEBUG] Gráfico de múltiplos Ys gerado com sucesso")
         return imagem_base64
+
 
 
     
