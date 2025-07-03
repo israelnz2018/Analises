@@ -711,15 +711,19 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
         # 🔧 Preparar info_grafico
         
+        
         if subgrupo:
-            subgrupos = dados[subgrupo].unique()
-            titulo = f"Boxplot por {subgrupo}"
-            titulo_x = subgrupo
-            titulo_y = ""
+            for ax, sub in zip(axs, subgrupos):
+                dados_sub = dados[dados[subgrupo] == sub]
+                sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax)
+                ax.set_title(f"Boxplot por {sub}", fontsize=int(tamanho_fonte))
         else:
-            titulo = f"Boxplot de {' e '.join(dados.columns)}"
-            titulo_x = ", ".join(dados.columns) if len(dados.columns) > 1 else dados.columns[0]
-            titulo_y = "Valor"
+            plt.figure(figsize=(10, 6))
+            sns.boxplot(data=dados, orient="v")
+            plt.title(
+                f"Boxplot de {' e '.join(dados.columns)}",
+                fontsize=int(tamanho_fonte)
+            )
 
         info_grafico = {
             "titulo_principal": titulo,
