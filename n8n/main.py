@@ -171,7 +171,7 @@ async def analisar(
     field_LSE: str = Form(None),
     field_LIE: str = Form(None),
     Data: str = Form(None),
-    pergunta: str = Form(None)   # ✅ NOVO campo para pergunta do aluno
+    pergunta: str = Form(None)
 ):
     try:
         if not arquivo:
@@ -184,48 +184,15 @@ async def analisar(
         if df is None or df.empty:
             return JSONResponse({"erro": "Arquivo vazio ou aba inválida.", "analise": ""}, status_code=400)
 
-        # 🔧 Processa lista_y
         lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
-
-        # 🔧 Processa lista_x
         lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
-
-        # 🔧 Processa coluna_z
         lista_z = [coluna_z.strip()] if coluna_z else []
-
         subgrupo_val = subgrupo.strip() if subgrupo else None
-
-        # 🔧 Concatena colunas usadas
-        colunas_usadas = lista_y_processada + lista_x_processada + lista_z
-        if subgrupo_val:
-            colunas_usadas.append(subgrupo_val)
-
-        # ✅ PRINT DEBUG COMPLETO
-        print("\n====================== INÍCIO DEBUG /ANALISE ======================")
-        print("📂 Nome do arquivo recebido:", arquivo.filename)
-        print("📑 Aba solicitada:", aba)
-        print("🧾 Colunas no DataFrame:", df.columns.tolist())
-        print("➡ coluna_y recebida:", coluna_y)
-        print("➡ lista_y recebida:", lista_y_processada)
-        print("➡ coluna_x recebida:", coluna_x)
-        print("➡ lista_x recebida:", lista_x_processada)
-        print("➡ coluna_z recebida:", coluna_z)
-        print("➡ lista_z recebida:", lista_z)
-        print("➡ subgrupo recebido:", subgrupo_val)
-        print("➡ field:", field)
-        print("➡ field_conf:", field_conf)
-        print("➡ field_dist:", field_dist)
-        print("➡ field_LSE:", field_LSE)
-        print("➡ field_LIE:", field_LIE)
-        print("➡ Data:", Data)
-        print("🔧 ferramenta:", ferramenta)
-        print("🔧 grafico:", grafico)
-        print("➡ pergunta:", pergunta)
-        print("======================= FIM DEBUG /ANALISE ==========================\n")
 
         resultado_texto = ""
         imagem_analise_base64 = None
         imagem_grafico_isolado_base64 = None
+        info_grafico = None
         resposta_ia = None
 
         global ultimo_resultado_texto
@@ -255,8 +222,7 @@ async def analisar(
             permitidos = CONFIG_ANALISES.get(ferramenta.strip(), ["df"])
             args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
             resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
-
-            ultimo_resultado_texto = resultado_texto  # ✅ atualiza global
+            ultimo_resultado_texto = resultado_texto
 
         if grafico:
             funcao_grafico = GRAFICOS.get(grafico.strip())
@@ -287,18 +253,20 @@ async def analisar(
             params_aceitos = inspect.signature(funcao_grafico).parameters
             args_filtrados = {k: v for k, v in args_to_pass.items() if k in params_aceitos}
 
-            imagem_grafico_isolado_base64 = funcao_grafico(**args_filtrados)
-
-            ultimo_resultado_texto = f"Gráfico gerado: {grafico}"  # ✅ atualiza global com descrição do gráfico
+            # 🔧 Recebe mensagem, imagem e info_grafico
+            mensagem, imagem_grafico_isolado_base64, info_grafico = funcao_grafico(**args_filtrados)
+            ultimo_resultado_texto = f"Gráfico gerado: {grafico}"
 
         return JSONResponse({
             "analise": resultado_texto,
             "grafico_base64": imagem_analise_base64,
             "grafico_isolado_base64": imagem_grafico_isolado_base64,
+            "info_grafico": info_grafico,
             "resposta_ia": resposta_ia
         })
 
     except Exception as e:
+        import traceback
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao processar a análise.",
@@ -306,6 +274,7 @@ async def analisar(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
 
 
     # ✅ SE TIVER PERGUNTA: chama o agente IA sobre a análise ou gráfico
