@@ -746,9 +746,13 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64, info_grafico
 
-
-
-def personalizar_boxplot(df, info_colunas, titulo_grafico="", tamanho_fonte=12):
+def personalizar_boxplot(df, info_colunas, 
+                         titulo_grafico="", 
+                         tamanho_fonte=12,
+                         titulo_x="",
+                         titulo_y="",
+                         inclinacao_x="",
+                         cor=""):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -759,27 +763,34 @@ def personalizar_boxplot(df, info_colunas, titulo_grafico="", tamanho_fonte=12):
 
     lista_y = info_colunas.get("lista_y")
     if not lista_y:
-        return None
+        return None, None
 
     colunas_validas = [col for col in lista_y if col in df.columns]
     if not colunas_validas:
-        return None
+        return None, None
 
     dados = df[colunas_validas].dropna()
     if dados.empty:
-        return None
+        return None, None
 
     fig, ax = plt.subplots(figsize=(10, 6))
     if len(colunas_validas) == 1:
-        sns.boxplot(y=colunas_validas[0], data=dados, ax=ax)
+        sns.boxplot(y=colunas_validas[0], data=dados, ax=ax, color=cor if cor else None)
+        ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0])
+        ax.set_xlabel(titulo_x if titulo_x else "")
     else:
         sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
+        ax.set_xlabel(titulo_x if titulo_x else "")
+        ax.set_ylabel(titulo_y if titulo_y else "")
 
-    # 🔧 Personaliza apenas o título e tamanho da fonte
     ax.set_title(
         titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas",
         fontsize=int(tamanho_fonte)
     )
+
+    # 🔧 Inclinação do eixo X, se aplicável
+    if inclinacao_x:
+        plt.setp(ax.get_xticklabels(), rotation=float(inclinacao_x))
 
     plt.tight_layout()
 
@@ -789,7 +800,20 @@ def personalizar_boxplot(df, info_colunas, titulo_grafico="", tamanho_fonte=12):
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    return imagem_base64
+    # ✅ Dicionário de info_grafico
+    info_grafico = {
+        "cor": cor or "",
+        "titulo_grafico": titulo_grafico or "",
+        "titulo_x": titulo_x or "",
+        "titulo_y": titulo_y or "",
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",  # não aplicável ao boxplot, deixado vazio
+        "espessura": ""      # não aplicável aqui, deixado vazio
+    }
+
+    return imagem_base64, info_grafico
+
 
 
 
