@@ -747,7 +747,6 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
 
 
-
 def personalizar_boxplot(df, info_colunas, 
                          titulo_grafico="", 
                          tamanho_fonte=12,
@@ -780,15 +779,14 @@ def personalizar_boxplot(df, info_colunas,
         sns.boxplot(y=colunas_validas[0], data=dados, ax=ax, color=cor if cor else None)
         ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0])
         ax.set_xlabel(titulo_x if titulo_x else "")
+        titulo_principal = titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {colunas_validas[0]}"
     else:
         sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
-        ax.set_xlabel(titulo_x if titulo_x else "")
-        ax.set_ylabel(titulo_y if titulo_y else "")
+        ax.set_xlabel(titulo_x if titulo_x else ", ".join(colunas_validas))
+        ax.set_ylabel(titulo_y if titulo_y else "Valor")
+        titulo_principal = titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {' e '.join(colunas_validas)}"
 
-    ax.set_title(
-        titulo_grafico if titulo_grafico.strip() != "" else "Boxplot de variáveis contínuas",
-        fontsize=int(tamanho_fonte)
-    )
+    ax.set_title(titulo_principal, fontsize=int(tamanho_fonte))
 
     # 🔧 Inclinação do eixo X, se aplicável
     if inclinacao_x:
@@ -802,12 +800,12 @@ def personalizar_boxplot(df, info_colunas,
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    # ✅ Dicionário de info_grafico
+    # ✅ Dicionário info_grafico completo
     info_grafico = {
         "cor": cor or "",
-        "titulo_grafico": titulo_grafico or "",
-        "titulo_x": titulo_x or "",
-        "titulo_y": titulo_y or "",
+        "titulo_principal": titulo_principal,
+        "titulo_x": titulo_x if titulo_x else (", ".join(colunas_validas) if len(colunas_validas) > 1 else colunas_validas[0]),
+        "titulo_y": titulo_y if titulo_y else ("Valor" if len(colunas_validas) > 1 else colunas_validas[0]),
         "tamanho_fonte": tamanho_fonte or "",
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",  # não aplicável ao boxplot, deixado vazio
@@ -815,6 +813,7 @@ def personalizar_boxplot(df, info_colunas,
     }
 
     return imagem_base64, info_grafico
+
 
 
 
