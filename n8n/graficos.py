@@ -746,8 +746,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     return "", imagem_base64, info_grafico
 
 
-
-def personalizar_boxplot(df, info_colunas, 
+def personalizar_boxplot(df, lista_y, 
                          titulo_grafico="", 
                          tamanho_fonte=12,
                          titulo_x="",
@@ -762,7 +761,6 @@ def personalizar_boxplot(df, info_colunas,
 
     aplicar_estilo_minitab()
 
-    lista_y = info_colunas.get("lista_y")
     if not lista_y:
         return None, None
 
@@ -779,16 +777,16 @@ def personalizar_boxplot(df, info_colunas,
         sns.boxplot(y=colunas_validas[0], data=dados, ax=ax, color=cor if cor else None)
         ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0])
         ax.set_xlabel(titulo_x if titulo_x else "")
-        titulo_principal = titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {colunas_validas[0]}"
     else:
         sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
-        ax.set_xlabel(titulo_x if titulo_x else ", ".join(colunas_validas))
-        ax.set_ylabel(titulo_y if titulo_y else "Valor")
-        titulo_principal = titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {' e '.join(colunas_validas)}"
+        ax.set_xlabel(titulo_x if titulo_x else "")
+        ax.set_ylabel(titulo_y if titulo_y else "")
 
-    ax.set_title(titulo_principal, fontsize=int(tamanho_fonte))
+    ax.set_title(
+        titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {' e '.join(colunas_validas)}",
+        fontsize=int(tamanho_fonte)
+    )
 
-    # 🔧 Inclinação do eixo X, se aplicável
     if inclinacao_x:
         plt.setp(ax.get_xticklabels(), rotation=float(inclinacao_x))
 
@@ -800,19 +798,19 @@ def personalizar_boxplot(df, info_colunas,
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    # ✅ Dicionário info_grafico completo
     info_grafico = {
         "cor": cor or "",
-        "titulo_principal": titulo_principal,
-        "titulo_x": titulo_x if titulo_x else (", ".join(colunas_validas) if len(colunas_validas) > 1 else colunas_validas[0]),
-        "titulo_y": titulo_y if titulo_y else ("Valor" if len(colunas_validas) > 1 else colunas_validas[0]),
+        "titulo_grafico": titulo_grafico or "",
+        "titulo_x": titulo_x or "",
+        "titulo_y": titulo_y or "",
         "tamanho_fonte": tamanho_fonte or "",
         "inclinacao_x": inclinacao_x or "",
-        "inclinacao_y": "",  # não aplicável ao boxplot, deixado vazio
-        "espessura": ""      # não aplicável aqui, deixado vazio
+        "inclinacao_y": "",  # não aplicável
+        "espessura": ""      # não aplicável
     }
 
     return imagem_base64, info_grafico
+
 
 
 
