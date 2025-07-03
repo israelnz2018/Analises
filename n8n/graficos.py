@@ -693,6 +693,15 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     if subgrupo and subgrupo not in df.columns:
         return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, None
 
+    info_grafico = {
+        "titulo_principal": "",
+        "tamanho_fonte": 12,
+        "titulo_x": "",
+        "titulo_y": "Valor",
+        "inclinacao_x": 0,
+        "cor": "steelblue"
+    }
+
     if subgrupo:
         dados = df[lista_y + [subgrupo]].dropna()
         subgrupos = dados[subgrupo].unique()
@@ -705,59 +714,27 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
         for ax, sub in zip(axs, subgrupos):
             dados_sub = dados[dados[subgrupo] == sub]
             sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax)
-            ax.set_title(f"Boxplot ({sub})")
+            titulo_sub = f"Boxplot por {sub} de {' e '.join(lista_y)}"
+            ax.set_title(titulo_sub, fontsize=12)
 
         plt.tight_layout()
 
-        # 🔧 Preparar info_grafico
-        
-        
-        if subgrupo:
-            for ax, sub in zip(axs, subgrupos):
-                dados_sub = dados[dados[subgrupo] == sub]
-                sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax)
-                ax.set_title(f"Boxplot por {sub}", fontsize=int(tamanho_fonte))
-        else:
-            plt.figure(figsize=(10, 6))
-            sns.boxplot(data=dados, orient="v")
-            plt.title(
-                f"Boxplot de {' e '.join(dados.columns)}",
-                fontsize=int(tamanho_fonte)
-            )
-
-        info_grafico = {
-            "titulo_principal": titulo,
-            "tamanho_fonte": 12,
-            "titulo_x": titulo_x,
-            "titulo_y": titulo_y,
-            "inclinacao_x": 0,
-            "cor": "steelblue"
-        }
-
-
-    
+        info_grafico["titulo_principal"] = f"Boxplot por {subgrupos[0]} e {subgrupos[1]}"
+        info_grafico["titulo_x"] = subgrupo
 
     else:
         dados = df[lista_y].dropna()
         if dados.empty:
             return "❌ Dados insuficientes para gerar o gráfico.", None, None
+
         plt.figure(figsize=(10, 6))
         sns.boxplot(data=dados, orient="v")
-        plt.title("Boxplot de variáveis contínuas")
+        titulo = f"Boxplot de {' e '.join(lista_y)}"
+        plt.title(titulo, fontsize=12)
         plt.tight_layout()
 
-        # 🔧 Preparar info_grafico
-      
-
-        info_grafico = {
-            "titulo_principal": f"Boxplot de {' e '.join(dados.columns)}",
-            "tamanho_fonte": 12,
-            "titulo_x": ", ".join(dados.columns) if len(dados.columns) > 1 else dados.columns[0],
-            "titulo_y": "Valor",
-            "inclinacao_x": 0,
-            "cor": "steelblue"
-        }
-
+        info_grafico["titulo_principal"] = titulo
+        info_grafico["titulo_x"] = ", ".join(lista_y) if len(lista_y) > 1 else lista_y[0]
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
@@ -766,6 +743,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64, info_grafico
+
 
 
 
