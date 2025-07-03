@@ -746,8 +746,8 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64, info_grafico
 
-
 def personalizar_boxplot(df, lista_y, 
+                         subgrupo=None,
                          titulo_grafico="", 
                          tamanho_fonte=12,
                          titulo_x="",
@@ -772,28 +772,57 @@ def personalizar_boxplot(df, lista_y,
     if not colunas_validas:
         return None, None
 
-    dados = df[colunas_validas].dropna()
+    dados = df[colunas_validas + ([subgrupo] if subgrupo and subgrupo in df.columns else [])].dropna()
     if dados.empty:
         return None, None
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    if subgrupo and subgrupo in df.columns:
+        subgrupos = dados[subgrupo].unique()
+        fig, axs = plt.subplots(1, len(subgrupos), figsize=(8*len(subgrupos), 6), sharey=True)
 
-    if len(colunas_validas) == 1:
-        sns.boxplot(y=colunas_validas[0], data=dados, ax=ax, color=cor if cor else None)
-        ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0], fontsize=int(tamanho_fonte))
-        ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
-        titulo_padrao = f"Boxplot de {colunas_validas[0]}"
+        if len(subgrupos) == 1:
+            axs = [axs]
+
+        for ax, sg in zip(axs, subgrupos):
+            dados_sub = dados[dados[subgrupo] == sg]
+            if len(colunas_validas) == 1:
+                sns.boxplot(y=colunas_validas[0], data=dados_sub, ax=ax, color=cor if cor else None)
+                ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0], fontsize=int(tamanho_fonte))
+                ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
+            else:
+                sns.boxplot(data=dados_sub[colunas_validas], orient="v", ax=ax)
+                ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
+                ax.set_ylabel(titulo_y if titulo_y else "", fontsize=int(tamanho_fonte))
+
+            ax.set_title(f"Boxplot por {sg}", fontsize=int(tamanho_fonte))
+
+            if inclinacao_x:
+                plt.setp(ax.get_xticklabels(), rotation=float(inclinacao_x), fontsize=int(tamanho_fonte))
+            else:
+                plt.setp(ax.get_xticklabels(), fontsize=int(tamanho_fonte))
+
+        titulo_padrao = f"Boxplot por {' e '.join(subgrupos)}"
+
     else:
-        sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
-        ax.set_xlabel(titulo_x if titulo_x else ", ".join(colunas_validas), fontsize=int(tamanho_fonte))
-        ax.set_ylabel(titulo_y if titulo_y else "", fontsize=int(tamanho_fonte))
-        titulo_padrao = f"Boxplot de {' e '.join(colunas_validas)}"
+        fig, ax = plt.subplots(figsize=(10, 6))
 
-    titulo_final = titulo_grafico if titulo_grafico.strip() else titulo_padrao
-    ax.set_title(titulo_final, fontsize=int(tamanho_fonte))
+        if len(colunas_validas) == 1:
+            sns.boxplot(y=colunas_validas[0], data=dados, ax=ax, color=cor if cor else None)
+            ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0], fontsize=int(tamanho_fonte))
+            ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
+            titulo_padrao = f"Boxplot de {colunas_validas[0]}"
+        else:
+            sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
+            ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
+            ax.set_ylabel(titulo_y if titulo_y else "Valor", fontsize=int(tamanho_fonte))
+            titulo_padrao = f"Boxplot de {' e '.join(colunas_validas)}"
 
-    if inclinacao_x:
-        plt.setp(ax.get_xticklabels(), rotation=float(inclinacao_x), fontsize=int(tamanho_fonte))
+        ax.set_title(titulo_grafico.strip() if titulo_grafico.strip() else titulo_padrao, fontsize=int(tamanho_fonte))
+
+        if inclinacao_x:
+            plt.setp(ax.get_xticklabels(), rotation=float(inclinacao_x), fontsize=int(tamanho_fonte))
+        else:
+            plt.setp(ax.get_xticklabels(), fontsize=int(tamanho_fonte))
 
     plt.tight_layout()
 
@@ -805,9 +834,9 @@ def personalizar_boxplot(df, lista_y,
 
     info_grafico = {
         "cor": cor or "",
-        "titulo_grafico": titulo_final,
-        "titulo_x": titulo_x or (", ".join(colunas_validas) if len(colunas_validas) > 1 else colunas_validas[0]),
-        "titulo_y": titulo_y or (colunas_validas[0] if len(colunas_validas) == 1 else "Valor"),
+        "titulo_grafico": titulo_grafico.strip() if titulo_grafico.strip() else titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
         "tamanho_fonte": tamanho_fonte or "",
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
@@ -816,6 +845,7 @@ def personalizar_boxplot(df, lista_y,
     }
 
     return imagem_base64, info_grafico
+
 
 
 
