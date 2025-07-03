@@ -788,11 +788,9 @@ def personalizar_boxplot(df, lista_y,
         ax.set_ylabel(titulo_y if titulo_y else "")
         titulo_padrao = f"Boxplot de {' e '.join(colunas_validas)}"
 
-    # ✅ Aplica título
-    ax.set_title(
-        titulo_grafico if titulo_grafico.strip() != "" else titulo_padrao,
-        fontsize=int(tamanho_fonte)
-    )
+    # ✅ Aplica título no gráfico
+    titulo_final = titulo_grafico if titulo_grafico.strip() else titulo_padrao
+    ax.set_title(titulo_final, fontsize=int(tamanho_fonte))
 
     # ✅ Inclinação eixo X, se aplicável
     if inclinacao_x:
@@ -806,10 +804,10 @@ def personalizar_boxplot(df, lista_y,
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    # ✅ info_grafico com consistência
+    # ✅ info_grafico consistente com frontend
     info_grafico = {
         "cor": cor or "",
-        "titulo_grafico": titulo_grafico if titulo_grafico.strip() != "" else titulo_padrao,
+        "titulo_grafico": titulo_final,
         "titulo_x": titulo_x or (", ".join(colunas_validas) if len(colunas_validas) > 1 else colunas_validas[0]),
         "titulo_y": titulo_y or (colunas_validas[0] if len(colunas_validas) == 1 else "Valor"),
         "tamanho_fonte": tamanho_fonte or "",
@@ -819,6 +817,7 @@ def personalizar_boxplot(df, lista_y,
     }
 
     return imagem_base64, info_grafico
+
 
 
 
