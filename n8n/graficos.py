@@ -718,7 +718,6 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
         plt.tight_layout()
 
-        # 🔧 Atualizar info_grafico
         info_grafico["titulo_grafico"] = f"Boxplot por {subgrupos[0]} e {subgrupos[1]}"
         info_grafico["titulo_x"] = ", ".join(lista_y)
         info_grafico["titulo_y"] = ""
@@ -732,10 +731,12 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
         plt.title(f"Boxplot de {' e '.join(lista_y)}")
         plt.tight_layout()
 
-        # 🔧 Atualizar info_grafico
         info_grafico["titulo_grafico"] = f"Boxplot de {' e '.join(lista_y)}"
         info_grafico["titulo_x"] = ", ".join(lista_y) if len(lista_y) > 1 else lista_y[0]
         info_grafico["titulo_y"] = "Valor"
+
+    # ✅ Adiciona lista_y no info_grafico para o frontend
+    info_grafico["lista_y"] = lista_y
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
@@ -744,6 +745,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64, info_grafico
+
 
 def personalizar_boxplot(df, lista_y, 
                          titulo_grafico="", 
@@ -763,7 +765,6 @@ def personalizar_boxplot(df, lista_y,
     if not lista_y:
         return None, None
 
-    # ✅ Garante lista_y como lista, mesmo que venha string única
     if isinstance(lista_y, str):
         lista_y = [lista_y]
 
@@ -788,11 +789,9 @@ def personalizar_boxplot(df, lista_y,
         ax.set_ylabel(titulo_y if titulo_y else "")
         titulo_padrao = f"Boxplot de {' e '.join(colunas_validas)}"
 
-    # ✅ Aplica título no gráfico
     titulo_final = titulo_grafico if titulo_grafico.strip() else titulo_padrao
     ax.set_title(titulo_final, fontsize=int(tamanho_fonte))
 
-    # ✅ Inclinação eixo X, se aplicável
     if inclinacao_x:
         plt.setp(ax.get_xticklabels(), rotation=float(inclinacao_x))
 
@@ -804,7 +803,6 @@ def personalizar_boxplot(df, lista_y,
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    # ✅ info_grafico consistente com frontend
     info_grafico = {
         "cor": cor or "",
         "titulo_grafico": titulo_final,
@@ -812,11 +810,13 @@ def personalizar_boxplot(df, lista_y,
         "titulo_y": titulo_y or (colunas_validas[0] if len(colunas_validas) == 1 else "Valor"),
         "tamanho_fonte": tamanho_fonte or "",
         "inclinacao_x": inclinacao_x or "",
-        "inclinacao_y": "",  # não aplicável ao boxplot
-        "espessura": ""      # não aplicável aqui
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": lista_y  # ✅ incluído para o frontend usar
     }
 
     return imagem_base64, info_grafico
+
 
 
 
