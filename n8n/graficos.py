@@ -678,20 +678,20 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
         return imagem_base64
 
 
-
 def gerar_boxplot(df, lista_y, subgrupo=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
     from io import BytesIO
+    from suporte import aplicar_estilo_minitab
+
+    aplicar_estilo_minitab()
 
     if not lista_y or any(y not in df.columns for y in lista_y):
         return "❌ Uma ou mais colunas Y informadas não foram encontradas no arquivo.", None, {}
 
     if subgrupo and subgrupo not in df.columns:
         return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, {}
-
-    aplicar_estilo_minitab()
 
     if subgrupo:
         dados = df[lista_y + [subgrupo]].dropna()
@@ -709,42 +709,46 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
         plt.tight_layout()
 
-        # Captura info do primeiro subplot como exemplo
+        # 🔧 Preparar info_grafico para multiplos subplots
         info_grafico = {
-            "tamanho_fonte": plt.rcParams.get("font.size", ""),
-            "titulo_principal": axs[0].get_title(),
-            "titulo_x": axs[0].get_xlabel(),
-            "titulo_y": axs[0].get_ylabel(),
-            "inclinacao_x": axs[0].get_xticklabels()[0].get_rotation() if axs[0].get_xticklabels() else "",
-            "cor": ""  # cor não definida explicitamente
+            "titulo_principal": f"Boxplot ({', '.join(map(str, subgrupos))})",
+            "tamanho_fonte": 12,
+            "titulo_x": "",
+            "titulo_y": "",
+            "cor": "",  # seaborn usa default
+            "inclinacao_x": 0
         }
 
     else:
         dados = df[lista_y].dropna()
         if dados.empty:
             return "❌ Dados insuficientes para gerar o gráfico.", None, {}
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.boxplot(data=dados, orient="v", ax=ax)
+        ax.set_title("Boxplot de variáveis contínuas")
+        ax.set_xlabel("")
+        ax.set_ylabel("")
 
-        plt.figure(figsize=(10, 6))
-        ax = sns.boxplot(data=dados, orient="v")
-        plt.title("Boxplot de variáveis contínuas")
         plt.tight_layout()
 
+        # 🔧 Preparar info_grafico para boxplot simples
         info_grafico = {
-            "tamanho_fonte": plt.rcParams.get("font.size", ""),
             "titulo_principal": ax.get_title(),
+            "tamanho_fonte": 12,
             "titulo_x": ax.get_xlabel(),
             "titulo_y": ax.get_ylabel(),
-            "inclinacao_x": ax.get_xticklabels()[0].get_rotation() if ax.get_xticklabels() else "",
-            "cor": ""  # cor não definida explicitamente
+            "cor": "",  # seaborn usa default
+            "inclinacao_x": 0
         }
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
-    plt.close()
+    plt.close(fig)
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64, info_grafico
+
 
 def personalizar_boxplot(df, info_colunas, 
                          titulo_grafico="", 
