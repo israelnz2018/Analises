@@ -688,7 +688,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     aplicar_estilo_minitab()
 
     info_grafico = {
-        "titulo_principal": "",
+        "titulo_grafico": "",
         "tamanho_fonte": 12,
         "titulo_x": "",
         "titulo_y": "",
@@ -719,7 +719,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
         plt.tight_layout()
 
         # 🔧 Atualizar info_grafico
-        info_grafico["titulo_principal"] = f"Boxplot por {subgrupos[0]} e {subgrupos[1]}"
+        info_grafico["titulo_grafico"] = f"Boxplot por {subgrupos[0]} e {subgrupos[1]}"
         info_grafico["titulo_x"] = ", ".join(lista_y)
         info_grafico["titulo_y"] = ""
     else:
@@ -733,7 +733,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
         plt.tight_layout()
 
         # 🔧 Atualizar info_grafico
-        info_grafico["titulo_principal"] = f"Boxplot de {' e '.join(lista_y)}"
+        info_grafico["titulo_grafico"] = f"Boxplot de {' e '.join(lista_y)}"
         info_grafico["titulo_x"] = ", ".join(lista_y) if len(lista_y) > 1 else lista_y[0]
         info_grafico["titulo_y"] = "Valor"
 
