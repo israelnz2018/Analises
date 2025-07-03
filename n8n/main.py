@@ -368,7 +368,7 @@ async def personalizar_grafico(
     Data: str = Form(None),
     lista_y: str = Form(None),
     lista_x: str = Form(None),
-    cor: str = Form(""),  # 🔧 define valor padrão vazio
+    cor: str = Form(""),
     titulo_x: str = Form(""),
     titulo_y: str = Form(""),
     titulo_grafico: str = Form(""),
@@ -380,7 +380,7 @@ async def personalizar_grafico(
     try:
         global df_global
         from graficos import GRAFICOS
-        import inspect  # ✅ necessário para signature
+        import inspect
 
         print("\n====================== INÍCIO DEBUG /PERSONALIZAR-GRAFICO ======================")
         print("🎨 Gráfico solicitado:", grafico)
@@ -408,10 +408,6 @@ async def personalizar_grafico(
 
         params_aceitos = inspect.signature(funcao_grafico).parameters
 
-        # ✅ Inclinação: aplica sempre se o eixo existir, ignora se não existir
-        inclinacao_x_valida = inclinacao_x or ""
-        inclinacao_y_valida = inclinacao_y or ""
-
         args_to_pass = {k: v for k, v in {
             "df": df,
             "coluna_y": coluna_y,
@@ -431,15 +427,16 @@ async def personalizar_grafico(
             "titulo_y": titulo_y or "",
             "titulo_grafico": titulo_grafico or "",
             "tamanho_fonte": tamanho_fonte or "",
-            "inclinacao_x": inclinacao_x_valida,
-            "inclinacao_y": inclinacao_y_valida,
+            "inclinacao_x": inclinacao_x or "",
+            "inclinacao_y": inclinacao_y or "",
             "espessura": espessura or ""
         }.items() if k in params_aceitos}
 
-        imagem_grafico_isolado_base64 = funcao_grafico(**args_to_pass)
+        imagem_grafico_isolado_base64, info_grafico = funcao_grafico(**args_to_pass)
 
         return {
-            "grafico_isolado_base64": imagem_grafico_isolado_base64
+            "grafico_isolado_base64": imagem_grafico_isolado_base64,
+            "info_grafico": info_grafico  # ✅ Retorna info_grafico com os dados salvos
         }
 
     except Exception as e:
@@ -450,6 +447,7 @@ async def personalizar_grafico(
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
+
 
 
 
