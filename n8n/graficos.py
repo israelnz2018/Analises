@@ -1396,3 +1396,10 @@ GRAFICOS = {
     "Dispersão 3D com Regressão": gerar_dispersao_3d_com_regressao,
     "Dispersão 3D com Regressão Personalizado": personalizar_dispersao_3d_com_regressao
 }
+
+# ✅ Configuração de personalização permitida para cada tipo de boxplot
+CONFIG_PERSONALIZACAO_BOX = {
+    "BoxPlot_1Y": ["titulo_grafico", "titulo_x", "titulo_y", "tamanho_fonte", "inclinacao_x", "cor"],
+    "BoxPlot_2Y": ["titulo_grafico", "titulo_y", "tamanho_fonte", "inclinacao_x"],
+    "BoxPlot_2Y_subgrupo": ["titulo_y", "tamanho_fonte", "inclinacao_x"]
+}
