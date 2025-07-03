@@ -684,39 +684,68 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     import seaborn as sns
     import base64
     from io import BytesIO
-    from suporte import aplicar_estilo_minitab
-
-    aplicar_estilo_minitab()
 
     if not lista_y or any(y not in df.columns for y in lista_y):
         return "❌ Uma ou mais colunas Y informadas não foram encontradas no arquivo.", None, {}
 
-    dados = df[lista_y].dropna()
-    if dados.empty:
-        return "❌ Dados insuficientes para gerar o gráfico.", None, {}
+    if subgrupo and subgrupo not in df.columns:
+        return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, {}
 
-    fig, ax = plt.subplots(figsize=(10, 6))
-    if len(lista_y) == 1:
-        sns.boxplot(y=lista_y[0], data=dados, ax=ax)
+    aplicar_estilo_minitab()
+
+    if subgrupo:
+        dados = df[lista_y + [subgrupo]].dropna()
+        subgrupos = dados[subgrupo].unique()
+
+        if len(subgrupos) != 2:
+            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None, {}
+
+        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+
+        for ax, sub in zip(axs, subgrupos):
+            dados_sub = dados[dados[subgrupo] == sub]
+            sns.boxplot(data=dados_sub[lista_y], orient="v", ax=ax)
+            ax.set_title(f"Boxplot ({sub})")
+
+        plt.tight_layout()
+
+        # Captura info do primeiro subplot como exemplo
+        info_grafico = {
+            "tamanho_fonte": plt.rcParams.get("font.size", ""),
+            "titulo_principal": axs[0].get_title(),
+            "titulo_x": axs[0].get_xlabel(),
+            "titulo_y": axs[0].get_ylabel(),
+            "inclinacao_x": axs[0].get_xticklabels()[0].get_rotation() if axs[0].get_xticklabels() else "",
+            "cor": ""  # cor não definida explicitamente
+        }
+
     else:
-        sns.boxplot(data=dados[lista_y], orient="v", ax=ax)
+        dados = df[lista_y].dropna()
+        if dados.empty:
+            return "❌ Dados insuficientes para gerar o gráfico.", None, {}
 
-    ax.set_title("Boxplot de variáveis contínuas")
-    plt.tight_layout()
+        plt.figure(figsize=(10, 6))
+        ax = sns.boxplot(data=dados, orient="v")
+        plt.title("Boxplot de variáveis contínuas")
+        plt.tight_layout()
+
+        info_grafico = {
+            "tamanho_fonte": plt.rcParams.get("font.size", ""),
+            "titulo_principal": ax.get_title(),
+            "titulo_x": ax.get_xlabel(),
+            "titulo_y": ax.get_ylabel(),
+            "inclinacao_x": ax.get_xticklabels()[0].get_rotation() if ax.get_xticklabels() else "",
+            "cor": ""  # cor não definida explicitamente
+        }
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
-    plt.close(fig)
+    plt.close()
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    # 🔧 Retorna também as colunas usadas
-    info_colunas = {
-        "lista_y": lista_y,
-        "subgrupo": subgrupo
-    }
+    return "", imagem_base64, info_grafico
 
-    return "", imagem_base64, info_colunas
 
 
 def personalizar_boxplot(df, info_colunas, titulo_grafico="", tamanho_fonte=12):
