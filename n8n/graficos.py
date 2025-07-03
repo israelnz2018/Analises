@@ -729,14 +729,17 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
         plt.tight_layout()
 
         # 🔧 Preparar info_grafico
+      
+
         info_grafico = {
-            "titulo_principal": "Boxplot de variáveis contínuas",
+            "titulo_principal": f"Boxplot de {' e '.join(dados.columns)}",
             "tamanho_fonte": 12,
-            "titulo_x": dados.columns[0] if len(dados.columns) == 1 else "",
+            "titulo_x": ", ".join(dados.columns) if len(dados.columns) > 1 else dados.columns[0],
             "titulo_y": "Valor",
             "inclinacao_x": 0,
             "cor": "steelblue"
         }
+
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
