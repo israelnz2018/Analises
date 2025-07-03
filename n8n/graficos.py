@@ -710,14 +710,28 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
         plt.tight_layout()
 
         # 🔧 Preparar info_grafico
+        
+        if subgrupo:
+            subgrupos = dados[subgrupo].unique()
+            titulo = f"Boxplot por {subgrupo}"
+            titulo_x = subgrupo
+            titulo_y = ""
+        else:
+            titulo = f"Boxplot de {' e '.join(dados.columns)}"
+            titulo_x = ", ".join(dados.columns) if len(dados.columns) > 1 else dados.columns[0]
+            titulo_y = "Valor"
+
         info_grafico = {
-            "titulo_principal": f"Boxplot ({subgrupos[0]} vs {subgrupos[1]})",
+            "titulo_principal": titulo,
             "tamanho_fonte": 12,
-            "titulo_x": subgrupo,
-            "titulo_y": "Valor",
+            "titulo_x": titulo_x,
+            "titulo_y": titulo_y,
             "inclinacao_x": 0,
             "cor": "steelblue"
         }
+
+
+    
 
     else:
         dados = df[lista_y].dropna()
