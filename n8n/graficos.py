@@ -745,7 +745,6 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64, info_grafico
-
 def personalizar_boxplot(df, lista_y, 
                          subgrupo=None,
                          titulo_grafico="", 
@@ -792,8 +791,11 @@ def personalizar_boxplot(df, lista_y,
                 sns.boxplot(data=dados_sub[colunas_validas], orient="v", ax=ax)
                 ax.set_ylabel(titulo_y if titulo_y else "Valor", fontsize=int(tamanho_fonte))
 
-            # ✅ Sempre define título do eixo X como input ou vazio, sem colunas duplicadas
-            ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+            # ✅ NUNCA define xlabel duplicado quando mais de 1 Y
+            if len(colunas_validas) == 1:
+                ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+            else:
+                ax.set_xlabel("", fontsize=int(tamanho_fonte))
 
             ax.set_title(f"Boxplot por {sg}", fontsize=int(tamanho_fonte))
 
@@ -810,12 +812,12 @@ def personalizar_boxplot(df, lista_y,
         if len(colunas_validas) == 1:
             sns.boxplot(y=colunas_validas[0], data=dados, ax=ax, color=cor if cor else None)
             ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0], fontsize=int(tamanho_fonte))
+            ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
         else:
             sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
             ax.set_ylabel(titulo_y if titulo_y else "Valor", fontsize=int(tamanho_fonte))
-
-        # ✅ Sempre define título do eixo X como input ou vazio, sem colunas duplicadas
-        ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+            # ✅ Remove xlabel duplicado para 2Y
+            ax.set_xlabel("", fontsize=int(tamanho_fonte))
 
         titulo_padrao = f"Boxplot de {' e '.join(colunas_validas)}"
         ax.set_title(titulo_grafico.strip() if titulo_grafico.strip() else titulo_padrao, fontsize=int(tamanho_fonte))
@@ -846,6 +848,7 @@ def personalizar_boxplot(df, lista_y,
     }
 
     return imagem_base64, info_grafico
+
 
 
 
