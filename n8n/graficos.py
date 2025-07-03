@@ -788,11 +788,11 @@ def personalizar_boxplot(df, lista_y,
             if len(colunas_validas) == 1:
                 sns.boxplot(y=colunas_validas[0], data=dados_sub, ax=ax, color=cor if cor else None)
                 ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0], fontsize=int(tamanho_fonte))
-                ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
+                ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
             else:
                 sns.boxplot(data=dados_sub[colunas_validas], orient="v", ax=ax)
-                ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
-                ax.set_ylabel(titulo_y if titulo_y else "", fontsize=int(tamanho_fonte))
+                ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+                ax.set_ylabel(titulo_y if titulo_y else "Valor", fontsize=int(tamanho_fonte))
 
             ax.set_title(f"Boxplot por {sg}", fontsize=int(tamanho_fonte))
 
@@ -809,11 +809,11 @@ def personalizar_boxplot(df, lista_y,
         if len(colunas_validas) == 1:
             sns.boxplot(y=colunas_validas[0], data=dados, ax=ax, color=cor if cor else None)
             ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0], fontsize=int(tamanho_fonte))
-            ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
+            ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
             titulo_padrao = f"Boxplot de {colunas_validas[0]}"
         else:
             sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
-            ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
+            ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
             ax.set_ylabel(titulo_y if titulo_y else "Valor", fontsize=int(tamanho_fonte))
             titulo_padrao = f"Boxplot de {' e '.join(colunas_validas)}"
 
@@ -845,6 +845,7 @@ def personalizar_boxplot(df, lista_y,
     }
 
     return imagem_base64, info_grafico
+
 
 
 
