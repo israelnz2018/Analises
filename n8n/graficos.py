@@ -745,7 +745,6 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
     return "", imagem_base64, info_grafico
 
-
 def personalizar_boxplot(df, lista_y, 
                          titulo_grafico="", 
                          tamanho_fonte=12,
@@ -764,6 +763,10 @@ def personalizar_boxplot(df, lista_y,
     if not lista_y:
         return None, None
 
+    # ✅ Garante lista_y como lista, mesmo que venha string única
+    if isinstance(lista_y, str):
+        lista_y = [lista_y]
+
     colunas_validas = [col for col in lista_y if col in df.columns]
     if not colunas_validas:
         return None, None
@@ -773,20 +776,25 @@ def personalizar_boxplot(df, lista_y,
         return None, None
 
     fig, ax = plt.subplots(figsize=(10, 6))
+
     if len(colunas_validas) == 1:
         sns.boxplot(y=colunas_validas[0], data=dados, ax=ax, color=cor if cor else None)
         ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0])
         ax.set_xlabel(titulo_x if titulo_x else "")
+        titulo_padrao = f"Boxplot de {colunas_validas[0]}"
     else:
         sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
-        ax.set_xlabel(titulo_x if titulo_x else "")
+        ax.set_xlabel(titulo_x if titulo_x else ", ".join(colunas_validas))
         ax.set_ylabel(titulo_y if titulo_y else "")
+        titulo_padrao = f"Boxplot de {' e '.join(colunas_validas)}"
 
+    # ✅ Aplica título
     ax.set_title(
-        titulo_grafico if titulo_grafico.strip() != "" else f"Boxplot de {' e '.join(colunas_validas)}",
+        titulo_grafico if titulo_grafico.strip() != "" else titulo_padrao,
         fontsize=int(tamanho_fonte)
     )
 
+    # ✅ Inclinação eixo X, se aplicável
     if inclinacao_x:
         plt.setp(ax.get_xticklabels(), rotation=float(inclinacao_x))
 
@@ -798,18 +806,20 @@ def personalizar_boxplot(df, lista_y,
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
+    # ✅ info_grafico com consistência
     info_grafico = {
         "cor": cor or "",
-        "titulo_grafico": titulo_grafico or "",
-        "titulo_x": titulo_x or "",
-        "titulo_y": titulo_y or "",
+        "titulo_grafico": titulo_grafico if titulo_grafico.strip() != "" else titulo_padrao,
+        "titulo_x": titulo_x or (", ".join(colunas_validas) if len(colunas_validas) > 1 else colunas_validas[0]),
+        "titulo_y": titulo_y or (colunas_validas[0] if len(colunas_validas) == 1 else "Valor"),
         "tamanho_fonte": tamanho_fonte or "",
         "inclinacao_x": inclinacao_x or "",
-        "inclinacao_y": "",  # não aplicável
-        "espessura": ""      # não aplicável
+        "inclinacao_y": "",  # não aplicável ao boxplot
+        "espessura": ""      # não aplicável aqui
     }
 
     return imagem_base64, info_grafico
+
 
 
 
