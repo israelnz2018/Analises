@@ -780,20 +780,20 @@ def personalizar_boxplot(df, lista_y,
 
     if len(colunas_validas) == 1:
         sns.boxplot(y=colunas_validas[0], data=dados, ax=ax, color=cor if cor else None)
-        ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0])
-        ax.set_xlabel(titulo_x if titulo_x else "")
+        ax.set_ylabel(titulo_y if titulo_y else colunas_validas[0], fontsize=int(tamanho_fonte))
+        ax.set_xlabel(titulo_x if titulo_x else "", fontsize=int(tamanho_fonte))
         titulo_padrao = f"Boxplot de {colunas_validas[0]}"
     else:
         sns.boxplot(data=dados[colunas_validas], orient="v", ax=ax)
-        ax.set_xlabel(titulo_x if titulo_x else ", ".join(colunas_validas))
-        ax.set_ylabel(titulo_y if titulo_y else "")
+        ax.set_xlabel(titulo_x if titulo_x else ", ".join(colunas_validas), fontsize=int(tamanho_fonte))
+        ax.set_ylabel(titulo_y if titulo_y else "", fontsize=int(tamanho_fonte))
         titulo_padrao = f"Boxplot de {' e '.join(colunas_validas)}"
 
     titulo_final = titulo_grafico if titulo_grafico.strip() else titulo_padrao
     ax.set_title(titulo_final, fontsize=int(tamanho_fonte))
 
     if inclinacao_x:
-        plt.setp(ax.get_xticklabels(), rotation=float(inclinacao_x))
+        plt.setp(ax.get_xticklabels(), rotation=float(inclinacao_x), fontsize=int(tamanho_fonte))
 
     plt.tight_layout()
 
@@ -812,7 +812,7 @@ def personalizar_boxplot(df, lista_y,
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
-        "lista_y": lista_y  # ✅ incluído para o frontend usar
+        "lista_y": lista_y
     }
 
     return imagem_base64, info_grafico
