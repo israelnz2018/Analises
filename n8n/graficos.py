@@ -729,12 +729,12 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
         plt.figure(figsize=(10, 6))
         sns.boxplot(data=dados, orient="v")
-        plt.title("Boxplot de variáveis contínuas")
+        plt.title(f"Boxplot de {' e '.join(lista_y)}")
         plt.tight_layout()
 
         # 🔧 Atualizar info_grafico
-        info_grafico["titulo_principal"] = f"Boxplot de {' e '.join(dados.columns)}"
-        info_grafico["titulo_x"] = ", ".join(dados.columns) if len(dados.columns) > 1 else dados.columns[0]
+        info_grafico["titulo_principal"] = f"Boxplot de {' e '.join(lista_y)}"
+        info_grafico["titulo_x"] = ", ".join(lista_y) if len(lista_y) > 1 else lista_y[0]
         info_grafico["titulo_y"] = "Valor"
 
     buf = BytesIO()
@@ -744,6 +744,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64, info_grafico
+
 
 
 
