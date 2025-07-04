@@ -209,7 +209,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
         "titulo_x": coluna_x,
         "titulo_y": "Frequência",
         "inclinacao_x": 0,
-        "cor": "C0",
+        "cor": None,  # ✅ Inicializa sem cor fixa
         "lista_y": [coluna_y] if coluna_y else []
     }
 
@@ -230,10 +230,12 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
             if contagem.empty:
                 ax.axis('off')
                 ax.set_title(f"{titulo} - Sem dados")
-                return
+                return None
 
             acumulado = contagem.cumsum() / contagem.sum() * 100
-            contagem.plot(kind="bar", ax=ax)
+            bars = contagem.plot(kind="bar", ax=ax)
+            real_color = bars.patches[0].get_facecolor() if bars.patches else None
+
             ax.set_ylabel("Frequência")
             ax.set_title(titulo)
 
@@ -244,6 +246,8 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
             for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
                 ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
+
+            return real_color
 
         if subgrupo:
             colunas = [coluna_x, subgrupo] + ([coluna_y] if coluna_y else [])
@@ -260,7 +264,9 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
-                plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
+                cor_usada = plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
+
+            info_grafico["cor"] = cor_usada
 
         else:
             dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
@@ -268,7 +274,8 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
                 return "❌ Dados insuficientes para gerar o gráfico.", None, None
 
             fig, ax = plt.subplots(figsize=(10, 5))
-            plotar(dados, f"Pareto - {coluna_x}", ax)
+            cor_usada = plotar(dados, f"Pareto - {coluna_x}", ax)
+            info_grafico["cor"] = cor_usada
 
         plt.tight_layout()
 
@@ -282,6 +289,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None, None
+
 
 
 def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
