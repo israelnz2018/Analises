@@ -593,7 +593,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
         "titulo_x": coluna_x,
         "titulo_y": "Frequência",
         "inclinacao_x": 90,
-        "cor": "",
+        "cor": None,  # ✅ inicializa sem cor fixa
         "lista_y": [coluna_y] if coluna_y else []
     }
 
@@ -626,10 +626,14 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
                 else:
                     contagem = dados_sub[coluna_x].value_counts().reindex(categorias, fill_value=0)
 
-                contagem.plot(kind="bar", ax=ax)
+                bars = contagem.plot(kind="bar", ax=ax)
+                cor_usada = bars.patches[0].get_facecolor() if bars.patches else None
+
                 ax.set_ylabel("Frequência")
                 ax.set_title(f"Barras de {coluna_x} ({sub})")
                 ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
+
+            info_grafico["cor"] = cor_usada
 
             plt.tight_layout()
 
@@ -642,11 +646,14 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
                 contagem = dados[coluna_x].value_counts()
 
             plt.figure(figsize=(10,6))
-            contagem.plot(kind="bar")
+            bars = contagem.plot(kind="bar")
+            cor_usada = bars.patches[0].get_facecolor() if bars.patches else None
             plt.ylabel("Frequência")
             plt.title(f"Barras de {coluna_x}")
             plt.xticks(rotation=90)
             plt.tight_layout()
+
+            info_grafico["cor"] = cor_usada
 
         buf = BytesIO()
         plt.savefig(buf, format="png")
@@ -658,6 +665,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de barras: {str(e)}", None, None
+
 
 
 def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
@@ -675,13 +683,19 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     if subgrupo and subgrupo not in df.columns:
         subgrupo = None
 
+    cor_usada_final = None
+
     colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
     dados = df.dropna(subset=colunas_necessarias)
     if dados.empty:
         return None, None
 
     def plotar(ax, contagem, titulo):
-        contagem.plot(kind="bar", color=cor if cor else None, edgecolor="black", ax=ax)
+        nonlocal cor_usada_final
+        bars = contagem.plot(kind="bar", color=cor if cor else None, edgecolor="black", ax=ax)
+        if bars.patches:
+            cor_usada_final = bars.patches[0].get_facecolor()
+
         ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
         ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else ("Soma de Y" if coluna_y else "Frequência"), fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
@@ -734,7 +748,7 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     info_grafico = {
-        "cor": cor or "",
+        "cor": cor if cor else cor_usada_final,
         "titulo_grafico": titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
@@ -742,11 +756,12 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
-        "lista_y": [coluna_y] if coluna_y else []
+        "lista_y": [coluna_y] if coluna_y else [],
+        "subgrupo": subgrupo if subgrupo else ""
     }
-    info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
+
 
 
 
@@ -950,19 +965,29 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
         "titulo_x": coluna_x,
         "titulo_y": coluna_y,
         "inclinacao_x": 0,
-        "cor": "",
+        "cor": None,  # ✅ inicializa sem cor fixa
         "lista_y": [coluna_y]
     }
 
     try:
         plt.figure(figsize=(10, 6))
 
+        # 🔧 Captura cor usada
         if subgrupo and subgrupo in df.columns:
-            sns.scatterplot(x=coluna_x, y=coluna_y, hue=subgrupo, data=df)
+            plot = sns.scatterplot(x=coluna_x, y=coluna_y, hue=subgrupo, data=df)
+            cor_usada = None  # quando há hue, cores múltiplas
             plt.title(f"Dispersão de {coluna_y} por {coluna_x} (Subgrupo: {subgrupo})")
         else:
-            sns.scatterplot(x=coluna_x, y=coluna_y, data=df)
+            plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df)
+            # Captura a cor real do primeiro ponto, se existir
+            colecoes = plot.collections
+            if colecoes:
+                cor_usada = colecoes[0].get_facecolor()[0] if colecoes[0].get_facecolor().size > 0 else None
+            else:
+                cor_usada = None
             plt.title(f"Dispersão de {coluna_y} por {coluna_x}")
+
+        info_grafico["cor"] = cor_usada
 
         plt.tight_layout()
 
@@ -992,7 +1017,14 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
         return None, None
 
     plt.figure(figsize=(10, 6))
-    sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
+    plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
+
+    # 🔧 Captura a cor real usada
+    colecoes = plot.collections
+    if colecoes:
+        cor_usada_final = colecoes[0].get_facecolor()[0] if colecoes[0].get_facecolor().size > 0 else None
+    else:
+        cor_usada_final = cor
 
     plt.xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
     plt.ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
@@ -1009,7 +1041,7 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     plt.close()
 
     info_grafico = {
-        "cor": cor or "",
+        "cor": cor if cor else cor_usada_final,
         "titulo_grafico": titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
@@ -1021,6 +1053,7 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     }
 
     return imagem_base64, info_grafico
+
 
 
 
@@ -1050,7 +1083,7 @@ def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
         "titulo_x": "",
         "titulo_y": coluna_y,
         "inclinacao_x": 0,
-        "cor": "",
+        "cor": None,  # ✅ inicializa sem cor fixa
         "lista_y": [coluna_y]
     }
 
@@ -1071,10 +1104,16 @@ def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
             x_label = "Tempo / Sequência"
 
         if subgrupo:
-            sns.lineplot(x=eixo_x, y=coluna_y, hue=subgrupo, data=df, marker="o")
+            plot = sns.lineplot(x=eixo_x, y=coluna_y, hue=subgrupo, data=df, marker="o")
+            cor_usada = None  # múltiplas cores quando há subgrupo
             titulo = f"{titulo_base} (Subgrupo: {subgrupo})"
         else:
-            sns.lineplot(x=eixo_x, y=coluna_y, data=df, marker="o")
+            plot = sns.lineplot(x=eixo_x, y=coluna_y, data=df, marker="o")
+            colecoes = plot.collections
+            if colecoes:
+                cor_usada = colecoes[0].get_facecolor()[0] if colecoes[0].get_facecolor().size > 0 else None
+            else:
+                cor_usada = None
             titulo = titulo_base
 
         plt.title(titulo)
@@ -1082,6 +1121,7 @@ def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
         plt.ylabel(coluna_y)
         plt.tight_layout()
 
+        info_grafico["cor"] = cor_usada
         info_grafico["titulo_grafico"] = titulo
         info_grafico["titulo_x"] = x_label
 
@@ -1095,6 +1135,8 @@ def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de tendência: {str(e)}", None, None
+
+
 
 def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
@@ -1123,7 +1165,14 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
         eixo_x = df["sequencia"]
         x_label = titulo_x.strip() if titulo_x.strip() != "" else "Tempo / Sequência"
 
-    sns.lineplot(x=eixo_x, y=coluna_y, data=df, color=cor, marker="o")
+    plot = sns.lineplot(x=eixo_x, y=coluna_y, data=df, color=cor, marker="o")
+
+    # 🔧 Captura a cor real usada
+    colecoes = plot.collections
+    if colecoes:
+        cor_usada_final = colecoes[0].get_facecolor()[0] if colecoes[0].get_facecolor().size > 0 else None
+    else:
+        cor_usada_final = cor
 
     plt.xlabel(x_label, fontsize=int(tamanho_fonte))
     plt.ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
@@ -1140,7 +1189,7 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     plt.close()
 
     info_grafico = {
-        "cor": cor or "",
+        "cor": cor if cor else cor_usada_final,
         "titulo_grafico": titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
@@ -1152,7 +1201,6 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     }
 
     return imagem_base64, info_grafico
-
 
 
 
@@ -1182,20 +1230,24 @@ def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
         "titulo_x": coluna_x,
         "titulo_y": coluna_y,
         "inclinacao_x": 0,
-        "cor": "",
+        "cor": None,  # ✅ inicializa sem cor fixa
         "lista_y": [coluna_y, coluna_z]
     }
 
     try:
         plt.figure(figsize=(10, 6))
 
-        plt.scatter(
+        scatter = plt.scatter(
             x=dados[coluna_x],
             y=dados[coluna_y],
             s=dados[coluna_z] * 30,
             alpha=0.5,
             edgecolors="w"
         )
+
+        # 🔧 Captura cor real usada
+        cor_usada = scatter.get_facecolor()[0] if scatter.get_facecolor().size > 0 else None
+        info_grafico["cor"] = cor_usada
 
         plt.xlabel(coluna_x)
         plt.ylabel(coluna_y)
@@ -1234,7 +1286,8 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
         return None, None
 
     plt.figure(figsize=(10, 6))
-    plt.scatter(
+
+    scatter = plt.scatter(
         x=dados[coluna_x],
         y=dados[coluna_y],
         s=dados[coluna_z] * 30,
@@ -1242,6 +1295,9 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
         color=cor,
         edgecolors="w"
     )
+
+    # 🔧 Captura cor real usada
+    cor_usada_final = scatter.get_facecolor()[0] if scatter.get_facecolor().size > 0 else cor
 
     plt.xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
     plt.ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
@@ -1258,7 +1314,7 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     info_grafico = {
-        "cor": cor or "",
+        "cor": cor if cor else cor_usada_final,
         "titulo_grafico": titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
@@ -1266,10 +1322,11 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
-        "lista_y": [coluna_y] if coluna_y else []
+        "lista_y": [coluna_y, coluna_z]
     }
 
     return imagem_base64, info_grafico
+
 
 
 
@@ -1456,37 +1513,34 @@ def gerar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z):
     try:
         aplicar_estilo_minitab()
 
-        # Dados
         X = dados[[coluna_x, coluna_y]].values
         y = dados[coluna_z].values
 
-        # Regressão
         model = LinearRegression()
         model.fit(X, y)
 
-        # Grade para superfície
         x_range = np.linspace(dados[coluna_x].min(), dados[coluna_x].max(), 20)
         y_range = np.linspace(dados[coluna_y].min(), dados[coluna_y].max(), 20)
         x_grid, y_grid = np.meshgrid(x_range, y_range)
         z_pred = model.predict(np.c_[x_grid.ravel(), y_grid.ravel()]).reshape(x_grid.shape)
 
-        # Gráfico
         fig = plt.figure(figsize=(10, 6))
         ax = fig.add_subplot(111, projection='3d')
 
-        # Dispersão real
-        ax.scatter(dados[coluna_x], dados[coluna_y], dados[coluna_z], color='b', label='Pontos reais')
+        scatter = ax.scatter(dados[coluna_x], dados[coluna_y], dados[coluna_z], color='b', label='Pontos reais')
 
-        # Plano de regressão
         ax.plot_surface(x_grid, y_grid, z_pred, alpha=0.5, color='red')
 
         ax.set_xlabel(coluna_x)
         ax.set_ylabel(coluna_y)
         ax.set_zlabel(coluna_z)
-        ax.set_title(f'Dispersão 3D com Regressão - {coluna_z} ~ {coluna_x} + {coluna_y}')
+        titulo = f'Dispersão 3D com Regressão - {coluna_z} ~ {coluna_x} + {coluna_y}'
+        ax.set_title(titulo)
         plt.tight_layout()
 
-        # Exporta imagem
+        # Captura cor real usada
+        cor_usada = scatter.get_facecolor()[0] if scatter.get_facecolor().size > 0 else None
+
         buf = BytesIO()
         plt.savefig(buf, format="png")
         plt.close(fig)
@@ -1494,12 +1548,12 @@ def gerar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z):
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
         info_grafico = {
-            "titulo_grafico": f"Dispersão 3D com Regressão - {coluna_z} ~ {coluna_x} + {coluna_y}",
+            "titulo_grafico": titulo,
             "tamanho_fonte": 12,
             "titulo_x": coluna_x,
             "titulo_y": coluna_y,
             "inclinacao_x": 0,
-            "cor": "",
+            "cor": cor_usada,
             "lista_y": [coluna_y, coluna_z]
         }
 
@@ -1526,7 +1580,6 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     if not coluna_z or coluna_z not in df.columns:
         return None, None
 
-    # Dados
     dados = df[[coluna_x, coluna_y, coluna_z]].dropna()
     if dados.empty:
         return None, None
@@ -1534,36 +1587,32 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     X = dados[[coluna_x, coluna_y]].values
     y = dados[coluna_z].values
 
-    # Regressão
     model = LinearRegression()
     model.fit(X, y)
 
-    # Grade para superfície
     x_range = np.linspace(dados[coluna_x].min(), dados[coluna_x].max(), 20)
     y_range = np.linspace(dados[coluna_y].min(), dados[coluna_y].max(), 20)
     x_grid, y_grid = np.meshgrid(x_range, y_range)
     z_pred = model.predict(np.c_[x_grid.ravel(), y_grid.ravel()]).reshape(x_grid.shape)
 
-    # Gráfico
     fig = plt.figure(figsize=(10, 6))
     ax = fig.add_subplot(111, projection='3d')
 
-    # Dispersão real
-    ax.scatter(dados[coluna_x], dados[coluna_y], dados[coluna_z], color="blue", label='Pontos reais')
+    scatter = ax.scatter(dados[coluna_x], dados[coluna_y], dados[coluna_z], color="blue", label='Pontos reais')
 
-    # Plano de regressão
     ax.plot_surface(x_grid, y_grid, z_pred, alpha=0.5, color=cor)
 
     ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
     ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
     ax.set_zlabel(coluna_z, fontsize=int(tamanho_fonte))
-    titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else "Dispersão 3D com Regressão"
+    titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Dispersão 3D com Regressão - {coluna_z} ~ {coluna_x} + {coluna_y}"
     ax.set_title(titulo_padrao, fontsize=int(tamanho_fonte))
     ax.view_init(elev=30, azim=int(inclinacao_x))
 
     plt.tight_layout()
 
-    # Exporta imagem
+    cor_usada_final = scatter.get_facecolor()[0] if scatter.get_facecolor().size > 0 else cor
+
     buf = BytesIO()
     plt.savefig(buf, format="png")
     plt.close(fig)
@@ -1571,7 +1620,7 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     info_grafico = {
-        "cor": cor or "",
+        "cor": cor if cor else cor_usada_final,
         "titulo_grafico": titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
@@ -1579,10 +1628,11 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
-        "lista_y": [coluna_y] if coluna_y else []
+        "lista_y": [coluna_y, coluna_z]
     }
 
     return imagem_base64, info_grafico
+
 
 
 
