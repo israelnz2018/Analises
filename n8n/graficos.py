@@ -129,7 +129,7 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
         if len(subgrupos) == 1:
             axs = [axs]
 
-        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
+        for ax, sub in zip(axs, subgrupos):
             sns.histplot(
                 dados[dados[subgrupo] == sub][coluna_y],
                 bins=10,
@@ -141,7 +141,8 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
                 ax=ax
             )
 
-            ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
+            # 🔧 Ajustado: título exibe o nome real do subgrupo
+            ax.set_title(f"{sub}", fontsize=int(tamanho_fonte))
             ax.set_xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
             ax.set_ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
             ax.tick_params(axis='x', rotation=int(inclinacao_x))
@@ -191,6 +192,7 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
     info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
+
 
 
 def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
