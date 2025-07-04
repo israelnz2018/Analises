@@ -745,6 +745,8 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64, info_grafico
+
+
 def personalizar_boxplot(df, lista_y, 
                          subgrupo=None,
                          titulo_grafico="", 
@@ -846,6 +848,8 @@ def personalizar_boxplot(df, lista_y,
         "espessura": "",
         "lista_y": lista_y
     }
+
+    info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
 
