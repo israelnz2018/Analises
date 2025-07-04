@@ -27,29 +27,36 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
-    # Aplica estilo Minitab
     aplicar_estilo_minitab()
 
-    # Garante que coluna_y seja string única
+    info_grafico = {
+        "titulo_grafico": "Histograma com Curva de Densidade",
+        "tamanho_fonte": 12,
+        "titulo_x": coluna_y,
+        "titulo_y": "Frequência",
+        "inclinacao_x": 0,
+        "cor": "steelblue",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+
     if isinstance(coluna_y, list):
         coluna_y = coluna_y[0] if coluna_y else None
 
-    # Validação coluna Y
     if not coluna_y or coluna_y not in df.columns:
-        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None, None
 
     try:
         if subgrupo:
             if subgrupo not in df.columns:
-                return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None
+                return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, None
 
             dados = df[[coluna_y, subgrupo]].dropna()
             if dados.empty:
-                return "❌ Dados insuficientes para gerar o gráfico.", None
+                return "❌ Dados insuficientes para gerar o gráfico.", None, None
 
             subgrupos = dados[subgrupo].unique()
             if len(subgrupos) != 2:
-                return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None
+                return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None, None
 
             fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
             for ax, sub in zip(axs, subgrupos):
@@ -57,15 +64,15 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
                     dados[dados[subgrupo] == sub][coluna_y],
                     bins=10,
                     kde=True,
-                    stat="count",  # ✅ corrigido para valor aceito
+                    stat="count",
                     alpha=0.4,
                     color="steelblue",
                     edgecolor="black",
                     ax=ax
                 )
-                ax.set_title(f"Histograma - {sub}")
-                ax.set_xlabel(coluna_y)
-                ax.set_ylabel("Frequência")  # ✅ label em português
+                ax.set_title(f"Histograma - {sub}", fontsize=12)
+                ax.set_xlabel(coluna_y, fontsize=12)
+                ax.set_ylabel("Frequência", fontsize=12)
 
             plt.tight_layout()
 
@@ -75,27 +82,27 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
                 df[coluna_y].dropna(),
                 bins=10,
                 kde=True,
-                stat="count",  # ✅ corrigido para valor aceito
+                stat="count",
                 alpha=0.4,
                 color="steelblue",
                 edgecolor="black"
             )
-            plt.xlabel(coluna_y)
-            plt.ylabel("Frequência")  # ✅ label em português
-            plt.title("Histograma com Curva de Densidade")
+            plt.xlabel(coluna_y, fontsize=12)
+            plt.ylabel("Frequência", fontsize=12)
+            plt.title("Histograma com Curva de Densidade", fontsize=12)
             plt.tight_layout()
 
-        # Salva imagem
         buf = BytesIO()
         plt.savefig(buf, format="png")
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
 
-        return "", imagem_base64
+        return "", imagem_base64, info_grafico
 
     except Exception as e:
-        return f"❌ Erro ao gerar o histograma: {str(e)}", None
+        return f"❌ Erro ao gerar o histograma: {str(e)}", None, None
+
 
 
 def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
