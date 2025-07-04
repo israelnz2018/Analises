@@ -339,9 +339,10 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
         if len(subgrupos) == 1:
             axs = [axs]
 
-        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
+        for ax, sub in zip(axs, subgrupos):
             dados_sub = dados[dados[subgrupo] == sub]
-            titulo = f"Grupo {i+1}"
+            # 🔧 Ajustado: título exibe o nome real do subgrupo
+            titulo = f"{sub}"
             plotar(ax, dados_sub, titulo)
 
         titulo_padrao = f"Pareto por {' e '.join(subgrupos)}"
@@ -374,6 +375,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
+
 
 
 
