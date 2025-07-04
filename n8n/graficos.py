@@ -975,17 +975,16 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
     try:
         plt.figure(figsize=(10, 6))
 
-        # 🔧 Captura cor usada
         if subgrupo and subgrupo in df.columns:
             plot = sns.scatterplot(x=coluna_x, y=coluna_y, hue=subgrupo, data=df)
-            cor_usada = None  # quando há hue, cores múltiplas
+            cor_usada = None  # várias cores
             plt.title(f"Dispersão de {coluna_y} por {coluna_x} (Subgrupo: {subgrupo})")
         else:
             plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df)
-            # Captura a cor real do primeiro ponto, se existir
             colecoes = plot.collections
-            if colecoes:
-                cor_usada = colecoes[0].get_facecolor()[0] if colecoes[0].get_facecolor().size > 0 else None
+            if colecoes and len(colecoes) > 0:
+                facecolors = colecoes[0].get_facecolor()
+                cor_usada = facecolors[0] if facecolors is not None and len(facecolors) > 0 else None
             else:
                 cor_usada = None
             plt.title(f"Dispersão de {coluna_y} por {coluna_x}")
@@ -1005,6 +1004,7 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de dispersão: {str(e)}", None, None
 
+
 def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -1022,10 +1022,10 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     plt.figure(figsize=(10, 6))
     plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
 
-    # 🔧 Captura a cor real usada
     colecoes = plot.collections
-    if colecoes:
-        cor_usada_final = colecoes[0].get_facecolor()[0] if colecoes[0].get_facecolor().size > 0 else None
+    if colecoes and len(colecoes) > 0:
+        facecolors = colecoes[0].get_facecolor()
+        cor_usada_final = facecolors[0] if facecolors is not None and len(facecolors) > 0 else cor
     else:
         cor_usada_final = cor
 
@@ -1056,6 +1056,59 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     }
 
     return imagem_base64, info_grafico
+
+def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+    from suporte import aplicar_estilo_minitab
+
+    aplicar_estilo_minitab()
+
+    if not coluna_y or coluna_y not in df.columns:
+        return None, None
+    if not coluna_x or coluna_x not in df.columns:
+        return None, None
+
+    plt.figure(figsize=(10, 6))
+    plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
+
+    colecoes = plot.collections
+    if colecoes and len(colecoes) > 0:
+        facecolors = colecoes[0].get_facecolor()
+        cor_usada_final = facecolors[0] if facecolors is not None and len(facecolors) > 0 else cor
+    else:
+        cor_usada_final = cor
+
+    plt.xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+    titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Dispersão de {coluna_y} por {coluna_x}"
+    plt.title(titulo_padrao, fontsize=int(tamanho_fonte))
+    plt.xticks(rotation=int(inclinacao_x), fontsize=int(tamanho_fonte))
+    plt.yticks(fontsize=int(tamanho_fonte))
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close()
+
+    info_grafico = {
+        "cor": cor if cor else cor_usada_final,
+        "titulo_grafico": titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+
+    return imagem_base64, info_grafico
+
 
 
 
