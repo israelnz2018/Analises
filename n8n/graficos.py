@@ -473,7 +473,7 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
     aplicar_estilo_minitab()
 
     if not coluna_x or coluna_x not in df.columns:
-        return None
+        return None, None
 
     if coluna_y and coluna_y not in df.columns:
         coluna_y = None
@@ -483,16 +483,18 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
 
     dados = df.dropna(subset=[coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else []))
     if dados.empty:
-        return None
+        return None, None
 
     if subgrupo:
         subgrupos = dados[subgrupo].dropna().unique()
-        if len(subgrupos) != 2:
-            return None
+        fig, axs = plt.subplots(1, len(subgrupos), figsize=(8 * len(subgrupos), 6))
 
-        fig, axs = plt.subplots(1, 2, figsize=(16, 6))
-        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
+        if len(subgrupos) == 1:
+            axs = [axs]
+
+        for ax, sub in zip(axs, subgrupos):
             dados_sub = dados[dados[subgrupo] == sub]
+
             if coluna_y:
                 soma = dados_sub.groupby(coluna_x)[coluna_y].sum()
             else:
@@ -500,25 +502,17 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
 
             if soma.empty or soma.sum() == 0:
                 ax.axis('off')
-                ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=int(tamanho_fonte))
+                ax.set_title(f"{sub} (Sem dados)", fontsize=int(tamanho_fonte))
                 continue
 
             soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, ax=ax)
             ax.set_ylabel("")
-            ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
+            ax.set_title(str(sub), fontsize=int(tamanho_fonte))
 
-            # Ajusta tamanho das labels do pie
             for text in ax.texts:
                 text.set_fontsize(int(tamanho_fonte))
 
-        plt.tight_layout()
-
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        plt.close()
-        return imagem_base64
+        titulo_padrao = f"Pizza por {' e '.join([str(s) for s in subgrupos])}"
 
     else:
         if coluna_y:
@@ -527,27 +521,41 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
             soma = dados[coluna_x].value_counts()
 
         if soma.empty or soma.sum() == 0:
-            return None
+            return None, None
 
-        plt.figure(figsize=(8, 6))
-        ax = soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
-        plt.ylabel("")
+        fig, ax = plt.subplots(figsize=(8, 6))
+        soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, ax=ax)
+        ax.set_ylabel("")
 
-        titulo = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Pizza de {coluna_x}"
-        plt.title(titulo, fontsize=int(tamanho_fonte))
+        titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Pizza de {coluna_x}"
+        ax.set_title(titulo_padrao, fontsize=int(tamanho_fonte))
 
-        # Ajusta tamanho das labels do pie
         for text in ax.texts:
             text.set_fontsize(int(tamanho_fonte))
 
-        plt.tight_layout()
+    plt.tight_layout()
 
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        plt.close()
-        return imagem_base64, info_grafico
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close(fig)
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    info_grafico = {
+        "cor": "",  # Pizza não usa cor única
+        "titulo_grafico": titulo_padrao,
+        "titulo_x": "",
+        "titulo_y": "",
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": "",
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+    info_grafico["subgrupo"] = subgrupo if subgrupo else ""
+
+    return imagem_base64, info_grafico
+
 
 
 
