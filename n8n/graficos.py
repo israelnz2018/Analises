@@ -200,18 +200,9 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
+    from matplotlib.colors import to_hex
 
     aplicar_estilo_minitab()
-
-    info_grafico = {
-        "titulo_grafico": f"Pareto - {coluna_x}",
-        "tamanho_fonte": 12,
-        "titulo_x": coluna_x,
-        "titulo_y": "Frequência",
-        "inclinacao_x": 0,
-        "cor": None,  # ✅ Inicializa sem cor fixa
-        "lista_y": [coluna_y] if coluna_y else []
-    }
 
     if not coluna_x or coluna_x not in df.columns:
         return "❌ A coluna X informada não foi encontrada no arquivo.", None, None
@@ -219,6 +210,16 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None, None
     if subgrupo and subgrupo not in df.columns:
         return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, None
+
+    info_grafico = {
+        "titulo_grafico": f"Pareto - {coluna_x}",
+        "tamanho_fonte": 12,
+        "titulo_x": coluna_x,
+        "titulo_y": "Frequência",
+        "inclinacao_x": 0,
+        "cor": "",  # ✅ atualizado abaixo após plot
+        "lista_y": [coluna_y] if coluna_y else []
+    }
 
     try:
         def plotar(dados, titulo, ax):
@@ -234,12 +235,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
             acumulado = contagem.cumsum() / contagem.sum() * 100
             bars = contagem.plot(kind="bar", ax=ax)
-
-            # ✅ Captura a cor real do primeiro bar ou define None
-            if bars.patches and len(bars.patches) > 0:
-                real_color = bars.patches[0].get_facecolor()
-            else:
-                real_color = None
+            real_color = bars.patches[0].get_facecolor() if bars.patches else None
 
             ax.set_ylabel("Frequência")
             ax.set_title(titulo)
@@ -252,29 +248,23 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
             for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
                 ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
 
-            return real_color
+            return to_hex(real_color) if real_color else ""
 
         if subgrupo:
             colunas = [coluna_x, subgrupo] + ([coluna_y] if coluna_y else [])
             dados = df[colunas].dropna()
-
             subgrupos = dados[subgrupo].dropna().unique()
+
             if dados.empty:
                 return "❌ Dados insuficientes para gerar o gráfico.", None, None
-
             if len(subgrupos) != 2:
                 return f"❌ O gráfico espera exatamente 2 categorias no subgrupo e encontrou {len(subgrupos)}.", None, None
 
             fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
 
-            cor_usada = None
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
-                cor_temp = plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
-                if not cor_usada and cor_temp:
-                    cor_usada = cor_temp
-
-            info_grafico["cor"] = cor_usada
+                cor_usada = plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
 
         else:
             dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
@@ -283,9 +273,11 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
             fig, ax = plt.subplots(figsize=(10, 5))
             cor_usada = plotar(dados, f"Pareto - {coluna_x}", ax)
-            info_grafico["cor"] = cor_usada
 
         plt.tight_layout()
+
+        # ✅ Atualiza info_grafico com cor convertida para string hex
+        info_grafico["cor"] = cor_usada
 
         buf = BytesIO()
         fig.savefig(buf, format="png")
@@ -316,6 +308,11 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     if subgrupo and subgrupo not in df.columns:
         subgrupo = None
 
+    colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
+    dados = df.dropna(subset=colunas_necessarias)
+    if dados.empty:
+        return None, None
+
     def plotar(ax, dados, titulo):
         if coluna_y:
             contagem = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
@@ -330,7 +327,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
         acumulado = contagem.cumsum() / contagem.sum() * 100
 
         contagem.plot(kind="bar", ax=ax, color=cor if cor else None, edgecolor="black")
-
+        
         ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
         ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else "Frequência / Soma", fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
@@ -343,11 +340,6 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
 
         for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
             ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
-
-    colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
-    dados = df.dropna(subset=colunas_necessarias)
-    if dados.empty:
-        return None, None
 
     if subgrupo:
         subgrupos = dados[subgrupo].unique()
@@ -369,24 +361,24 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
         titulo_padrao = titulo
 
     plt.tight_layout()
-
     buf = BytesIO()
     plt.savefig(buf, format="png")
-    plt.close(fig)
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close(fig)
 
     info_grafico = {
-        "cor": cor or "",
+        "cor": cor if cor else "",
         "titulo_grafico": titulo_padrao,
-        "titulo_x": titulo_x,
-        "titulo_y": titulo_y,
+        "titulo_x": titulo_x.strip() if titulo_x.strip() != "" else coluna_x,
+        "titulo_y": titulo_y.strip() if titulo_y.strip() != "" else "Frequência",
         "tamanho_fonte": tamanho_fonte or "",
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
         "lista_y": [coluna_y] if coluna_y else []
     }
+
     info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
