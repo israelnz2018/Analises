@@ -284,7 +284,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
         return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None, None
 
 
-def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
+def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
@@ -312,7 +312,9 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
 
         acumulado = contagem.cumsum() / contagem.sum() * 100
 
-        contagem.plot(kind="bar", ax=ax)
+        # 🔧 CORRIGIDO: remove color fixo para usar cor original do Matplotlib
+        contagem.plot(kind="bar", ax=ax, edgecolor="black")
+        
         ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
         ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else "Frequência / Soma", fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
@@ -341,7 +343,6 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
 
         for ax, sub in zip(axs, subgrupos):
             dados_sub = dados[dados[subgrupo] == sub]
-            # 🔧 Ajustado: título exibe o nome real do subgrupo
             titulo = f"{sub}"
             plotar(ax, dados_sub, titulo)
 
@@ -375,6 +376,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
+
 
 
 
@@ -642,8 +644,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
         return f"❌ Erro ao gerar o gráfico de barras: {str(e)}", None, None
 
 
-
-def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
+def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
@@ -658,14 +659,13 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     if subgrupo and subgrupo not in df.columns:
         subgrupo = None
 
-    # ➡️ Filtra dados válidos
     colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
     dados = df.dropna(subset=colunas_necessarias)
     if dados.empty:
         return None, None
 
     def plotar(ax, contagem, titulo):
-        contagem.plot(kind="bar", edgecolor="black", ax=ax)
+        contagem.plot(kind="bar", color=cor if cor else None, edgecolor="black", ax=ax)
         ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
         ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else ("Soma de Y" if coluna_y else "Frequência"), fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
@@ -731,6 +731,7 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
+
 
 
 
