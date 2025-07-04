@@ -1239,6 +1239,7 @@ def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
+    import matplotlib.colors as mcolors
 
     if not coluna_x or coluna_x not in df.columns:
         return "❌ A coluna X informada não foi encontrada no arquivo.", None, None
@@ -1259,7 +1260,7 @@ def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
         "titulo_x": coluna_x,
         "titulo_y": coluna_y,
         "inclinacao_x": 0,
-        "cor": None,  # ✅ inicializa sem cor fixa
+        "cor": None,
         "lista_y": [coluna_y, coluna_z]
     }
 
@@ -1274,8 +1275,13 @@ def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
             edgecolors="w"
         )
 
-        # 🔧 Captura cor real usada
-        cor_usada = scatter.get_facecolor()[0] if scatter.get_facecolor().size > 0 else None
+        facecolors = scatter.get_facecolor()
+        if facecolors is not None and len(facecolors) > 0:
+            rgba = facecolors[0]
+            cor_usada = mcolors.to_hex(rgba)
+        else:
+            cor_usada = None
+
         info_grafico["cor"] = cor_usada
 
         plt.xlabel(coluna_x)
@@ -1300,6 +1306,7 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
+    import matplotlib.colors as mcolors
 
     aplicar_estilo_minitab()
 
@@ -1325,8 +1332,12 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
         edgecolors="w"
     )
 
-    # 🔧 Captura cor real usada
-    cor_usada_final = scatter.get_facecolor()[0] if scatter.get_facecolor().size > 0 else cor
+    facecolors = scatter.get_facecolor()
+    if facecolors is not None and len(facecolors) > 0:
+        rgba = facecolors[0]
+        cor_usada_final = mcolors.to_hex(rgba)
+    else:
+        cor_usada_final = cor
 
     plt.xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
     plt.ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
@@ -1355,6 +1366,7 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
     }
 
     return imagem_base64, info_grafico
+
 
 
 
@@ -1527,6 +1539,7 @@ def gerar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z):
     from io import BytesIO
     import base64
     from suporte import aplicar_estilo_minitab
+    import matplotlib.colors as mcolors
 
     if not coluna_x or coluna_x not in df.columns:
         return "❌ A coluna X informada não foi encontrada no arquivo.", None, None
@@ -1567,8 +1580,8 @@ def gerar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z):
         ax.set_title(titulo)
         plt.tight_layout()
 
-        # Captura cor real usada
-        cor_usada = scatter.get_facecolor()[0] if scatter.get_facecolor().size > 0 else None
+        facecolors = scatter.get_facecolor()
+        cor_usada = mcolors.to_hex(facecolors[0]) if facecolors is not None and len(facecolors) > 0 else None
 
         buf = BytesIO()
         plt.savefig(buf, format="png")
@@ -1591,6 +1604,7 @@ def gerar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z):
     except Exception as e:
         return f"❌ Erro ao gerar dispersão 3D com regressão: {str(e)}", None, None
 
+
 def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, cor="red", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=30):
     from sklearn.linear_model import LinearRegression
     import numpy as np
@@ -1599,6 +1613,7 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     from io import BytesIO
     import base64
     from suporte import aplicar_estilo_minitab
+    import matplotlib.colors as mcolors
 
     aplicar_estilo_minitab()
 
@@ -1640,7 +1655,8 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
 
     plt.tight_layout()
 
-    cor_usada_final = scatter.get_facecolor()[0] if scatter.get_facecolor().size > 0 else cor
+    facecolors = scatter.get_facecolor()
+    cor_usada_final = mcolors.to_hex(facecolors[0]) if facecolors is not None and len(facecolors) > 0 else cor
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
@@ -1661,6 +1677,7 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     }
 
     return imagem_base64, info_grafico
+
 
 
 
