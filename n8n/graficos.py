@@ -233,7 +233,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
                 return
 
             acumulado = contagem.cumsum() / contagem.sum() * 100
-            contagem.plot(kind="bar", ax=ax, color="C0")
+            contagem.plot(kind="bar", ax=ax)
             ax.set_ylabel("Frequência")
             ax.set_title(titulo)
 
@@ -312,7 +312,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
 
         acumulado = contagem.cumsum() / contagem.sum() * 100
 
-        contagem.plot(kind="bar", ax=ax, color=cor if cor else "steelblue", edgecolor="black")
+        contagem.plot(kind="bar", ax=ax)
         ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
         ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else "Frequência / Soma", fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
@@ -665,7 +665,7 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
         return None, None
 
     def plotar(ax, contagem, titulo):
-        contagem.plot(kind="bar", color=cor, edgecolor="black", ax=ax)
+        contagem.plot(kind="bar", edgecolor="black", ax=ax)
         ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
         ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else ("Soma de Y" if coluna_y else "Frequência"), fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
@@ -1333,7 +1333,7 @@ def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
         return f"❌ Erro ao gerar superfície 3D: {str(e)}", None, None
 
 
-def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
+def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor=None, titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
     import numpy as np
@@ -1367,7 +1367,10 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
     fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(111, projection='3d')
 
-    surf = ax.plot_surface(xi, yi, zi, cmap=cor, edgecolor='k', linewidth=0.2, alpha=0.9, antialiased=True)
+    # ➡️ Usa cmap do gráfico original se vier preenchido, senão usa 'viridis'
+    cmap_utilizado = cor if cor in plt.colormaps() else "viridis"
+
+    surf = ax.plot_surface(xi, yi, zi, cmap=cmap_utilizado, edgecolor='k', linewidth=0.2, alpha=0.9, antialiased=True)
 
     ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, labelpad=12, fontsize=int(tamanho_fonte))
     ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, labelpad=12, fontsize=int(tamanho_fonte))
@@ -1375,7 +1378,7 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
     titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else "Gráfico de Superfície 3D"
     ax.set_title(titulo_padrao, pad=20, fontsize=int(tamanho_fonte))
 
-    ax.view_init(elev=30, azim=int(inclinacao_x))  # inclinacao_x controla a rotação horizontal
+    ax.view_init(elev=30, azim=int(inclinacao_x))
 
     fig.colorbar(surf, shrink=0.5, aspect=10, pad=0.1)
 
@@ -1383,12 +1386,12 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
 
     buf = BytesIO()
     plt.savefig(buf, format="png", dpi=300)
-    plt.close()
+    plt.close(fig)
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     info_grafico = {
-        "cor": cor or "",
+        "cor": cmap_utilizado,
         "titulo_grafico": titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
@@ -1396,10 +1399,11 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
-        "lista_y": [coluna_y] if coluna_y else []
+        "lista_y": [coluna_y, coluna_z] if coluna_y and coluna_z else []
     }
 
     return imagem_base64, info_grafico
+
 
 
 
