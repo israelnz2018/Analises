@@ -316,11 +316,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     if subgrupo and subgrupo not in df.columns:
         subgrupo = None
 
-    cor_usada_final = None
-
     def plotar(ax, dados, titulo):
-        nonlocal cor_usada_final
-
         if coluna_y:
             contagem = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
         else:
@@ -333,12 +329,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
 
         acumulado = contagem.cumsum() / contagem.sum() * 100
 
-        bar_color = cor if cor else None
-        bars = contagem.plot(kind="bar", ax=ax, edgecolor="black", color=bar_color)
-
-        # 🔧 Captura cor real usada
-        if bars.patches:
-            cor_usada_final = bars.patches[0].get_facecolor()
+        contagem.plot(kind="bar", ax=ax, color=cor if cor else None, edgecolor="black")
 
         ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
         ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else "Frequência / Soma", fontsize=int(tamanho_fonte))
@@ -353,7 +344,6 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
         for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
             ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
 
-    # ➡️ Filtra dados válidos
     colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
     dados = df.dropna(subset=colunas_necessarias)
     if dados.empty:
@@ -368,8 +358,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
 
         for ax, sub in zip(axs, subgrupos):
             dados_sub = dados[dados[subgrupo] == sub]
-            titulo = f"{sub}"
-            plotar(ax, dados_sub, titulo)
+            plotar(ax, dados_sub, f"{sub}")
 
         titulo_padrao = f"Pareto por {' e '.join(subgrupos)}"
 
@@ -380,24 +369,25 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
         titulo_padrao = titulo
 
     plt.tight_layout()
+
     buf = BytesIO()
     plt.savefig(buf, format="png")
+    plt.close(fig)
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close(fig)
 
     info_grafico = {
-        "cor": cor if cor else cor_usada_final,
-        "titulo_grafico": titulo_grafico.strip() if titulo_grafico.strip() else titulo_padrao,
+        "cor": cor or "",
+        "titulo_grafico": titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
         "tamanho_fonte": tamanho_fonte or "",
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
-        "lista_y": [coluna_y] if coluna_y else [],
-        "subgrupo": subgrupo if subgrupo else ""
+        "lista_y": [coluna_y] if coluna_y else []
     }
+    info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
 
