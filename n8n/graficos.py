@@ -177,12 +177,12 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
     plt.close(fig)
 
     info_grafico = {
-        "cor": cor,
-        "titulo_grafico": titulo_grafico if titulo_grafico else titulo_padrao,
+        "cor": cor or "",
+        "titulo_grafico": titulo_grafico.strip() if titulo_grafico.strip() else titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
-        "tamanho_fonte": tamanho_fonte,
-        "inclinacao_x": inclinacao_x,
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
         "lista_y": [coluna_y]
@@ -191,6 +191,7 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
     info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
+
 
 
 
