@@ -1075,14 +1075,13 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
 
 
 
-
-  
 def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
+    import matplotlib.colors as mcolors
 
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None, None
@@ -1101,7 +1100,7 @@ def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
         "titulo_x": "",
         "titulo_y": coluna_y,
         "inclinacao_x": 0,
-        "cor": None,  # ✅ inicializa sem cor fixa
+        "cor": None,
         "lista_y": [coluna_y]
     }
 
@@ -1123,13 +1122,18 @@ def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
 
         if subgrupo:
             plot = sns.lineplot(x=eixo_x, y=coluna_y, hue=subgrupo, data=df, marker="o")
-            cor_usada = None  # múltiplas cores quando há subgrupo
+            cor_usada = None
             titulo = f"{titulo_base} (Subgrupo: {subgrupo})"
         else:
             plot = sns.lineplot(x=eixo_x, y=coluna_y, data=df, marker="o")
             colecoes = plot.collections
-            if colecoes:
-                cor_usada = colecoes[0].get_facecolor()[0] if colecoes[0].get_facecolor().size > 0 else None
+            if colecoes and len(colecoes) > 0:
+                facecolors = colecoes[0].get_facecolor()
+                if facecolors is not None and len(facecolors) > 0:
+                    rgba = facecolors[0]
+                    cor_usada = mcolors.to_hex(rgba)
+                else:
+                    cor_usada = None
             else:
                 cor_usada = None
             titulo = titulo_base
@@ -1162,6 +1166,7 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
+    import matplotlib.colors as mcolors
 
     aplicar_estilo_minitab()
 
@@ -1185,10 +1190,15 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
 
     plot = sns.lineplot(x=eixo_x, y=coluna_y, data=df, color=cor, marker="o")
 
-    # 🔧 Captura a cor real usada
+    # 🔧 Captura a cor real usada em hexadecimal
     colecoes = plot.collections
-    if colecoes:
-        cor_usada_final = colecoes[0].get_facecolor()[0] if colecoes[0].get_facecolor().size > 0 else None
+    if colecoes and len(colecoes) > 0:
+        facecolors = colecoes[0].get_facecolor()
+        if facecolors is not None and len(facecolors) > 0:
+            rgba = facecolors[0]
+            cor_usada_final = mcolors.to_hex(rgba)
+        else:
+            cor_usada_final = cor
     else:
         cor_usada_final = cor
 
@@ -1207,7 +1217,7 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     plt.close()
 
     info_grafico = {
-        "cor": cor if cor else cor_usada_final,
+        "cor": cor_usada_final,
         "titulo_grafico": titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
@@ -1219,6 +1229,7 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     }
 
     return imagem_base64, info_grafico
+
 
 
 
