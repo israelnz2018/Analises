@@ -652,7 +652,7 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     aplicar_estilo_minitab()
 
     if not coluna_x or coluna_x not in df.columns:
-        return None
+        return None, None
     if coluna_y and coluna_y not in df.columns:
         coluna_y = None
     if subgrupo and subgrupo not in df.columns:
@@ -662,24 +662,24 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
     dados = df.dropna(subset=colunas_necessarias)
     if dados.empty:
-        return None
+        return None, None
 
     def plotar(ax, contagem, titulo):
         contagem.plot(kind="bar", color=cor, edgecolor="black", ax=ax)
-        ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
-        ax.set_ylabel(titulo_y if titulo_y.strip() != "" else ("Soma de Y" if coluna_y else "Frequência"), fontsize=int(tamanho_fonte))
+        ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+        ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else ("Soma de Y" if coluna_y else "Frequência"), fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
         ax.tick_params(axis='x', rotation=int(inclinacao_x), labelsize=int(tamanho_fonte))
         ax.tick_params(axis='y', labelsize=int(tamanho_fonte))
 
     if subgrupo:
         subgrupos = dados[subgrupo].dropna().unique()
-        if len(subgrupos) != 2:
-            return None
+        fig, axs = plt.subplots(1, len(subgrupos), figsize=(8 * len(subgrupos), 6), sharey=True)
 
-        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+        if len(subgrupos) == 1:
+            axs = [axs]
 
-        for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
+        for ax, sub in zip(axs, subgrupos):
             dados_sub = dados[dados[subgrupo] == sub]
             if coluna_y:
                 contagem = dados_sub.groupby(coluna_x)[coluna_y].sum()
@@ -688,10 +688,12 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
 
             if contagem.empty:
                 ax.axis('off')
-                ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=int(tamanho_fonte))
+                ax.set_title(f"{sub} (Sem dados)", fontsize=int(tamanho_fonte))
                 continue
 
-            plotar(ax, contagem, f"Grupo {i+1}")
+            plotar(ax, contagem, str(sub))
+
+        titulo_padrao = f"Barras por {' e '.join([str(s) for s in subgrupos])}"
 
     else:
         if coluna_y:
@@ -700,21 +702,36 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
             contagem = dados[coluna_x].value_counts()
 
         if contagem.empty:
-            return None
+            return None, None
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        titulo = titulo_grafico if titulo_grafico.strip() != "" else f"Barras de {coluna_x}"
+        titulo = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Barras de {coluna_x}"
         plotar(ax, contagem, titulo)
+        titulo_padrao = titulo
 
     plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
+    plt.close(fig)
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close(fig)
+
+    info_grafico = {
+        "cor": cor or "",
+        "titulo_grafico": titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+    info_grafico["subgrupo"] = subgrupo if subgrupo else ""
 
     return imagem_base64, info_grafico
+
 
 
 
@@ -953,16 +970,17 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     aplicar_estilo_minitab()
 
     if not coluna_y or coluna_y not in df.columns:
-        return None
+        return None, None
     if not coluna_x or coluna_x not in df.columns:
-        return None
+        return None, None
 
     plt.figure(figsize=(10, 6))
     sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
 
-    plt.xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
-    plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Dispersão de {coluna_y} por {coluna_x}", fontsize=int(tamanho_fonte))
+    plt.xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+    titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Dispersão de {coluna_y} por {coluna_x}"
+    plt.title(titulo_padrao, fontsize=int(tamanho_fonte))
     plt.xticks(rotation=int(inclinacao_x), fontsize=int(tamanho_fonte))
     plt.yticks(fontsize=int(tamanho_fonte))
     plt.tight_layout()
@@ -973,7 +991,20 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close()
 
+    info_grafico = {
+        "cor": cor or "",
+        "titulo_grafico": titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+
     return imagem_base64, info_grafico
+
 
 
 
@@ -1058,9 +1089,9 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     aplicar_estilo_minitab()
 
     if not coluna_y or coluna_y not in df.columns:
-        return None
+        return None, None
     if Data and Data not in df.columns:
-        return None
+        return None, None
 
     df = df.dropna(subset=[coluna_y]).reset_index(drop=True)
 
@@ -1069,17 +1100,18 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     if Data:
         df = df.dropna(subset=[Data])
         eixo_x = df[Data]
-        x_label = titulo_x if titulo_x.strip() != "" else Data
+        x_label = titulo_x.strip() if titulo_x.strip() != "" else Data
     else:
         df["sequencia"] = df.index + 1
         eixo_x = df["sequencia"]
-        x_label = titulo_x if titulo_x.strip() != "" else "Tempo / Sequência"
+        x_label = titulo_x.strip() if titulo_x.strip() != "" else "Tempo / Sequência"
 
     sns.lineplot(x=eixo_x, y=coluna_y, data=df, color=cor, marker="o")
 
     plt.xlabel(x_label, fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
-    plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Tendência temporal de {coluna_y}", fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+    titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Tendência temporal de {coluna_y}"
+    plt.title(titulo_padrao, fontsize=int(tamanho_fonte))
     plt.xticks(rotation=int(inclinacao_x), fontsize=int(tamanho_fonte))
     plt.yticks(fontsize=int(tamanho_fonte))
     plt.tight_layout()
@@ -1090,7 +1122,20 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close()
 
+    info_grafico = {
+        "cor": cor or "",
+        "titulo_grafico": titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+
     return imagem_base64, info_grafico
+
 
 
 
@@ -1161,15 +1206,15 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
     aplicar_estilo_minitab()
 
     if not coluna_x or coluna_x not in df.columns:
-        return None
+        return None, None
     if not coluna_y or coluna_y not in df.columns:
-        return None
+        return None, None
     if not coluna_z or coluna_z not in df.columns:
-        return None
+        return None, None
 
     dados = df[[coluna_x, coluna_y, coluna_z]].dropna()
     if dados.empty:
-        return None
+        return None, None
 
     plt.figure(figsize=(10, 6))
     plt.scatter(
@@ -1181,9 +1226,10 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
         edgecolors="w"
     )
 
-    plt.xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
-    plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Gráfico de Bolhas: {coluna_x} vs {coluna_y} (Z = tamanho das bolhas)", fontsize=int(tamanho_fonte))
+    plt.xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+    titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Gráfico de Bolhas: {coluna_x} vs {coluna_y} (Z = tamanho das bolhas)"
+    plt.title(titulo_padrao, fontsize=int(tamanho_fonte))
     plt.xticks(rotation=int(inclinacao_x), fontsize=int(tamanho_fonte))
     plt.yticks(fontsize=int(tamanho_fonte))
     plt.tight_layout()
@@ -1194,7 +1240,20 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
+    info_grafico = {
+        "cor": cor or "",
+        "titulo_grafico": titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+
     return imagem_base64, info_grafico
+
 
 
 
@@ -1286,15 +1345,15 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
     aplicar_estilo_minitab()
 
     if not coluna_x or coluna_x not in df.columns:
-        return None
+        return None, None
     if not coluna_y or coluna_y not in df.columns:
-        return None
+        return None, None
     if not coluna_z or coluna_z not in df.columns:
-        return None
+        return None, None
 
     dados = df[[coluna_x, coluna_y, coluna_z]].dropna()
     if dados.empty:
-        return None
+        return None, None
 
     X = dados[coluna_x].astype(float).values
     Y = dados[coluna_y].astype(float).values
@@ -1310,10 +1369,11 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
 
     surf = ax.plot_surface(xi, yi, zi, cmap=cor, edgecolor='k', linewidth=0.2, alpha=0.9, antialiased=True)
 
-    ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, labelpad=12, fontsize=int(tamanho_fonte))
-    ax.set_ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, labelpad=12, fontsize=int(tamanho_fonte))
+    ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, labelpad=12, fontsize=int(tamanho_fonte))
+    ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, labelpad=12, fontsize=int(tamanho_fonte))
     ax.set_zlabel(coluna_z, labelpad=12, fontsize=int(tamanho_fonte))
-    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else "Gráfico de Superfície 3D", pad=20, fontsize=int(tamanho_fonte))
+    titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else "Gráfico de Superfície 3D"
+    ax.set_title(titulo_padrao, pad=20, fontsize=int(tamanho_fonte))
 
     ax.view_init(elev=30, azim=int(inclinacao_x))  # inclinacao_x controla a rotação horizontal
 
@@ -1327,7 +1387,20 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
+    info_grafico = {
+        "cor": cor or "",
+        "titulo_grafico": titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+
     return imagem_base64, info_grafico
+
 
 
 
@@ -1426,16 +1499,16 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     aplicar_estilo_minitab()
 
     if not coluna_x or coluna_x not in df.columns:
-        return None
+        return None, None
     if not coluna_y or coluna_y not in df.columns:
-        return None
+        return None, None
     if not coluna_z or coluna_z not in df.columns:
-        return None
+        return None, None
 
     # Dados
     dados = df[[coluna_x, coluna_y, coluna_z]].dropna()
     if dados.empty:
-        return None
+        return None, None
 
     X = dados[[coluna_x, coluna_y]].values
     y = dados[coluna_z].values
@@ -1460,10 +1533,11 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     # Plano de regressão
     ax.plot_surface(x_grid, y_grid, z_pred, alpha=0.5, color=cor)
 
-    ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
-    ax.set_ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+    ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+    ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
     ax.set_zlabel(coluna_z, fontsize=int(tamanho_fonte))
-    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else f"Dispersão 3D com Regressão", fontsize=int(tamanho_fonte))
+    titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else "Dispersão 3D com Regressão"
+    ax.set_title(titulo_padrao, fontsize=int(tamanho_fonte))
     ax.view_init(elev=30, azim=int(inclinacao_x))
 
     plt.tight_layout()
@@ -1475,7 +1549,20 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
+    info_grafico = {
+        "cor": cor or "",
+        "titulo_grafico": titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+
     return imagem_base64, info_grafico
+
 
 
 
