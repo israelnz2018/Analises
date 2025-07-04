@@ -104,7 +104,6 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
         return f"❌ Erro ao gerar o histograma: {str(e)}", None, None
 
 
-
 def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -112,26 +111,19 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
 
-    # ➡️ Função para verificar se o campo está preenchido de forma válida
-    def is_preenchido(valor, padrao):
-        return valor and valor.strip() != "" and valor.strip().lower() != padrao.lower()
+    aplicar_estilo_minitab()
 
-    # ➡️ Ajusta coluna_y se vier como lista
     if isinstance(coluna_y, list):
         coluna_y = coluna_y[0] if coluna_y else None
 
-    # ➡️ Validação coluna_y
     if not coluna_y or coluna_y not in df.columns:
-        return None
+        return None, None
 
-    # ➡️ Aplica estilo Minitab
-    aplicar_estilo_minitab()
+    dados = df[[coluna_y, subgrupo]].dropna() if subgrupo and subgrupo in df.columns else df[[coluna_y]].dropna()
+    if dados.empty:
+        return None, None
 
     if subgrupo and subgrupo in df.columns:
-        dados = df[[coluna_y, subgrupo]].dropna()
-        if dados.empty:
-            return None
-
         subgrupos = dados[subgrupo].unique()
         fig, axs = plt.subplots(1, len(subgrupos), figsize=(8 * len(subgrupos), 5), sharey=True)
         if len(subgrupos) == 1:
@@ -149,62 +141,57 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
                 ax=ax
             )
 
-            # ➡️ Títulos fixos Grupo 1 e Grupo 2
-            titulo = f"Grupo {i+1}"
-            ax.set_title(titulo, fontsize=int(tamanho_fonte))
-
-            # ➡️ X label: usa personalizado se preenchido, senão mantém coluna_y
-            xlabel = titulo_x if is_preenchido(titulo_x, "Eixo X") else coluna_y
-            ax.set_xlabel(xlabel, fontsize=int(tamanho_fonte))
-
-            # ➡️ Y label: usa personalizado se preenchido, senão mantém padrão "Frequência"
-            ylabel = titulo_y if is_preenchido(titulo_y, "Eixo Y") else "Frequência"
-            ax.set_ylabel(ylabel, fontsize=int(tamanho_fonte))
-
+            ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
+            ax.set_xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
+            ax.set_ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
             ax.tick_params(axis='x', rotation=int(inclinacao_x))
 
-        plt.tight_layout()
-
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        plt.close()
-        return imagem_base64
+        titulo_padrao = f"Histograma por {' e '.join(subgrupos)}"
 
     else:
-        plt.figure(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(10, 6))
         sns.histplot(
-            df[coluna_y].dropna(),
+            dados[coluna_y],
             bins=10,
             kde=True,
             stat="count",
             alpha=0.4,
             color=cor,
-            edgecolor="black"
+            edgecolor="black",
+            ax=ax
         )
 
-        # ➡️ Título gráfico único
-        titulo = titulo_grafico if is_preenchido(titulo_grafico, "Título do Gráfico") else "Histograma com Curva de Densidade"
-        plt.title(titulo, fontsize=int(tamanho_fonte))
+        ax.set_title(titulo_grafico if titulo_grafico else f"Histograma de {coluna_y}", fontsize=int(tamanho_fonte))
+        ax.set_xlabel(titulo_x if titulo_x else coluna_y, fontsize=int(tamanho_fonte))
+        ax.set_ylabel(titulo_y if titulo_y else "Frequência", fontsize=int(tamanho_fonte))
+        ax.tick_params(axis='x', rotation=int(inclinacao_x))
 
-        # ➡️ X label gráfico único
-        xlabel = titulo_x if is_preenchido(titulo_x, "Eixo X") else coluna_y
-        plt.xlabel(xlabel, fontsize=int(tamanho_fonte))
+        titulo_padrao = f"Histograma de {coluna_y}"
 
-        # ➡️ Y label gráfico único
-        ylabel = titulo_y if is_preenchido(titulo_y, "Eixo Y") else "Frequência"
-        plt.ylabel(ylabel, fontsize=int(tamanho_fonte))
+    plt.tight_layout()
 
-        plt.xticks(rotation=int(inclinacao_x))
-        plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close(fig)
 
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        plt.close()
-        return imagem_base64
+    info_grafico = {
+        "cor": cor,
+        "titulo_grafico": titulo_grafico if titulo_grafico else titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte,
+        "inclinacao_x": inclinacao_x,
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y]
+    }
+
+    info_grafico["subgrupo"] = subgrupo if subgrupo else ""
+
+    return imagem_base64, info_grafico
+
 
 
 
