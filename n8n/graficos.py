@@ -665,7 +665,6 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
         return f"❌ Erro ao gerar o gráfico de barras: {str(e)}", None, None
 
 
-
 def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
@@ -690,9 +689,13 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
 
     def plotar(ax, contagem, titulo):
         nonlocal cor_usada_final
-        bars = contagem.plot(kind="bar", color=cor if cor else None, edgecolor="black", ax=ax)
+        bars = contagem.plot(kind="bar", color=cor if cor else "steelblue", edgecolor="black", ax=ax)
         if bars.patches:
-            cor_usada_final = bars.patches[0].get_facecolor()
+            cor_rgb = bars.patches[0].get_facecolor()
+            if isinstance(cor_rgb, tuple):
+                cor_usada_final = '#%02x%02x%02x' % tuple(int(255*x) for x in cor_rgb[:3])
+            else:
+                cor_usada_final = cor_rgb
 
         ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
         ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else ("Soma de Y" if coluna_y else "Frequência"), fontsize=int(tamanho_fonte))
@@ -759,6 +762,7 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     }
 
     return imagem_base64, info_grafico
+
 
 
 
