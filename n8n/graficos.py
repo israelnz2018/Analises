@@ -947,12 +947,17 @@ def personalizar_boxplot(df, lista_y,
     return imagem_base64, info_grafico
 
 
+
+
+
+
 def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
+    import matplotlib.colors as mcolors
 
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None, None
@@ -968,7 +973,7 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
         "titulo_x": coluna_x,
         "titulo_y": coluna_y,
         "inclinacao_x": 0,
-        "cor": None,  # ✅ inicializa sem cor fixa
+        "cor": None,
         "lista_y": [coluna_y]
     }
 
@@ -977,14 +982,18 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
 
         if subgrupo and subgrupo in df.columns:
             plot = sns.scatterplot(x=coluna_x, y=coluna_y, hue=subgrupo, data=df)
-            cor_usada = None  # várias cores
+            cor_usada = None
             plt.title(f"Dispersão de {coluna_y} por {coluna_x} (Subgrupo: {subgrupo})")
         else:
             plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df)
             colecoes = plot.collections
             if colecoes and len(colecoes) > 0:
                 facecolors = colecoes[0].get_facecolor()
-                cor_usada = facecolors[0] if facecolors is not None and len(facecolors) > 0 else None
+                if facecolors is not None and len(facecolors) > 0:
+                    rgba = facecolors[0]
+                    cor_usada = mcolors.to_hex(rgba)
+                else:
+                    cor_usada = None
             else:
                 cor_usada = None
             plt.title(f"Dispersão de {coluna_y} por {coluna_x}")
@@ -1011,6 +1020,7 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
+    import matplotlib.colors as mcolors
 
     aplicar_estilo_minitab()
 
@@ -1022,10 +1032,15 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     plt.figure(figsize=(10, 6))
     plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
 
+    # 🔧 Captura a cor real usada em hexadecimal
     colecoes = plot.collections
     if colecoes and len(colecoes) > 0:
         facecolors = colecoes[0].get_facecolor()
-        cor_usada_final = facecolors[0] if facecolors is not None and len(facecolors) > 0 else cor
+        if facecolors is not None and len(facecolors) > 0:
+            rgba = facecolors[0]
+            cor_usada_final = mcolors.to_hex(rgba)
+        else:
+            cor_usada_final = cor
     else:
         cor_usada_final = cor
 
@@ -1044,7 +1059,7 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     plt.close()
 
     info_grafico = {
-        "cor": cor if cor else cor_usada_final,
+        "cor": cor_usada_final,
         "titulo_grafico": titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
@@ -1056,59 +1071,6 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     }
 
     return imagem_base64, info_grafico
-
-def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    import base64
-    from io import BytesIO
-    from suporte import aplicar_estilo_minitab
-
-    aplicar_estilo_minitab()
-
-    if not coluna_y or coluna_y not in df.columns:
-        return None, None
-    if not coluna_x or coluna_x not in df.columns:
-        return None, None
-
-    plt.figure(figsize=(10, 6))
-    plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
-
-    colecoes = plot.collections
-    if colecoes and len(colecoes) > 0:
-        facecolors = colecoes[0].get_facecolor()
-        cor_usada_final = facecolors[0] if facecolors is not None and len(facecolors) > 0 else cor
-    else:
-        cor_usada_final = cor
-
-    plt.xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y.strip() if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
-    titulo_padrao = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Dispersão de {coluna_y} por {coluna_x}"
-    plt.title(titulo_padrao, fontsize=int(tamanho_fonte))
-    plt.xticks(rotation=int(inclinacao_x), fontsize=int(tamanho_fonte))
-    plt.yticks(fontsize=int(tamanho_fonte))
-    plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close()
-
-    info_grafico = {
-        "cor": cor if cor else cor_usada_final,
-        "titulo_grafico": titulo_padrao,
-        "titulo_x": titulo_x,
-        "titulo_y": titulo_y,
-        "tamanho_fonte": tamanho_fonte or "",
-        "inclinacao_x": inclinacao_x or "",
-        "inclinacao_y": "",
-        "espessura": "",
-        "lista_y": [coluna_y] if coluna_y else []
-    }
-
-    return imagem_base64, info_grafico
-
 
 
 
