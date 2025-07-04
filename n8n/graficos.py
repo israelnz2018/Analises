@@ -584,7 +584,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
         "titulo_x": coluna_x,
         "titulo_y": "Frequência",
         "inclinacao_x": 90,
-        "cor": None,  # ✅ inicializa sem cor fixa
+        "cor": "",  # ✅ inicializa como string vazia
         "lista_y": [coluna_y] if coluna_y else []
     }
 
@@ -618,7 +618,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
                     contagem = dados_sub[coluna_x].value_counts().reindex(categorias, fill_value=0)
 
                 bars = contagem.plot(kind="bar", ax=ax)
-                cor_usada = bars.patches[0].get_facecolor() if bars.patches else None
+                cor_usada = bars.patches[0].get_facecolor() if bars.patches else ""
 
                 ax.set_ylabel("Frequência")
                 ax.set_title(f"Barras de {coluna_x} ({sub})")
@@ -638,7 +638,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
 
             plt.figure(figsize=(10,6))
             bars = contagem.plot(kind="bar")
-            cor_usada = bars.patches[0].get_facecolor() if bars.patches else None
+            cor_usada = bars.patches[0].get_facecolor() if bars.patches else ""
             plt.ylabel("Frequência")
             plt.title(f"Barras de {coluna_x}")
             plt.xticks(rotation=90)
@@ -658,7 +658,6 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
         return f"❌ Erro ao gerar o gráfico de barras: {str(e)}", None, None
 
 
-
 def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
@@ -674,7 +673,7 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     if subgrupo and subgrupo not in df.columns:
         subgrupo = None
 
-    cor_usada_final = None
+    cor_usada_final = ""
 
     colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
     dados = df.dropna(subset=colunas_necessarias)
@@ -741,8 +740,8 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     info_grafico = {
         "cor": cor if cor else cor_usada_final,
         "titulo_grafico": titulo_padrao,
-        "titulo_x": titulo_x,
-        "titulo_y": titulo_y,
+        "titulo_x": titulo_x.strip() if titulo_x.strip() != "" else coluna_x,
+        "titulo_y": titulo_y.strip() if titulo_y.strip() != "" else ("Soma de Y" if coluna_y else "Frequência"),
         "tamanho_fonte": tamanho_fonte or "",
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
@@ -752,6 +751,7 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     }
 
     return imagem_base64, info_grafico
+
 
 
 
