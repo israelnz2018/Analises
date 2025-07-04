@@ -299,7 +299,11 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     if subgrupo and subgrupo not in df.columns:
         subgrupo = None
 
+    cor_usada_final = None
+
     def plotar(ax, dados, titulo):
+        nonlocal cor_usada_final
+
         if coluna_y:
             contagem = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
         else:
@@ -312,9 +316,13 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
 
         acumulado = contagem.cumsum() / contagem.sum() * 100
 
-        # 🔧 CORRIGIDO: remove color fixo para usar cor original do Matplotlib
-        contagem.plot(kind="bar", ax=ax, edgecolor="black")
-        
+        bar_color = cor if cor else None
+        bars = contagem.plot(kind="bar", ax=ax, edgecolor="black", color=bar_color)
+
+        # 🔧 Captura cor real usada
+        if bars.patches:
+            cor_usada_final = bars.patches[0].get_facecolor()
+
         ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
         ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else "Frequência / Soma", fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
@@ -362,7 +370,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
     plt.close(fig)
 
     info_grafico = {
-        "cor": cor or "",
+        "cor": cor if cor else cor_usada_final,
         "titulo_grafico": titulo_grafico.strip() if titulo_grafico.strip() else titulo_padrao,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
@@ -370,12 +378,12 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, ti
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
-        "lista_y": [coluna_y] if coluna_y else []
+        "lista_y": [coluna_y] if coluna_y else [],
+        "subgrupo": subgrupo if subgrupo else ""
     }
 
-    info_grafico["subgrupo"] = subgrupo if subgrupo else ""
-
     return imagem_base64, info_grafico
+
 
 
 
