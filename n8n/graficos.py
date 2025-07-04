@@ -196,97 +196,6 @@ def personalizar_histograma(df, coluna_y, subgrupo=None, cor="#000000", titulo_x
 
 
 
-def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
-    import matplotlib.pyplot as plt
-    import base64
-    from io import BytesIO
-    from suporte import aplicar_estilo_minitab
-
-    aplicar_estilo_minitab()
-
-    info_grafico = {
-        "titulo_grafico": f"Pareto - {coluna_x}",
-        "tamanho_fonte": 12,
-        "titulo_x": coluna_x,
-        "titulo_y": "Frequência",
-        "inclinacao_x": 0,
-        "cor": "C0",
-        "lista_y": [coluna_y] if coluna_y else []
-    }
-
-    if not coluna_x or coluna_x not in df.columns:
-        return "❌ A coluna X informada não foi encontrada no arquivo.", None, None
-    if coluna_y and coluna_y not in df.columns:
-        return "❌ A coluna Y informada não foi encontrada no arquivo.", None, None
-    if subgrupo and subgrupo not in df.columns:
-        return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, None
-
-    try:
-        def plotar(dados, titulo, ax):
-            if coluna_y:
-                contagem = dados.groupby(coluna_x)[coluna_y].sum().sort_values(ascending=False)
-            else:
-                contagem = dados[coluna_x].value_counts().sort_values(ascending=False)
-
-            if contagem.empty:
-                ax.axis('off')
-                ax.set_title(f"{titulo} - Sem dados")
-                return
-
-            acumulado = contagem.cumsum() / contagem.sum() * 100
-            contagem.plot(kind="bar", ax=ax, color="C0")
-            ax.set_ylabel("Frequência")
-            ax.set_title(titulo)
-
-            ax2 = ax.twinx()
-            ax2.plot(acumulado.index, acumulado.values, color="red", marker="o")
-            ax2.set_ylabel("Acumulado (%)")
-            ax2.set_ylim(0, 110)
-
-            for i, (x, y) in enumerate(zip(contagem.index, acumulado)):
-                ax2.text(i, y + 2, f"{y:.1f}%", color="red", ha="center", fontsize=8)
-
-        if subgrupo:
-            colunas = [coluna_x, subgrupo] + ([coluna_y] if coluna_y else [])
-            dados = df[colunas].dropna()
-
-            subgrupos = dados[subgrupo].dropna().unique()
-            if dados.empty:
-                return "❌ Dados insuficientes para gerar o gráfico.", None, None
-
-            if len(subgrupos) != 2:
-                return f"❌ O gráfico espera exatamente 2 categorias no subgrupo e encontrou {len(subgrupos)}.", None, None
-
-            fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
-
-            for ax, sub in zip(axs, subgrupos):
-                dados_sub = dados[dados[subgrupo] == sub]
-                plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
-
-        else:
-            dados = df[[coluna_x, coluna_y]].dropna() if coluna_y else df[[coluna_x]].dropna()
-            if dados.empty:
-                return "❌ Dados insuficientes para gerar o gráfico.", None, None
-
-            fig, ax = plt.subplots(figsize=(10, 5))
-            plotar(dados, f"Pareto - {coluna_x}", ax)
-
-        plt.tight_layout()
-
-        buf = BytesIO()
-        fig.savefig(buf, format="png")
-        plt.close(fig)
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-
-        return "", imagem_base64, info_grafico
-
-    except Exception as e:
-        return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None, None
-
-
-
-
 def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
@@ -296,7 +205,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     aplicar_estilo_minitab()
 
     if not coluna_x or coluna_x not in df.columns:
-        return None
+        return None, None
     if coluna_y and coluna_y not in df.columns:
         coluna_y = None
     if subgrupo and subgrupo not in df.columns:
@@ -333,24 +242,27 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     colunas_necessarias = [coluna_x] + ([coluna_y] if coluna_y else []) + ([subgrupo] if subgrupo else [])
     dados = df.dropna(subset=colunas_necessarias)
     if dados.empty:
-        return None
+        return None, None
 
     if subgrupo:
         subgrupos = dados[subgrupo].unique()
-        if len(subgrupos) != 2:
-            return None  # apenas se houver exatamente 2 categorias
+        fig, axs = plt.subplots(1, len(subgrupos), figsize=(8 * len(subgrupos), 6), sharey=True)
 
-        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+        if len(subgrupos) == 1:
+            axs = [axs]
 
         for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
             dados_sub = dados[dados[subgrupo] == sub]
             titulo = f"Grupo {i+1}"
             plotar(ax, dados_sub, titulo)
 
+        titulo_padrao = f"Pareto por {' e '.join(subgrupos)}"
+
     else:
         fig, ax = plt.subplots(figsize=(10, 6))
         titulo = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Pareto - {coluna_x}"
         plotar(ax, dados, titulo)
+        titulo_padrao = titulo
 
     plt.tight_layout()
     buf = BytesIO()
@@ -359,7 +271,22 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
 
+    info_grafico = {
+        "cor": cor or "",
+        "titulo_grafico": titulo_grafico.strip() if titulo_grafico.strip() else titulo_padrao,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte or "",
+        "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",
+        "espessura": "",
+        "lista_y": [coluna_y] if coluna_y else []
+    }
+
+    info_grafico["subgrupo"] = subgrupo if subgrupo else ""
+
     return imagem_base64, info_grafico
+
 
 
 
