@@ -569,7 +569,6 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
 
 
 
-
 def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
     import matplotlib.pyplot as plt
     import base64
@@ -598,6 +597,13 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
         return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, None
 
     try:
+        def converter_cor_rgb_para_hex(cor_rgb):
+            if isinstance(cor_rgb, tuple):
+                return '#%02x%02x%02x' % tuple(int(255*x) for x in cor_rgb[:3])
+            return cor_rgb
+
+        cor_usada_final = ""
+
         if subgrupo:
             dados = df[[coluna_x, coluna_y, subgrupo]].dropna() if coluna_y else df[[coluna_x, subgrupo]].dropna()
             subgrupos = dados[subgrupo].unique()
@@ -618,13 +624,12 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
                     contagem = dados_sub[coluna_x].value_counts().reindex(categorias, fill_value=0)
 
                 bars = contagem.plot(kind="bar", ax=ax)
-                cor_usada = bars.patches[0].get_facecolor() if bars.patches else ""
+                if bars.patches:
+                    cor_usada_final = converter_cor_rgb_para_hex(bars.patches[0].get_facecolor())
 
                 ax.set_ylabel("Frequência")
                 ax.set_title(f"Barras de {coluna_x} ({sub})")
                 ax.set_xticklabels(ax.get_xticklabels(), rotation=90)
-
-            info_grafico["cor"] = cor_usada
 
             plt.tight_layout()
 
@@ -638,13 +643,15 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
 
             plt.figure(figsize=(10,6))
             bars = contagem.plot(kind="bar")
-            cor_usada = bars.patches[0].get_facecolor() if bars.patches else ""
+            if bars.patches:
+                cor_usada_final = converter_cor_rgb_para_hex(bars.patches[0].get_facecolor())
+
             plt.ylabel("Frequência")
             plt.title(f"Barras de {coluna_x}")
             plt.xticks(rotation=90)
             plt.tight_layout()
 
-            info_grafico["cor"] = cor_usada
+        info_grafico["cor"] = cor_usada_final
 
         buf = BytesIO()
         plt.savefig(buf, format="png")
@@ -656,6 +663,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de barras: {str(e)}", None, None
+
 
 
 def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor=None, titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
