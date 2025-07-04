@@ -358,7 +358,8 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
 
-    return imagem_base64
+    return imagem_base64, info_grafico
+
 
 
 
@@ -528,7 +529,8 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
         buf.seek(0)
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
-        return imagem_base64
+        return imagem_base64, info_grafico
+
 
 
 
@@ -686,7 +688,8 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
 
-    return imagem_base64
+    return imagem_base64, info_grafico
+
 
 
 
@@ -944,7 +947,8 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close()
 
-    return imagem_base64
+    return imagem_base64, info_grafico
+
 
 
   
@@ -1060,7 +1064,8 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close()
 
-    return imagem_base64
+    return imagem_base64, info_grafico
+
 
 
 
@@ -1163,7 +1168,8 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    return imagem_base64
+    return imagem_base64, info_grafico
+
 
 
 
@@ -1295,7 +1301,8 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    return imagem_base64
+    return imagem_base64, info_grafico
+
 
 
 from mpl_toolkits.mplot3d import Axes3D
@@ -1442,7 +1449,8 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
-    return imagem_base64
+    return imagem_base64, info_grafico
+
 
 
 
