@@ -314,9 +314,9 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
 
         acumulado = contagem.cumsum() / contagem.sum() * 100
 
-        contagem.plot(kind="bar", ax=ax, color=cor, edgecolor="black")
-        ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
-        ax.set_ylabel(titulo_y if titulo_y.strip() != "" else "Frequência / Soma", fontsize=int(tamanho_fonte))
+        contagem.plot(kind="bar", ax=ax, color=cor if cor else "steelblue", edgecolor="black")
+        ax.set_xlabel(titulo_x.strip() if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+        ax.set_ylabel(titulo_y.strip() if titulo_y.strip() != "" else "Frequência / Soma", fontsize=int(tamanho_fonte))
         ax.set_title(titulo, fontsize=int(tamanho_fonte))
         ax.set_xticklabels(ax.get_xticklabels(), rotation=int(inclinacao_x))
 
@@ -348,7 +348,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
 
     else:
         fig, ax = plt.subplots(figsize=(10, 6))
-        titulo = titulo_grafico if titulo_grafico.strip() != "" else f"Pareto - {coluna_x}"
+        titulo = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Pareto - {coluna_x}"
         plotar(ax, dados, titulo)
 
     plt.tight_layout()
@@ -359,6 +359,7 @@ def personalizar_pareto(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     plt.close(fig)
 
     return imagem_base64
+
 
 
 def gerar_pizza(df, coluna_x, coluna_y=None, subgrupo=None):
@@ -485,9 +486,11 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
 
             soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False, ax=ax)
             ax.set_ylabel("")
-
-            # ➡️ Títulos fixos Grupo 1 e Grupo 2, ignorando o campo titulo_grafico
             ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
+
+            # Ajusta tamanho das labels do pie
+            for text in ax.texts:
+                text.set_fontsize(int(tamanho_fonte))
 
         plt.tight_layout()
 
@@ -508,12 +511,16 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
             return None
 
         plt.figure(figsize=(8, 6))
-        soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
+        ax = soma.plot.pie(autopct='%1.1f%%', startangle=90, legend=False)
         plt.ylabel("")
 
-        # ➡️ Usa titulo_grafico se preenchido, senão padrão
-        titulo = titulo_grafico if titulo_grafico.strip() != "" else f"Pizza de {coluna_x}"
+        titulo = titulo_grafico.strip() if titulo_grafico.strip() != "" else f"Pizza de {coluna_x}"
         plt.title(titulo, fontsize=int(tamanho_fonte))
+
+        # Ajusta tamanho das labels do pie
+        for text in ax.texts:
+            text.set_fontsize(int(tamanho_fonte))
+
         plt.tight_layout()
 
         buf = BytesIO()
@@ -522,6 +529,7 @@ def personalizar_pizza(df, coluna_x, coluna_y=None, subgrupo=None, titulo_grafic
         imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
         return imagem_base64
+
 
 
 
@@ -607,7 +615,7 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
 
 
 
-def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
@@ -628,67 +636,58 @@ def personalizar_barras(df, coluna_x, coluna_y=None, subgrupo=None, cor="#000000
     if dados.empty:
         return None
 
+    def plotar(ax, contagem, titulo):
+        contagem.plot(kind="bar", color=cor, edgecolor="black", ax=ax)
+        ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+        ax.set_ylabel(titulo_y if titulo_y.strip() != "" else ("Soma de Y" if coluna_y else "Frequência"), fontsize=int(tamanho_fonte))
+        ax.set_title(titulo, fontsize=int(tamanho_fonte))
+        ax.tick_params(axis='x', rotation=int(inclinacao_x), labelsize=int(tamanho_fonte))
+        ax.tick_params(axis='y', labelsize=int(tamanho_fonte))
+
     if subgrupo:
         subgrupos = dados[subgrupo].dropna().unique()
         if len(subgrupos) != 2:
-            return None  # apenas se houver exatamente 2 categorias
+            return None
 
         fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
 
         for i, (ax, sub) in enumerate(zip(axs, subgrupos)):
             dados_sub = dados[dados[subgrupo] == sub]
-
             if coluna_y:
                 contagem = dados_sub.groupby(coluna_x)[coluna_y].sum()
-                ylabel = titulo_y if titulo_y.strip() != "" else "Soma de Y"
             else:
                 contagem = dados_sub[coluna_x].value_counts()
-                ylabel = titulo_y if titulo_y.strip() != "" else "Frequência"
 
             if contagem.empty:
                 ax.axis('off')
                 ax.set_title(f"Grupo {i+1} (Sem dados)", fontsize=int(tamanho_fonte))
                 continue
 
-            contagem.plot(kind="bar", color=cor, edgecolor="black", ax=ax)
-            ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
-            ax.set_ylabel(ylabel, fontsize=int(tamanho_fonte))
-            ax.set_title(f"Grupo {i+1}", fontsize=int(tamanho_fonte))
-            ax.tick_params(axis='x', rotation=int(inclinacao_x))
-            ax.tick_params(axis='y', rotation=int(inclinacao_y))
-
-        plt.tight_layout()
-
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        plt.close(fig)
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        return imagem_base64
+            plotar(ax, contagem, f"Grupo {i+1}")
 
     else:
         if coluna_y:
             contagem = dados.groupby(coluna_x)[coluna_y].sum()
-            ylabel = titulo_y if titulo_y.strip() != "" else "Soma de Y"
         else:
             contagem = dados[coluna_x].value_counts()
-            ylabel = titulo_y if titulo_y.strip() != "" else "Frequência"
 
-        plt.figure(figsize=(10, 6))
-        contagem.plot(kind="bar", color=cor, edgecolor="black")
-        plt.xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
-        plt.ylabel(ylabel, fontsize=int(tamanho_fonte))
-        plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Barras de {coluna_x}", fontsize=int(tamanho_fonte))
-        plt.xticks(rotation=int(inclinacao_x))
-        plt.yticks(rotation=int(inclinacao_y))
-        plt.tight_layout()
+        if contagem.empty:
+            return None
 
-        buf = BytesIO()
-        plt.savefig(buf, format="png")
-        plt.close()
-        buf.seek(0)
-        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
-        return imagem_base64
+        fig, ax = plt.subplots(figsize=(10, 6))
+        titulo = titulo_grafico if titulo_grafico.strip() != "" else f"Barras de {coluna_x}"
+        plotar(ax, contagem, titulo)
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close(fig)
+
+    return imagem_base64
+
 
 
 def gerar_boxplot(df, lista_y, subgrupo=None):
@@ -915,8 +914,7 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de dispersão: {str(e)}", None, None
 
-
-def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -931,22 +929,23 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
         return None
 
     plt.figure(figsize=(10, 6))
-    sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor, s=espessura*20)
+    sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
 
-    plt.xlabel(titulo_x if titulo_x else coluna_x, fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y else coluna_y, fontsize=int(tamanho_fonte))
-    plt.title(titulo_grafico if titulo_grafico else f"Dispersão de {coluna_y} por {coluna_x}", fontsize=int(tamanho_fonte))
-    plt.xticks(rotation=int(inclinacao_x))
-    plt.yticks(rotation=int(inclinacao_y))
+    plt.xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+    plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Dispersão de {coluna_y} por {coluna_x}", fontsize=int(tamanho_fonte))
+    plt.xticks(rotation=int(inclinacao_x), fontsize=int(tamanho_fonte))
+    plt.yticks(fontsize=int(tamanho_fonte))
     plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
-    plt.close()
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close()
 
     return imagem_base64
+
 
   
 def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
@@ -1019,8 +1018,7 @@ def gerar_tendencia(df, coluna_y, Data=None, subgrupo=None):
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de tendência: {str(e)}", None, None
 
-
-def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -1041,28 +1039,31 @@ def personalizar_tendencia(df, coluna_y, Data=None, cor="#000000", titulo_x="", 
     if Data:
         df = df.dropna(subset=[Data])
         eixo_x = df[Data]
-        x_label = titulo_x if titulo_x else Data
+        x_label = titulo_x if titulo_x.strip() != "" else Data
     else:
         df["sequencia"] = df.index + 1
         eixo_x = df["sequencia"]
-        x_label = titulo_x if titulo_x else "Tempo / Sequência"
+        x_label = titulo_x if titulo_x.strip() != "" else "Tempo / Sequência"
 
-    sns.lineplot(x=eixo_x, y=coluna_y, data=df, color=cor, marker="o", linewidth=espessura)
+    sns.lineplot(x=eixo_x, y=coluna_y, data=df, color=cor, marker="o")
 
     plt.xlabel(x_label, fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y else coluna_y, fontsize=int(tamanho_fonte))
-    plt.title(titulo_grafico if titulo_grafico else f"Tendência temporal de {coluna_y}", fontsize=int(tamanho_fonte))
-    plt.xticks(rotation=int(inclinacao_x))
-    plt.yticks(rotation=int(inclinacao_y))
+    plt.ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+    plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Tendência temporal de {coluna_y}", fontsize=int(tamanho_fonte))
+    plt.xticks(rotation=int(inclinacao_x), fontsize=int(tamanho_fonte))
+    plt.yticks(fontsize=int(tamanho_fonte))
     plt.tight_layout()
 
     buf = BytesIO()
     plt.savefig(buf, format="png")
-    plt.close()
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    plt.close()
 
     return imagem_base64
+
+
+
 def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
     import matplotlib.pyplot as plt
     import base64
@@ -1120,7 +1121,7 @@ def gerar_bolhas_3d(df, coluna_y, coluna_x, coluna_z):
         return f"❌ Erro ao gerar o gráfico de bolhas 3D: {str(e)}", None, None
 
 
-def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, espessura=2):
+def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
@@ -1146,15 +1147,14 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
         s=dados[coluna_z] * 30,
         alpha=0.5,
         color=cor,
-        edgecolors="w",
-        linewidth=espessura
+        edgecolors="w"
     )
 
-    plt.xlabel(titulo_x if titulo_x else coluna_x, fontsize=int(tamanho_fonte))
-    plt.ylabel(titulo_y if titulo_y else coluna_y, fontsize=int(tamanho_fonte))
-    plt.title(titulo_grafico if titulo_grafico else f"Gráfico de Bolhas: {coluna_x} vs {coluna_y} (Z = tamanho das bolhas)", fontsize=int(tamanho_fonte))
-    plt.xticks(rotation=int(inclinacao_x))
-    plt.yticks(rotation=int(inclinacao_y))
+    plt.xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+    plt.ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+    plt.title(titulo_grafico if titulo_grafico.strip() != "" else f"Gráfico de Bolhas: {coluna_x} vs {coluna_y} (Z = tamanho das bolhas)", fontsize=int(tamanho_fonte))
+    plt.xticks(rotation=int(inclinacao_x), fontsize=int(tamanho_fonte))
+    plt.yticks(fontsize=int(tamanho_fonte))
     plt.tight_layout()
 
     buf = BytesIO()
@@ -1164,6 +1164,7 @@ def personalizar_bolhas_3d(df, coluna_y, coluna_x, coluna_z, cor="#000000", titu
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return imagem_base64
+
 
 
 import matplotlib.pyplot as plt
@@ -1241,7 +1242,7 @@ def gerar_superficie_3d(df, coluna_y, coluna_x, coluna_z):
         return f"❌ Erro ao gerar superfície 3D: {str(e)}", None, None
 
 
-def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", titulo_x="", titulo_y="", titulo_z="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, inclinacao_y=0, inclinacao_z=0, espessura=2):
+def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
     import numpy as np
@@ -1275,14 +1276,14 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
     fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(111, projection='3d')
 
-    surf = ax.plot_surface(xi, yi, zi, cmap=cor, edgecolor='k', linewidth=espessura*0.1, alpha=0.9, antialiased=True)
+    surf = ax.plot_surface(xi, yi, zi, cmap=cor, edgecolor='k', linewidth=0.2, alpha=0.9, antialiased=True)
 
-    ax.set_xlabel(titulo_x if titulo_x else coluna_x, labelpad=12, fontsize=int(tamanho_fonte))
-    ax.set_ylabel(titulo_y if titulo_y else coluna_y, labelpad=12, fontsize=int(tamanho_fonte))
-    ax.set_zlabel(titulo_z if titulo_z else coluna_z, labelpad=12, fontsize=int(tamanho_fonte))
-    ax.set_title(titulo_grafico if titulo_grafico else "Gráfico de Superfície 3D", pad=20, fontsize=int(tamanho_fonte))
+    ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, labelpad=12, fontsize=int(tamanho_fonte))
+    ax.set_ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, labelpad=12, fontsize=int(tamanho_fonte))
+    ax.set_zlabel(coluna_z, labelpad=12, fontsize=int(tamanho_fonte))
+    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else "Gráfico de Superfície 3D", pad=20, fontsize=int(tamanho_fonte))
 
-    ax.view_init(elev=int(inclinacao_y), azim=int(inclinacao_x))
+    ax.view_init(elev=30, azim=int(inclinacao_x))  # inclinacao_x controla a rotação horizontal
 
     fig.colorbar(surf, shrink=0.5, aspect=10, pad=0.1)
 
@@ -1295,6 +1296,7 @@ def personalizar_superficie_3d(df, coluna_y, coluna_x, coluna_z, cor="viridis", 
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return imagem_base64
+
 
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.linear_model import LinearRegression
@@ -1379,8 +1381,7 @@ def gerar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z):
     except Exception as e:
         return f"❌ Erro ao gerar dispersão 3D com regressão: {str(e)}", None, None
 
-
-def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, cor_pontos="#0000FF", cor_plano="red", titulo_x="", titulo_y="", titulo_z="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=30, inclinacao_y=30, espessura=2):
+def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, cor="red", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=30):
     from sklearn.linear_model import LinearRegression
     import numpy as np
     import matplotlib.pyplot as plt
@@ -1399,19 +1400,20 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
         return None
 
     # Dados
-    X = df[[coluna_x, coluna_y]].dropna().values
-    y = df[coluna_z].dropna().values
-
-    if X.shape[0] == 0 or y.shape[0] == 0:
+    dados = df[[coluna_x, coluna_y, coluna_z]].dropna()
+    if dados.empty:
         return None
+
+    X = dados[[coluna_x, coluna_y]].values
+    y = dados[coluna_z].values
 
     # Regressão
     model = LinearRegression()
     model.fit(X, y)
 
     # Grade para superfície
-    x_range = np.linspace(df[coluna_x].min(), df[coluna_x].max(), 20)
-    y_range = np.linspace(df[coluna_y].min(), df[coluna_y].max(), 20)
+    x_range = np.linspace(dados[coluna_x].min(), dados[coluna_x].max(), 20)
+    y_range = np.linspace(dados[coluna_y].min(), dados[coluna_y].max(), 20)
     x_grid, y_grid = np.meshgrid(x_range, y_range)
     z_pred = model.predict(np.c_[x_grid.ravel(), y_grid.ravel()]).reshape(x_grid.shape)
 
@@ -1420,16 +1422,17 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     ax = fig.add_subplot(111, projection='3d')
 
     # Dispersão real
-    ax.scatter(df[coluna_x], df[coluna_y], df[coluna_z], color=cor_pontos, label='Pontos reais')
+    ax.scatter(dados[coluna_x], dados[coluna_y], dados[coluna_z], color="blue", label='Pontos reais')
 
     # Plano de regressão
-    ax.plot_surface(x_grid, y_grid, z_pred, alpha=0.5, color=cor_plano)
+    ax.plot_surface(x_grid, y_grid, z_pred, alpha=0.5, color=cor)
 
-    ax.set_xlabel(titulo_x if titulo_x else coluna_x, fontsize=int(tamanho_fonte))
-    ax.set_ylabel(titulo_y if titulo_y else coluna_y, fontsize=int(tamanho_fonte))
-    ax.set_zlabel(titulo_z if titulo_z else coluna_z, fontsize=int(tamanho_fonte))
-    ax.set_title(titulo_grafico if titulo_grafico else f'Dispersão 3D com Regressão - {coluna_z} ~ {coluna_x} + {coluna_y}', fontsize=int(tamanho_fonte))
-    ax.view_init(elev=int(inclinacao_y), azim=int(inclinacao_x))
+    ax.set_xlabel(titulo_x if titulo_x.strip() != "" else coluna_x, fontsize=int(tamanho_fonte))
+    ax.set_ylabel(titulo_y if titulo_y.strip() != "" else coluna_y, fontsize=int(tamanho_fonte))
+    ax.set_zlabel(coluna_z, fontsize=int(tamanho_fonte))
+    ax.set_title(titulo_grafico if titulo_grafico.strip() != "" else f"Dispersão 3D com Regressão", fontsize=int(tamanho_fonte))
+    ax.view_init(elev=30, azim=int(inclinacao_x))
+
     plt.tight_layout()
 
     # Exporta imagem
@@ -1440,6 +1443,7 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return imagem_base64
+
 
 
 GRAFICOS = {
