@@ -234,7 +234,12 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
             acumulado = contagem.cumsum() / contagem.sum() * 100
             bars = contagem.plot(kind="bar", ax=ax)
-            real_color = bars.patches[0].get_facecolor() if bars.patches else None
+
+            # ✅ Captura a cor real do primeiro bar ou define None
+            if bars.patches and len(bars.patches) > 0:
+                real_color = bars.patches[0].get_facecolor()
+            else:
+                real_color = None
 
             ax.set_ylabel("Frequência")
             ax.set_title(titulo)
@@ -262,9 +267,12 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
             fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
 
+            cor_usada = None
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
-                cor_usada = plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
+                cor_temp = plotar(dados_sub, f"Pareto - {coluna_x} ({sub})", ax)
+                if not cor_usada and cor_temp:
+                    cor_usada = cor_temp
 
             info_grafico["cor"] = cor_usada
 
@@ -289,6 +297,7 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
     except Exception as e:
         return f"❌ Erro ao gerar o gráfico de Pareto: {str(e)}", None, None
+
 
 
 
