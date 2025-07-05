@@ -180,16 +180,18 @@ def analise_correlacao_person(df, coluna_y, lista_x):
     return resumo, None
 
 
-
 def analise_matrix_correlacao(df, coluna_y, lista_x):
     colunas = ([coluna_y] if coluna_y else []) + (lista_x or [])
-    
+
     if len(colunas) < 2:
         return "❌ É necessário ao menos duas colunas para gerar a matriz de correlação.", None
 
     for col in colunas:
         if col not in df.columns:
             return f"❌ A coluna '{col}' não foi encontrada no arquivo.", None
+        # Verifica se coluna é numérica
+        if not pd.api.types.is_numeric_dtype(df[col]):
+            return f"❌ A coluna '{col}' contém dados não numéricos e não pode ser usada na matriz de correlação.", None
 
     dados = df[colunas].dropna()
     if dados.empty:
@@ -198,6 +200,9 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
     matriz_cor = dados.corr(method='pearson')
 
     linhas_resumo = []
+    relevantes = []
+    nao_relevantes = []
+
     for i in range(len(colunas)):
         for j in range(i + 1, len(colunas)):
             col1 = colunas[i]
@@ -206,14 +211,37 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
 
             if abs(r) < 0.3:
                 forca = "fraca"
+                nao_relevantes.append(f"{col1} x {col2}")
             elif abs(r) < 0.7:
                 forca = "moderada"
+                relevantes.append(f"{col1} x {col2}")
             else:
                 forca = "forte"
+                relevantes.append(f"{col1} x {col2}")
 
-            linhas_resumo.append(f"- {col1} vs {col2}: correlação {forca} (r = {r:.2f})")
+            sentido = "positiva" if r >= 0 else "negativa"
 
-    resumo = "📊 **Matriz de Correlação (Pearson)**\n" + "\n".join(linhas_resumo)
+            linhas_resumo.append(
+                f"{col1} x {col2}\n"
+                f"Coeficiente de Pearson = {r:.2f} → Correlação {forca}, {sentido}."
+            )
+
+    # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
+    conclusao = "🔎 **Conclusão:**\n"
+    if relevantes:
+        conclusao += f"- Correlações relevantes: {', '.join(relevantes)}\n"
+    else:
+        conclusao += "- Não há correlações relevantes.\n"
+    if nao_relevantes:
+        conclusao += f"- Correlações não relevantes: {', '.join(nao_relevantes)}"
+
+    resumo = (
+        f"📊 **Matriz de Correlação de Pearson**\n"
+        f"Variáveis analisadas:\n\n"
+        + "\n\n".join(linhas_resumo)
+        + "\n\n"
+        + conclusao
+    )
 
     aplicar_estilo_minitab()
     sns.pairplot(dados, kind='reg', plot_kws={'line_kws': {'color': 'red'}, 'scatter_kws': {'s': 20}})
@@ -226,6 +254,7 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
     img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
 
     return resumo, img_base64
+
 
 
 def analise_estabilidade(df, coluna_y):
