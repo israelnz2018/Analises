@@ -65,14 +65,12 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     fig, ax = plt.subplots(figsize=(8, 4))
 
     # Boxplot cinza neutro
-    ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightgrey', color='black'), medianprops=dict(color='black'))
+    bplot = ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightgrey', color='black'), medianprops=dict(color='black'))
 
     # 🔴 Linha da média no próprio boxplot (vermelha pontilhada) desde topo do boxplot até IC
-    boxplot_dict = ax.boxplot(dados, vert=False, patch_artist=True)
-    box_ymax = 1  # posição y do boxplot
-
-    ax.vlines(media, box_ymax - 0.25, 0.85, color='red', linestyle='--', lw=2)
-    ax.text(media, box_ymax + 0.05, 'x̄', ha='center', fontsize=10, color='red')
+    box_y = 1  # posição y do boxplot
+    ax.vlines(media, box_y, 0.85, color='red', linestyle='--', lw=2)
+    ax.text(media, box_y + 0.05, 'x̄', ha='center', fontsize=10, color='red')
 
     # 🔵 Desenha IC abaixo do boxplot com barras verticais nas extremidades
     ax.hlines(0.85, ic_low, ic_up, colors='blue', lw=2)
@@ -97,7 +95,9 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     plt.savefig(buf, format="png")
     plt.close(fig)
     buf.seek(0)
-    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+    return resultado, imagem_base64
+
+
 
 
 
