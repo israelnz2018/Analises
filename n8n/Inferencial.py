@@ -68,20 +68,22 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     # Boxplot cinza neutro
     ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightgrey', color='black'), medianprops=dict(color='black'))
 
-    # Marca média (x̄) abaixo do boxplot
-    ax.plot(media, 0.85, 'kx', markersize=10)
-    ax.text(media, 0.80, 'x̄', ha='center', fontsize=10)
+    # 🔴 Linha da média no próprio boxplot (vermelha)
+    ax.axvline(media, color='red', linestyle='--', lw=2)
+    ax.text(media, 1.05, 'x̄', ha='center', fontsize=10, color='red')
 
-    # Desenha IC abaixo do boxplot
-    ax.hlines(0.75, ic_low, ic_up, colors='blue', lw=2)
-    ax.text(media, 0.70, f"IC {confidence:.0f}%", ha='center', fontsize=9, color='blue')
+    # 🔵 Desenha IC abaixo do boxplot com barras verticais nas extremidades
+    ax.hlines(0.85, ic_low, ic_up, colors='blue', lw=2)
+    ax.vlines(ic_low, 0.82, 0.88, colors='blue', lw=2)
+    ax.vlines(ic_up, 0.82, 0.88, colors='blue', lw=2)
+    ax.text(media, 0.80, f"IC {confidence:.0f}%", ha='center', fontsize=9, color='blue')
 
-    # Marca H0 como bolinha vermelha abaixo do IC
-    ax.plot(ref, 0.65, 'ro')
-    ax.text(ref, 0.60, 'H0', ha='center', fontsize=9, color='red')
+    # 🔴 Marca H0 como bolinha vermelha sobre a linha azul
+    ax.plot(ref, 0.85, 'ro')
+    ax.text(ref, 0.80, 'H0', ha='center', fontsize=9, color='red')
 
     # Ajusta limites y para mostrar tudo
-    ax.set_ylim(0.5, 1.5)
+    ax.set_ylim(0.7, 1.2)
 
     # Ajusta título no padrão Minitab
     ax.set_title(f"Boxplot de {coluna_y}\n(com H0 e intervalo de confiança de {confidence:.0f}% para a média)", fontsize=11)
@@ -96,6 +98,7 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return resultado, [imagem_base64]
+
 
 
 
