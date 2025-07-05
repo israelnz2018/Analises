@@ -353,7 +353,7 @@ def analise_estabilidade(df, coluna_y):
     def check_crit8_mr(y_mr): return False
     def check_crit9_mr(y_mr): return False
 
-    # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
+    # 🔷 BLOCO DE RELATÓRIO
     texto_resumo = f"📊 **Análise de Estabilidade – Carta I-MR ({nome_coluna_y})**\n"
     texto_resumo += "🔎 **Critérios avaliados:**\n"
 
@@ -379,11 +379,31 @@ def analise_estabilidade(df, coluna_y):
         9: "12 pontos alternando"
     }
 
+    funcoes_I = {
+        2: check_crit2,
+        3: check_crit3,
+        4: check_crit4,
+        5: check_crit5,
+        6: check_crit6,
+        7: check_crit7,
+        8: check_crit8,
+        9: check_crit9
+    }
+
+    funcoes_MR = {
+        2: check_crit2_mr,
+        3: check_crit3_mr,
+        4: check_crit4_mr,
+        5: check_crit5_mr,
+        6: check_crit6_mr,
+        7: check_crit7_mr,
+        8: check_crit8_mr,
+        9: check_crit9_mr
+    }
+
     for i in range(2, 10):
-        func_i = globals()[f'check_crit{i}']
-        func_mr = globals()[f'check_crit{i}_mr']
-        flag_I = func_i(y)
-        flag_MR = func_mr(y_mr)
+        flag_I = funcoes_I[i](y)
+        flag_MR = funcoes_MR[i](y_mr)
         if flag_I and flag_MR:
             texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ❌ Detectado (Carta I e MR)\n"
         elif flag_I:
@@ -394,7 +414,7 @@ def analise_estabilidade(df, coluna_y):
             texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ✅ OK\n"
 
     # Conclusão
-    if any([crit1_flag_I, crit1_flag_MR] + [globals()[f'check_crit{i}'](y) or globals()[f'check_crit{i}_mr'](y_mr) for i in range(2,10)]):
+    if any([crit1_flag_I, crit1_flag_MR] + [funcoes_I[i](y) or funcoes_MR[i](y_mr) for i in range(2,10)]):
         texto_resumo += "🔎 **Conclusão:** Causa especial detectada. Investigue o processo para entender e remover a causa especial identificada.\n"
     else:
         texto_resumo += "🔎 **Conclusão:** Processo está estável. Nenhuma causa especial detectada.\n"
@@ -406,9 +426,6 @@ def analise_estabilidade(df, coluna_y):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
-
-
-
 
 
 
