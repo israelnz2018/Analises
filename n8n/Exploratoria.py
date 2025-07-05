@@ -259,10 +259,10 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
 
 def analise_estabilidade(df, coluna_y):
     import matplotlib.pyplot as plt
-    import seaborn as sns
     import numpy as np
     from io import BytesIO
     import base64
+    import pandas as pd
 
     aplicar_estilo_minitab()
 
@@ -270,7 +270,6 @@ def analise_estabilidade(df, coluna_y):
     if not nome_coluna_y or nome_coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    # Verifica se a coluna é numérica
     if not pd.api.types.is_numeric_dtype(df[nome_coluna_y]):
         return f"❌ A coluna '{nome_coluna_y}' contém dados não numéricos e não pode ser usada na análise de estabilidade.", None
 
@@ -290,109 +289,51 @@ def analise_estabilidade(df, coluna_y):
     mr_mean = mr[1:].mean()
     UCL_MR = mr_mean * 3.267
 
-    # Gráficos – aparência Minitab clean
+    # Gráfico estilo Minitab
     fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
-    axs[0].plot(dados["Subgrupo"], dados[nome_coluna_y], marker="o", linestyle="-", color="black")
-    axs[0].axhline(media, color="green", linestyle="-", label=f"X̄ = {media:.3f}")
-    axs[0].axhline(UCL_I, color="red", linestyle="-", label=f"UCL = {UCL_I:.3f}")
-    axs[0].axhline(LCL_I, color="red", linestyle="-", label=f"LCL = {LCL_I:.3f}")
-    axs[0].set_title(f"I Chart of {nome_coluna_y}", fontsize=12)
-    axs[0].set_ylabel("Individual Value")
-    axs[0].legend(loc="upper right", fontsize=8)
+    # Carta Individual (I)
+    y = dados[nome_coluna_y].values
+    x = dados["Subgrupo"].values
+    pontos_i = axs[0].scatter(x, y, color="black")
+    axs[0].plot(x, y, color="black", linestyle="-")
+    axs[0].axhline(media, color="green", linestyle="-")
+    axs[0].axhline(UCL_I, color="red", linestyle="-")
+    axs[0].axhline(LCL_I, color="red", linestyle="-")
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=12)
+    axs[0].set_ylabel("Valor Individual")
 
-    axs[1].plot(dados["Subgrupo"][1:], mr[1:], marker="o", linestyle="-", color="black")
-    axs[1].axhline(mr_mean, color="green", linestyle="-", label=f"MR̄ = {mr_mean:.3f}")
-    axs[1].axhline(UCL_MR, color="red", linestyle="-", label=f"UCL = {UCL_MR:.3f}")
-    axs[1].set_title("MR Chart", fontsize=12)
-    axs[1].set_ylabel("Moving Range")
-    axs[1].legend(loc="upper right", fontsize=8)
+    # Labels no lado direito
+    axs[0].text(len(x)+1, media, f"X̄={media:.3f}", va='center', fontsize=8)
+    axs[0].text(len(x)+1, UCL_I, f"LSC={UCL_I:.3f}", va='center', fontsize=8, color="red")
+    axs[0].text(len(x)+1, LCL_I, f"LIC={LCL_I:.3f}", va='center', fontsize=8, color="red")
+
+    # Destacar pontos fora dos limites
+    for xi, yi in zip(x, y):
+        if yi > UCL_I or yi < LCL_I:
+            axs[0].scatter(xi, yi, color="red")
+
+    # Carta MR
+    x_mr = dados["Subgrupo"].values[1:]
+    y_mr = mr[1:].values
+    axs[1].plot(x_mr, y_mr, color="black", linestyle="-")
+    axs[1].scatter(x_mr, y_mr, color="black")
+    axs[1].axhline(mr_mean, color="green", linestyle="-")
+    axs[1].axhline(UCL_MR, color="red", linestyle="-")
+    axs[1].set_title("Carta MR", fontsize=12)
+    axs[1].set_ylabel("Amplitude Móvel")
+
+    # Labels no lado direito
+    axs[1].text(len(x)+1, mr_mean, f"MR̄={mr_mean:.3f}", va='center', fontsize=8)
+    axs[1].text(len(x)+1, UCL_MR, f"LSC={UCL_MR:.3f}", va='center', fontsize=8, color="red")
+    axs[1].text(len(x)+1, 0, f"LIC=0.000", va='center', fontsize=8, color="red")
+
+    # Destacar pontos fora dos limites MR
+    for xi, yi in zip(x_mr, y_mr):
+        if yi > UCL_MR:
+            axs[1].scatter(xi, yi, color="red")
 
     plt.tight_layout()
-
-    # Critérios
-    y = dados[nome_coluna_y].values
-
-    def check_crit1():
-        return np.any((y > UCL_I) | (y < LCL_I))
-
-    def check_crit2():
-        seq = (y > media).astype(int)
-        return any(sum(seq[i:i+9]) == 9 or sum(1 - seq[i:i+9]) == 9 for i in range(len(seq)-8))
-
-    def check_crit3():
-        diff = np.sign(np.diff(y))
-        count = 1
-        for i in range(1, len(diff)):
-            if diff[i] == diff[i-1] and diff[i] != 0:
-                count += 1
-                if count >= 6:
-                    return True
-            else:
-                count = 1
-        return False
-
-    def check_crit4():
-        diff = np.sign(np.diff(y))
-        return np.all(diff[:14] != 0) and np.all(diff[:14][::2] * diff[1:15:2] == -1) if len(y) >= 15 else False
-
-    def check_crit5():
-        z = (y - media) / sigma
-        for i in range(len(z)-2):
-            s = z[i:i+3]
-            if (np.sum(np.abs(s) > 2) >= 2) and (np.all(s > 0) or np.all(s < 0)):
-                return True
-        return False
-
-    def check_crit6():
-        z = (y - media) / sigma
-        for i in range(len(z)-4):
-            s = z[i:i+5]
-            if (np.sum(np.abs(s) > 1) >= 4) and (np.all(s > 0) or np.all(s < 0)):
-                return True
-        return False
-
-    def check_crit7():
-        z = (y - media) / sigma
-        for i in range(len(z)-14):
-            if np.all(np.abs(z[i:i+15]) < 1):
-                return True
-        return False
-
-    def check_crit8():
-        z = (y - media) / sigma
-        for i in range(len(z)-7):
-            if np.all(np.abs(z[i:i+8]) > 1):
-                return True
-        return False
-
-    def check_crit9():
-        diff = np.sign(np.diff(y))
-        alt = 1
-        for i in range(1, len(diff)):
-            if diff[i] == -diff[i-1] and diff[i] != 0:
-                alt += 1
-                if alt >= 12:
-                    return True
-            else:
-                alt = 1
-        return False
-
-    # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
-    texto_resumo = f"📊 **Análise de Estabilidade – Carta I-MR ({nome_coluna_y})**\n"
-    texto_resumo += "🔎 **Critérios avaliados:**\n"
-
-    texto_resumo += f"1. Critério 1 – Pontos fora dos limites: {'❌ Ponto fora detectado.' if check_crit1() else '✅ Nenhum ponto fora dos limites.'}\n"
-    texto_resumo += f"2. Critério 2 – 9 pontos do mesmo lado da média: {'❌ Sequência detectada.' if check_crit2() else '✅ OK.'}\n"
-    texto_resumo += f"3. Critério 3 – 6 pontos subindo ou descendo: {'❌ Tendência detectada.' if check_crit3() else '✅ OK.'}\n"
-    texto_resumo += f"4. Critério 4 – 14 pontos alternando: {'❌ Alternância detectada.' if check_crit4() else '✅ OK.'}\n"
-    texto_resumo += f"5. Critério 5 – 2 de 3 pontos além de 2σ no mesmo lado: {'❌ Padrão detectado.' if check_crit5() else '✅ OK.'}\n"
-    texto_resumo += f"6. Critério 6 – 4 de 5 pontos além de 1σ no mesmo lado: {'❌ Padrão detectado.' if check_crit6() else '✅ OK.'}\n"
-    texto_resumo += f"7. Critério 7 – 15 pontos dentro de 1σ: {'❌ Padrão detectado.' if check_crit7() else '✅ OK.'}\n"
-    texto_resumo += f"8. Critério 8 – 8 pontos fora de 1σ: {'❌ Padrão detectado.' if check_crit8() else '✅ OK.'}\n"
-    texto_resumo += f"9. Critério 9 – 12 pontos alternando: {'❌ Padrão detectado.' if check_crit9() else '✅ OK.'}\n"
-
-    texto_resumo += "🔎 **Conclusão:** Análise concluída.\n"
 
     buffer = BytesIO()
     plt.savefig(buffer, format="png")
@@ -400,7 +341,11 @@ def analise_estabilidade(df, coluna_y):
     buffer.seek(0)
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
+    # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
+    texto_resumo = f"📊 **Carta I-MR ({nome_coluna_y}) gerada com sucesso.**"
+
     return texto_resumo, img_base64
+
 
 
 
