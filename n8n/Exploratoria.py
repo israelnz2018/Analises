@@ -164,9 +164,9 @@ def analise_correlacao_person(df, coluna_y, lista_x):
         )
 
     if conclusoes:
-        conclusao_final = f"Conclusão: Apenas as variáveis {', '.join(conclusoes)} são estatisticamente correlacionadas com {coluna_y}."
+        conclusao_final = f"🔎 **Conclusão**: Apenas as variáveis {', '.join(conclusoes)} são estatisticamente correlacionadas com {coluna_y}."
     else:
-        conclusao_final = f"Conclusão: Nenhuma das variáveis apresenta correlação estatisticamente significativa com {coluna_y}."
+        conclusao_final = f"🔎 **Conclusão**: Nenhuma das variáveis apresenta correlação estatisticamente significativa com {coluna_y}."
 
     # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
     resumo = (
