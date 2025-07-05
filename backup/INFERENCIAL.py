@@ -1,1 +1,1536 @@
+from suporte import *
 
+def analise_1_sample_t(df, coluna_y, field, field_conf=None):
+    if not coluna_y:
+        return "⚠ É obrigatório informar a coluna Y.", []
+
+    if coluna_y not in df.columns:
+        return f"⚠ Coluna {coluna_y} não encontrada no arquivo.", []
+
+    dados = df[coluna_y].dropna().astype(float)
+    if dados.empty:
+        return "⚠ Não há dados válidos na coluna Y.", []
+
+    try:
+        ref = float(field)
+    except (ValueError, TypeError):
+        return "⚠ O valor de referência informado não é numérico.", []
+
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (ValueError, TypeError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    n = len(dados)
+    media = dados.mean()
+    desvio = dados.std(ddof=1)
+    erro_media = desvio / (n ** 0.5)
+    ic_low, ic_up = stats.t.interval(1 - alpha, n - 1, loc=media, scale=erro_media)
+
+    t_stat, p_value = stats.ttest_1samp(dados, ref)
+
+    resultado = (
+        f"**Estatísticas Descritivas**\n"
+        f"N: {n}\n"
+        f"Média: {media:.2f}\n"
+        f"Desvio Padrão: {desvio:.2f}\n"
+        f"Erro Padrão da Média: {erro_media:.2f}\n"
+        f"IC {confidence:.1f}% para μ: ({ic_low:.2f}, {ic_up:.2f})\n\n"
+        f"**Teste t para uma amostra (1 Sample T)**\n"
+        f"H₀: μ = {ref}\n"
+        f"H₁: μ ≠ {ref}\n"
+        f"T-Valor: {t_stat:.2f}\n"
+        f"P-Valor: {p_value:.3f}\n"
+    )
+
+    if p_value < alpha:
+        resultado += "➡ Resultado: Rejeita H0 (diferença significativa)."
+    else:
+        resultado += "➡ Resultado: Não rejeita H0 (sem diferença significativa)."
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+
+    ax.plot(media, 1, 'kx', markersize=12, label="Média")
+    ax.hlines(1, ic_low, ic_up, colors='blue', lw=3, label=f"IC {confidence:.1f}%")
+    ax.plot(ref, 1, 'ro', label="H0")
+    ax.text(ref, 1.05, 'H0', color='red')
+
+    ax.set_title(f"Boxplot de {coluna_y}\n(com H0 e intervalo de confiança de {confidence:.1f}% para a média)")
+    ax.set_xlabel(coluna_y)
+    ax.legend()
+
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close(fig)
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    return resultado, [imagem_base64]
+
+
+
+
+
+
+from suporte import *
+
+def analise_2_sample_t(df, lista_y, field_conf=None):
+    if len(lista_y) != 2:
+        return "❌ É necessário selecionar exatamente duas colunas Y numéricas para o Teste 2 Sample T.", None
+
+    col1, col2 = lista_y
+    serie1 = pd.to_numeric(df[col1], errors="coerce").dropna()
+    serie2 = pd.to_numeric(df[col2], errors="coerce").dropna()
+
+    if len(serie1) < 2 or len(serie2) < 2:
+        return "❌ As colunas selecionadas não possuem dados suficientes para o teste.", None
+
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (ValueError, TypeError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    ad1 = anderson(serie1)
+    ad2 = anderson(serie2)
+    lim1 = ad1.critical_values[2]
+    lim2 = ad2.critical_values[2]
+    normal1 = ad1.statistic < lim1
+    normal2 = ad2.statistic < lim2
+
+    stat_f = np.var(serie1, ddof=1) / np.var(serie2, ddof=1)
+    df1, df2 = len(serie1)-1, len(serie2)-1
+    p_f = 2 * min(stats.f.cdf(stat_f, df1, df2), 1 - stats.f.cdf(stat_f, df1, df2))
+    equal_var = p_f > alpha
+
+    t_stat, p_valor = stats.ttest_ind(serie1, serie2, equal_var=equal_var)
+
+    texto = f"""📊 **Teste T para 2 Amostras Independentes**
+
+🔹 Nível de confiança: {confidence:.1f}%  
+🔹 Coluna 1: {col1}  
+🔹 Coluna 2: {col2}  
+
+🔹 Teste de normalidade (Anderson-Darling, 5%):  
+- {col1}: {"✅ Normal" if normal1 else "❌ Não normal"} (estatística = {ad1.statistic:.4f}, limite crítico = {lim1:.4f})  
+- {col2}: {"✅ Normal" if normal2 else "❌ Não normal"} (estatística = {ad2.statistic:.4f}, limite crítico = {lim2:.4f})  
+
+🔹 Teste F para igualdade de variâncias:  
+- Estatística F = {stat_f:.4f}, p = {p_f:.4f} → {"✅ Variâncias iguais" if equal_var else "❌ Variâncias diferentes"}
+
+🔹 Resultado do Teste T:  
+- Estatística t = {t_stat:.4f}, p = {p_valor:.4f}  
+- {"✅ Não há diferença significativa" if p_valor > alpha else "❌ Diferença estatisticamente significativa entre as médias"}"""
+
+    try:
+        aplicar_estilo_minitab()
+        fig, ax = plt.subplots(figsize=(6, 6))
+
+        dados_plot = pd.DataFrame({
+            'Valor': pd.concat([serie1, serie2]),
+            'Grupo': [col1] * len(serie1) + [col2] * len(serie2)
+        })
+
+        sns.boxplot(x="Grupo", y="Valor", data=dados_plot, ax=ax, width=0.6, palette="pastel")
+        medias = dados_plot.groupby("Grupo")["Valor"].mean()
+        ax.plot(range(len(medias)), medias.values, marker="D", linestyle="None", color="black", markersize=6, label="Média")
+
+        ax.set_title(f"Boxplot Comparativo 2 Sample T")
+        ax.set_ylabel("Valores")
+        ax.legend()
+
+        plt.tight_layout()
+
+        buffer = BytesIO()
+        plt.savefig(buffer, format="png")
+        plt.close(fig)
+        buffer.seek(0)
+        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+    except Exception as e:
+        texto += f"\n❌ Erro ao gerar o gráfico: {str(e)}"
+        imagem_base64 = None
+
+    return texto, imagem_base64
+
+
+
+
+from suporte import *
+
+def analise_paired_t(df: pd.DataFrame, lista_y: list, field_conf=None):
+    if len(lista_y) != 2:
+        return "❌ O teste t pareado requer exatamente 2 colunas Y.", None
+
+    col1, col2 = lista_y
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
+
+    # Garantir tamanhos iguais para o pareamento
+    min_len = min(len(dados1), len(dados2))
+    dados1 = dados1.iloc[:min_len]
+    dados2 = dados2.iloc[:min_len]
+
+    diferencas = dados1 - dados2
+
+    # Nível de confiança
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (ValueError, TypeError):
+        confidence = 95.0
+    alpha = 1 - (confidence / 100)
+
+    # Teste de normalidade (Anderson-Darling)
+    normalidade = stats.anderson(diferencas)
+    ad_stat = normalidade.statistic
+    ad_crit = normalidade.critical_values
+    ad_sig = normalidade.significance_level
+    ad_aprovado = ad_stat < ad_crit[list(ad_sig).index(5)] if 5 in ad_sig else False
+
+    # Teste t pareado
+    t_stat, p_valor = stats.ttest_rel(dados1, dados2, nan_policy='omit')
+    media_diff = np.mean(diferencas)
+    desvio_diff = np.std(diferencas, ddof=1)
+    n = len(diferencas)
+    se_diff = desvio_diff / np.sqrt(n)
+    intervalo = stats.t.interval(1 - alpha, n-1, loc=media_diff, scale=se_diff)
+
+    # Conclusão
+    conclusao = "✅ As diferenças seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ As diferenças podem não ser normais (Anderson-Darling)."
+    if p_valor < alpha:
+        conclusao += f" ✅ Rejeitamos H0 (p = {p_valor:.4f}). Existe diferença significativa entre as médias."
+    else:
+        conclusao += f" ⚠ Não rejeitamos H0 (p = {p_valor:.4f}). Não há diferença significativa entre as médias."
+
+    # Gráfico
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.hist(diferencas, bins=8, color='skyblue', edgecolor='black')
+    ax.set_title(f"Histograma das Diferenças\n(com H0 e intervalo t {confidence:.1f}% para a média)")
+    ax.set_xlabel("Diferenças")
+    ax.set_ylabel("Frequência")
+
+    # Adiciona H0 (linha no 0)
+    ax.axvline(0, color='red', linestyle='--', label='H0')
+
+    # Adiciona intervalo de confiança
+    ax.hlines(-0.5, intervalo[0], intervalo[1], color='blue', lw=4, label=f"IC {confidence:.1f}%")
+    ax.text(media_diff, -1, "X̄", color='blue', ha='center')
+
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Texto da análise
+    texto = f"""
+**Teste t Pareado**
+- Média das diferenças: {media_diff:.4f}
+- Desvio padrão das diferenças: {desvio_diff:.4f}
+- N: {n}
+- Intervalo {confidence:.1f}%: [{intervalo[0]:.4f}, {intervalo[1]:.4f}]
+- Estatística t: {t_stat:.4f}
+- p-valor: {p_valor:.4f}
+- Anderson-Darling: estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_aprovado else 'Reprovada'}
+
+**Conclusão**
+{conclusao}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+
+def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
+    ys = [c for c in lista_y if c not in ["", "Subgrupo"]]
+    x = subgrupo if subgrupo and subgrupo in df.columns else None
+
+    if len(ys) == 0:
+        return "❌ O One way ANOVA requer pelo menos 1 coluna Y.", None
+
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (TypeError, ValueError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    if x:
+        y_col = ys[0]
+        df_valid = df[[y_col, x]].dropna()
+        if df_valid[x].nunique() < 2:
+            return "❌ O One way ANOVA requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
+        grupos = [grupo[1].values for grupo in df_valid.groupby(x)[y_col]]
+    else:
+        grupos = []
+        for y_col in ys:
+            grupo = df[y_col].dropna().values
+            if len(grupo) > 0:
+                grupos.append(grupo)
+        if len(grupos) < 2:
+            return "❌ O One way ANOVA requer pelo menos 2 colunas Y com dados.", None
+
+    f_stat, p_valor = stats.f_oneway(*grupos)
+
+    concatenado = np.concatenate(grupos)
+    residuos = concatenado - np.mean(concatenado)
+    normalidade = stats.anderson(residuos)
+    ad_stat = normalidade.statistic
+    ad_crit = normalidade.critical_values
+    ad_sig = list(normalidade.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_aprovado = ad_stat < ad_crit[idx]
+    else:
+        ad_aprovado = False
+
+    conclusao = "✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ Resíduos podem não ser normais (Anderson-Darling)."
+    if p_valor < alpha:
+        conclusao += f" ✅ Rejeitamos H0 (p = {p_valor:.4f}). Existem diferenças significativas entre as médias dos grupos."
+    else:
+        conclusao += f" ⚠ Não rejeitamos H0 (p = {p_valor:.4f}). Não há diferenças significativas entre as médias dos grupos."
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    if x:
+        df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
+        medias = df_valid.groupby(x)[y_col].mean()
+        ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+    else:
+        ax.boxplot(grupos, labels=ys)
+        medias = [np.mean(g) for g in grupos]
+        ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
+
+    ax.set_title(f"One Way ANOVA - Boxplot por Grupo (IC {confidence:.1f}%)")
+    ax.set_xlabel("Grupo")
+    ax.set_ylabel("Valor")
+    plt.suptitle("")
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**One Way ANOVA**
+- Estatística F: {f_stat:.4f}
+- p-valor: {p_valor:.4f}
+- Nível de confiança: {confidence:.1f}%
+- Anderson-Darling (resíduos): estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_aprovado else 'Reprovada'}
+
+**Conclusão**
+{conclusao}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+
+
+
+
+def analise_1_wilcoxon(df: pd.DataFrame, coluna_y, field, field_conf=None):
+    if not coluna_y:
+        return "❌ O teste 1 Wilcoxon requer exatamente 1 coluna Y.", None
+
+    if coluna_y not in df.columns:
+        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
+
+    y = df[coluna_y].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    # Valor de referência
+    try:
+        valor_ref = float(field) if field is not None else 0
+    except:
+        return "❌ Valor de referência inválido. Informe um número válido no campo Field.", None
+
+    # Nível de confiança
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (ValueError, TypeError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    # Testes de normalidade
+    ad = stats.anderson(y)
+    sw_stat, sw_p = stats.shapiro(y)
+    dp_stat, dp_p = stats.normaltest(y)
+
+    ad_stat = ad.statistic
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad_stat < ad_crit[idx]
+    else:
+        ad_normal = False
+
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    recomendacao = ""
+    if ad_normal or sw_normal or dp_normal:
+        recomendacao = "⚠ Pelo menos um teste indicou normalidade dos dados. Considere realizar o teste 1 Sample T em vez do Wilcoxon."
+
+    # Wilcoxon Signed-Rank Test (comparando com valor_ref)
+    w_stat, p_valor = stats.wilcoxon(y - valor_ref, zero_method='wilcox', correction=False)
+
+    mediana_amostra = np.median(y)
+
+    # Gráfico
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+    ax.axvline(valor_ref, color='red', linestyle='--', label=f'Mediana H0 ({valor_ref})')
+    ax.axvline(mediana_amostra, color='blue', linestyle='-', label=f'Mediana amostra: {mediana_amostra:.2f}')
+    ax.set_title(f"1 Wilcoxon - Boxplot com Mediana H0 (IC {confidence:.1f}%)")
+    ax.set_xlabel(coluna_y)
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**1 Wilcoxon - Teste de Mediana**
+- Mediana amostra: {mediana_amostra:.4f}
+- Valor de referência (H0): {valor_ref}
+- Estatística W: {w_stat:.4f}
+- p-valor: {p_valor:.4f}
+- Nível de confiança: {confidence:.1f}%
+
+**Normalidade dos dados**
+- Anderson-Darling: estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: mediana diferente do valor de referência." if p_valor < alpha else "⚠ Não rejeitamos H0: mediana não difere significativamente do valor de referência."}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
+    if len(lista_y) != 2:
+        return "❌ O teste 2 Mann-Whitney requer exatamente 2 colunas Y.", None
+
+    col1, col2 = lista_y
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
+
+    if len(dados1) < 5 or len(dados2) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
+
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (ValueError, TypeError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    # Teste de normalidade dos dois grupos
+    ad1 = stats.anderson(dados1)
+    ad2 = stats.anderson(dados2)
+    ad1_stat = ad1.statistic
+    ad2_stat = ad2.statistic
+    ad1_crit = ad1.critical_values
+    ad2_crit = ad2.critical_values
+    ad_sig = list(ad1.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad1_normal = ad1_stat < ad1_crit[idx]
+        ad2_normal = ad2_stat < ad2_crit[idx]
+    else:
+        ad1_normal = ad2_normal = False
+
+    sw1_stat, sw1_p = stats.shapiro(dados1)
+    sw2_stat, sw2_p = stats.shapiro(dados2)
+    sw1_normal = sw1_p > 0.05
+    sw2_normal = sw2_p > 0.05
+
+    dp1_stat, dp1_p = stats.normaltest(dados1)
+    dp2_stat, dp2_p = stats.normaltest(dados2)
+    dp1_normal = dp1_p > 0.05
+    dp2_normal = dp2_p > 0.05
+
+    recomendacao = ""
+    if ad1_normal or sw1_normal or dp1_normal or ad2_normal or sw2_normal or dp2_normal:
+        recomendacao = "⚠ Pelo menos um grupo apresentou indícios de normalidade. Considere realizar o teste 2 Sample T."
+
+    u_stat, p_valor = stats.mannwhitneyu(dados1, dados2, alternative='two-sided')
+
+    mediana1 = np.median(dados1)
+    mediana2 = np.median(dados2)
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.boxplot([dados1, dados2], labels=[col1, col2], patch_artist=True,
+               boxprops=dict(facecolor='lightblue'))
+    ax.set_title(f"2 Mann-Whitney - Boxplot por Grupo (IC {confidence:.1f}%)")
+    ax.set_ylabel("Valores")
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**2 Mann-Whitney - Wilcoxon Rank-Sum**
+- Mediana {col1}: {mediana1:.4f}
+- Mediana {col2}: {mediana2:.4f}
+- Estatística U: {u_stat:.4f}
+- p-valor: {p_valor:.4f}
+- Nível de confiança: {confidence:.1f}%
+
+**Normalidade dos dados**
+{col1}:
+- Anderson-Darling: estatística={ad1_stat:.4f}, normalidade={'Aprovada' if ad1_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw1_p:.4f}, normalidade={'Aprovada' if sw1_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp1_p:.4f}, normalidade={'Aprovada' if dp1_normal else 'Reprovada'}
+
+{col2}:
+- Anderson-Darling: estatística={ad2_stat:.4f}, normalidade={'Aprovada' if ad2_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw2_p:.4f}, normalidade={'Aprovada' if sw2_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp2_p:.4f}, normalidade={'Aprovada' if dp2_normal else 'Reprovada'}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as distribuições são diferentes." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre as distribuições."}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
+    if not lista_y or len(lista_y) != 1:
+        return "❌ A análise Kruskal-Wallis requer exatamente 1 coluna Y.", None
+
+    coluna_y = lista_y[0]
+    x = subgrupo if subgrupo and subgrupo in df.columns else None
+
+    if coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no DataFrame.", None
+
+    if x:
+        df_valid = df[[coluna_y, x]].dropna()
+        grupos = [grupo[1].values for grupo in df_valid.groupby(x)[coluna_y]]
+
+        if len(grupos) < 2:
+            return "❌ O Kruskal-Wallis requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
+    else:
+        grupos = [df[coluna_y].dropna().values]
+        if len(grupos[0]) < 2:
+            return "❌ O Kruskal-Wallis requer ao menos uma coluna Y com dados suficientes.", None
+
+    h_stat, p_valor = stats.kruskal(*grupos)
+
+    normal_flag = False
+    if x:
+        for nome, g in df_valid.groupby(x)[coluna_y]:
+            dados = g.dropna()
+            if len(dados) >= 5:
+                ad = stats.anderson(dados)
+                sw_stat, sw_p = stats.shapiro(dados)
+                dp_stat, dp_p = stats.normaltest(dados)
+                ad_crit = ad.critical_values
+                ad_sig = list(ad.significance_level)
+                if 5 in ad_sig:
+                    idx = ad_sig.index(5)
+                    ad_normal = ad.statistic < ad_crit[idx]
+                else:
+                    ad_normal = False
+                sw_normal = sw_p > 0.05
+                dp_normal = dp_p > 0.05
+                if ad_normal or sw_normal or dp_normal:
+                    normal_flag = True
+    else:
+        for g in grupos:
+            if len(g) >= 5:
+                ad = stats.anderson(g)
+                sw_stat, sw_p = stats.shapiro(g)
+                dp_stat, dp_p = stats.normaltest(g)
+                ad_crit = ad.critical_values
+                ad_sig = list(ad.significance_level)
+                if 5 in ad_sig:
+                    idx = ad_sig.index(5)
+                    ad_normal = ad.statistic < ad_crit[idx]
+                else:
+                    ad_normal = False
+                sw_normal = sw_p > 0.05
+                dp_normal = dp_p > 0.05
+                if ad_normal or sw_normal or dp_normal:
+                    normal_flag = True
+
+    recomendacao = ""
+    if normal_flag:
+        recomendacao = "⚠ Pelo menos um grupo apresentou indícios de normalidade. Considere realizar o teste One Way ANOVA."
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    if x:
+        df_valid.boxplot(column=coluna_y, by=x, ax=ax, grid=False)
+        medias = df_valid.groupby(x)[coluna_y].mean()
+        ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+    else:
+        ax.boxplot(grupos, labels=[coluna_y])
+        medias = [np.mean(g) for g in grupos]
+        ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
+
+    ax.set_title("Kruskal-Wallis - Boxplot por Grupo")
+    ax.set_xlabel("Grupo")
+    ax.set_ylabel("Valor")
+    plt.suptitle("")
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**Kruskal-Wallis**
+- Estatística H: {h_stat:.4f}
+- p-valor: {p_valor:.4f}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: pelo menos um grupo tem distribuição diferente." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as distribuições dos grupos."}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+
+def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
+    ys = [c for c in lista_y if c != ""]
+    x = subgrupo if subgrupo and subgrupo in df.columns else None
+
+    if len(ys) < 2 and not x:
+        return "❌ O Friedman requer pelo menos 2 colunas Y ou 1 Y + Subgrupo com 2 ou mais categorias.", None
+
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (ValueError, TypeError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    if x:
+        y_col = ys[0]
+        df_valid = df[[y_col, x]].dropna()
+        pivot = df_valid.pivot(columns=x, values=y_col)
+
+        if pivot.shape[1] < 2:
+            return "❌ O Friedman requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
+
+        grupos = [pivot[col].values for col in pivot.columns]
+    else:
+        df_valid = df[ys].dropna()
+        if df_valid.shape[1] < 2:
+            return "❌ O Friedman requer pelo menos 2 colunas Y com dados.", None
+
+        grupos = [df_valid[col].values for col in df_valid.columns]
+
+    stat, p_valor = stats.friedmanchisquare(*grupos)
+
+    residuos = np.array(grupos).T - np.mean(grupos, axis=0)
+    residuos_flat = residuos.flatten()
+    ad = stats.anderson(residuos_flat)
+    sw_stat, sw_p = stats.shapiro(residuos_flat)
+    dp_stat, dp_p = stats.normaltest(residuos_flat)
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad.statistic < ad_crit[idx]
+    else:
+        ad_normal = False
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    recomendacao = ""
+    if ad_normal or sw_normal or dp_normal:
+        recomendacao = "⚠ Pelo menos um teste indicou normalidade dos resíduos. Considere realizar um ANOVA Repeated Measures."
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    if x:
+        df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
+        medias = df_valid.groupby(x)[y_col].mean()
+        ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+    else:
+        ax.boxplot(grupos, labels=ys)
+        medias = [np.mean(g) for g in grupos]
+        ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
+
+    ax.set_title(f"Friedman Pareado - Boxplot por Grupo (IC {confidence:.1f}%)")
+    ax.set_xlabel("Grupo")
+    ax.set_ylabel("Valor")
+    plt.suptitle("")
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**Friedman Pareado**
+- Estatística: {stat:.4f}
+- p-valor: {p_valor:.4f}
+- Nível de confiança: {confidence:.1f}%
+
+- Anderson-Darling (resíduos): estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk (resíduos): p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson (resíduos): p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: pelo menos um grupo tem distribuição diferente." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre os grupos."}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+def analise_1_intervalo_confianca(df: pd.DataFrame, coluna_y, field_conf=None):
+    if not coluna_y:
+        return "❌ O intervalo de confiança requer exatamente 1 coluna Y.", None
+
+    if coluna_y not in df.columns:
+        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
+
+    y = df[coluna_y].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    # Nível de confiança informado
+    try:
+        nivel_conf = float(field_conf) if field_conf else 95.0
+        if nivel_conf <= 1:  # Permite entrada como 0.95
+            nivel_conf *= 100
+        if not (50 <= nivel_conf < 100):
+            return "❌ O nível de confiança deve ser entre 50 e 99.9.", None
+    except:
+        return "❌ Valor do nível de confiança inválido. Informe um número (ex.: 95).", None
+
+    alpha = 1 - (nivel_conf / 100)
+
+    media = np.mean(y)
+    desvio = np.std(y, ddof=1)
+    n = len(y)
+    se = desvio / np.sqrt(n)
+    intervalo = stats.t.interval(1 - alpha, n-1, loc=media, scale=se)
+
+    ad = stats.anderson(y)
+    sw_stat, sw_p = stats.shapiro(y)
+    dp_stat, dp_p = stats.normaltest(y)
+
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad.statistic < ad_crit[idx]
+    else:
+        ad_normal = False
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    recomendacao = ""
+    if not (ad_normal or sw_normal or dp_normal):
+        recomendacao = "⚠ Os dados podem não ser normais. Considere também a mediana e intervalo interquartílico."
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 2))
+    ax.errorbar(media, 0, xerr=[[media - intervalo[0]], [intervalo[1] - media]], fmt='o', color='blue', ecolor='black', capsize=5)
+    ax.axvline(media, color='blue', linestyle='-', label=f'Média: {media:.2f}')
+    ax.set_yticks([])
+    ax.set_title(f"Intervalo de Confiança {nivel_conf:.1f}%")
+    ax.set_xlabel(coluna_y)
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**1 Intervalo de Confiança**
+- Média: {media:.4f}
+- Desvio padrão: {desvio:.4f}
+- N: {n}
+- Nível de confiança: {nivel_conf:.1f}%
+- Intervalo: [{intervalo[0]:.4f}, {intervalo[1]:.4f}]
+
+**Normalidade dos dados**
+- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+{recomendacao}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=None):
+    if not coluna_y:
+        return "❌ O intervalo interquartílico requer exatamente 1 coluna Y.", None
+
+    if coluna_y not in df.columns:
+        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
+
+    y = df[coluna_y].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    mediana = np.median(y)
+    q1 = np.percentile(y, 25)
+    q3 = np.percentile(y, 75)
+    iqr = q3 - q1
+    minimo = np.min(y)
+    maximo = np.max(y)
+    n = len(y)
+
+    ad = stats.anderson(y)
+    sw_stat, sw_p = stats.shapiro(y)
+    dp_stat, dp_p = stats.normaltest(y)
+
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad.statistic < ad_crit[idx]
+    else:
+        ad_normal = False
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    recomendacao = ""
+    if ad_normal or sw_normal or dp_normal:
+        recomendacao = "⚠ Os dados podem ser normais. Considere também o cálculo do intervalo de confiança da média."
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 2))
+    ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+    ax.set_title("1 Intervalo Interquartílico - Boxplot")
+    ax.set_xlabel(coluna_y)
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**1 Intervalo Interquartílico**
+- Mediana: {mediana:.4f}
+- Q1 (25%): {q1:.4f}
+- Q3 (75%): {q3:.4f}
+- IQR (Q3 - Q1): {iqr:.4f}
+- Mínimo: {minimo:.4f}
+- Máximo: {maximo:.4f}
+- N: {n}
+
+**Normalidade dos dados**
+- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+{recomendacao}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
+    if len(lista_y) != 2:
+        return "❌ O teste 2 Variâncias requer exatamente 2 colunas Y.", None
+
+    col1, col2 = lista_y
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
+
+    if len(dados1) < 5 or len(dados2) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
+
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (ValueError, TypeError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    var1 = np.var(dados1, ddof=1)
+    var2 = np.var(dados2, ddof=1)
+
+    f_stat = var1 / var2 if var1 > var2 else var2 / var1
+    dfn = len(dados1) - 1
+    dfd = len(dados2) - 1
+    p_valor = 2 * min(stats.f.cdf(f_stat, dfn, dfd), 1 - stats.f.cdf(f_stat, dfn, dfd))
+
+    def normalidade(dados):
+        ad = stats.anderson(dados)
+        sw_stat, sw_p = stats.shapiro(dados)
+        dp_stat, dp_p = stats.normaltest(dados)
+        ad_crit = ad.critical_values
+        ad_sig = list(ad.significance_level)
+        if 5 in ad_sig:
+            idx = ad_sig.index(5)
+            ad_normal = ad.statistic < ad_crit[idx]
+        else:
+            ad_normal = False
+        sw_normal = sw_p > 0.05
+        dp_normal = dp_p > 0.05
+        return ad, ad_normal, sw_p, sw_normal, dp_p, dp_normal
+
+    ad1, ad1_normal, sw1_p, sw1_normal, dp1_p, dp1_normal = normalidade(dados1)
+    ad2, ad2_normal, sw2_p, sw2_normal, dp2_p, dp2_normal = normalidade(dados2)
+
+    recomendacao = ""
+    if not (ad1_normal and ad2_normal and sw1_normal and sw2_normal and dp1_normal and dp2_normal):
+        recomendacao = "⚠ Os dados podem não ser normais. Considere o uso do teste de Levene ou Brown-Forsythe."
+
+    aplicar_estilo_minitab()
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    axes[0].boxplot([dados1, dados2], labels=[col1, col2], patch_artist=True,
+                    boxprops=dict(facecolor='lightblue'))
+    axes[0].set_title("Boxplot por Grupo")
+    axes[0].set_ylabel("Valores")
+
+    axes[1].bar([col1, col2], [var1, var2], color=['skyblue', 'lightgreen'])
+    axes[1].set_title("Comparação das Variâncias")
+    axes[1].set_ylabel("Variância")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**2 Variâncias**
+- Variância {col1}: {var1:.4f}
+- Variância {col2}: {var2:.4f}
+- Estatística F: {f_stat:.4f}
+- p-valor: {p_valor:.4f}
+- Nível de confiança: {confidence:.1f}%
+
+**Normalidade {col1}**
+- Anderson-Darling: estatística={ad1.statistic:.4f}, normalidade={'Aprovada' if ad1_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw1_p:.4f}, normalidade={'Aprovada' if sw1_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp1_p:.4f}, normalidade={'Aprovada' if dp1_normal else 'Reprovada'}
+
+**Normalidade {col2}**
+- Anderson-Darling: estatística={ad2.statistic:.4f}, normalidade={'Aprovada' if ad2_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw2_p:.4f}, normalidade={'Aprovada' if sw2_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp2_p:.4f}, normalidade={'Aprovada' if dp2_normal else 'Reprovada'}
+
+{recomendacao}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+
+def analise_2_variancas_brown_forsythe(df: pd.DataFrame, lista_y, field_conf=None): 
+    if len(lista_y) != 2:
+        return "❌ O teste 2 Variâncias Brown-Forsythe requer exatamente 2 colunas Y.", None
+
+    col1, col2 = lista_y
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
+
+    if len(dados1) < 5 or len(dados2) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
+
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (ValueError, TypeError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    var1 = np.var(dados1, ddof=1)
+    var2 = np.var(dados2, ddof=1)
+
+    stat, p_valor = stats.levene(dados1, dados2, center='median')
+
+    aplicar_estilo_minitab()
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    axes[0].boxplot([dados1, dados2], labels=[col1, col2], patch_artist=True,
+                    boxprops=dict(facecolor='lightblue'))
+    axes[0].set_title("Boxplot por Grupo")
+    axes[0].set_ylabel("Valores")
+
+    axes[1].bar([col1, col2], [var1, var2], color=['skyblue', 'lightgreen'])
+    axes[1].set_title("Comparação das Variâncias")
+    axes[1].set_ylabel("Variância")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**2 Variâncias Brown-Forsythe**
+- Variância {col1}: {var1:.4f}
+- Variância {col2}: {var2:.4f}
+- Estatística Brown-Forsythe: {stat:.4f}
+- p-valor: {p_valor:.4f}
+- Nível de confiança: {confidence:.1f}%
+
+**Conclusão**
+{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
+"""
+
+    return texto.strip(), grafico_base64
+
+def analise_bartlett(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
+    grupos = []
+    variancias = {}
+
+    if subgrupo and subgrupo in df.columns and len(lista_y) == 1:
+        y_col = lista_y[0]
+        df_valid = df[[y_col, subgrupo]].dropna()
+        if df_valid[subgrupo].nunique() < 2:
+            return "❌ O Bartlett requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
+        for nome, g in df_valid.groupby(subgrupo)[y_col]:
+            if len(g) < 5:
+                return f"❌ O grupo {nome} requer ao menos 5 valores não nulos.", None
+            grupos.append(g)
+            variancias[str(nome)] = np.var(g, ddof=1)
+        labels = list(df_valid[subgrupo].unique())
+    else:
+        if len(lista_y) < 2:
+            return "❌ O Bartlett requer pelo menos 2 colunas Y (grupos).", None
+        for col in lista_y:
+            if col not in df.columns:
+                return f"❌ A coluna {col} não foi encontrada no arquivo.", None
+            dados = df[col].dropna()
+            if len(dados) < 5:
+                return f"❌ O grupo {col} requer ao menos 5 valores não nulos.", None
+            grupos.append(dados)
+            variancias[col] = np.var(dados, ddof=1)
+        labels = lista_y
+
+    try:
+        confidence = float(field_conf) if field_conf else 95.0
+        if confidence <= 1:
+            confidence *= 100
+    except (ValueError, TypeError):
+        confidence = 95.0
+
+    alpha = 1 - (confidence / 100)
+
+    stat, p_valor = stats.bartlett(*grupos)
+
+    aplicar_estilo_minitab()
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    axes[0].boxplot(grupos, labels=labels, patch_artist=True,
+                    boxprops=dict(facecolor='lightblue'))
+    axes[0].set_title("Boxplot por Grupo")
+    axes[0].set_ylabel("Valores")
+
+    axes[1].bar(labels, [variancias[label] for label in labels], color='skyblue')
+    axes[1].set_title("Comparação das Variâncias")
+    axes[1].set_ylabel("Variância")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    variancia_texto = "\n".join([f"- Variância {label}: {variancias[label]:.4f}" for label in labels])
+    texto = f"""
+**Bartlett - Teste de Igualdade de Variâncias**
+{variancia_texto}
+- Estatística Bartlett: {stat:.4f}
+- p-valor: {p_valor:.4f}
+- Nível de confiança: {confidence:.1f}%
+
+**Conclusão**
+{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
+    grupos = []
+    variancias = {}
+
+    if subgrupo and subgrupo in df.columns and len(lista_y) == 1:
+        y_col = lista_y[0]
+        df_valid = df[[y_col, subgrupo]].dropna()
+        if df_valid[subgrupo].nunique() < 2:
+            return "❌ O Brown-Forsythe requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
+        for nome, g in df_valid.groupby(subgrupo)[y_col]:
+            if len(g) < 5:
+                return f"❌ O grupo {nome} requer ao menos 5 valores não nulos.", None
+            grupos.append(g)
+            variancias[str(nome)] = np.var(g, ddof=1)
+        labels = list(df_valid[subgrupo].unique())
+    else:
+        if len(lista_y) < 2:
+            return "❌ O Brown-Forsythe requer pelo menos 2 colunas Y (grupos).", None
+        for col in lista_y:
+            if col not in df.columns:
+                return f"❌ A coluna {col} não foi encontrada no arquivo.", None
+            dados = df[col].dropna()
+            if len(dados) < 5:
+                return f"❌ O grupo {col} requer ao menos 5 valores não nulos.", None
+            grupos.append(dados)
+            variancias[col] = np.var(dados, ddof=1)
+        labels = lista_y
+
+    stat, p_valor = stats.levene(*grupos, center='median')
+
+    aplicar_estilo_minitab()
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+
+    axes[0].boxplot(grupos, labels=labels, patch_artist=True,
+                    boxprops=dict(facecolor='lightblue'))
+    axes[0].set_title("Boxplot por Grupo")
+    axes[0].set_ylabel("Valores")
+
+    axes[1].bar(labels, [variancias[label] for label in labels], color='skyblue')
+    axes[1].set_title("Comparação das Variâncias")
+    axes[1].set_ylabel("Variância")
+
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    variancia_texto = "\n".join([f"- Variância {label}: {variancias[label]:.4f}" for label in labels])
+    texto = f"""
+**Brown-Forsythe - Teste de Igualdade de Variâncias**
+{variancia_texto}
+- Estatística Brown-Forsythe: {stat:.4f}
+- p-valor: {p_valor:.4f}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_conf=None):
+    if not coluna_y:
+        return "❌ O intervalo de confiança da variância requer exatamente 1 coluna Y.", None
+
+    if coluna_y not in df.columns:
+        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
+
+    y = df[coluna_y].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    try:
+        nivel_conf = float(field_conf) if field_conf else 95.0
+        if nivel_conf <= 1:
+            nivel_conf *= 100
+        if not (50 <= nivel_conf < 100):
+            return "❌ O nível de confiança deve ser entre 50 e 99.9.", None
+    except:
+        return "❌ Valor do nível de confiança inválido. Informe um número (ex.: 95).", None
+
+    alpha = 1 - (nivel_conf / 100)
+    n = len(y)
+    s2 = np.var(y, ddof=1)
+
+    chi2_lower = stats.chi2.ppf(alpha / 2, df=n-1)
+    chi2_upper = stats.chi2.ppf(1 - alpha / 2, df=n-1)
+
+    ic_lower = (n - 1) * s2 / chi2_upper
+    ic_upper = (n - 1) * s2 / chi2_lower
+
+    ad = stats.anderson(y)
+    sw_stat, sw_p = stats.shapiro(y)
+    dp_stat, dp_p = stats.normaltest(y)
+
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad.statistic < ad_crit[idx]
+    else:
+        ad_normal = False
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    recomendacao = ""
+    if not (ad_normal or sw_normal or dp_normal):
+        recomendacao = "⚠ Os dados podem não ser normais. O intervalo de confiança da variância pode não ser confiável."
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 2))
+    ax.bar(0, s2, color='skyblue', width=0.4, label='Variância amostra')
+    ax.errorbar(0, s2, yerr=[[s2 - ic_lower], [ic_upper - s2]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
+    ax.set_xticks([0])
+    ax.set_xticklabels([coluna_y])
+    ax.set_ylabel("Variância")
+    ax.set_title(f"Intervalo de Confiança da Variância ({nivel_conf:.1f}%)")
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**1 Intervalo de Confiança da Variância**
+- Variância amostra: {s2:.4f}
+- N: {n}
+- Nível de confiança: {nivel_conf:.1f}%
+- Intervalo: [{ic_lower:.4f}, {ic_upper:.4f}]
+
+**Normalidade dos dados**
+- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+{recomendacao}
+"""
+
+    return texto.strip(), grafico_base64
+
+def analise_1_proporcao(df: pd.DataFrame, coluna_y, field_conf=None):
+    if not coluna_y:
+        return "❌ O teste 1 Proporção requer exatamente 1 coluna Y.", None
+
+    if coluna_y not in df.columns:
+        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
+
+    y = df[coluna_y].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    try:
+        p0 = float(field_conf)
+        if not (0 < p0 < 1):
+            return "❌ A proporção de referência deve estar entre 0 e 1 (ex.: 0.5).", None
+    except:
+        return "❌ Valor de referência inválido. Informe um número como 0.5 no campo Field.", None
+
+    n = len(y)
+    sucesso = np.sum(y)
+    p_hat = sucesso / n
+
+    nivel_conf = 95.0
+    alpha = 1 - (nivel_conf / 100)
+
+    z = stats.norm.ppf(1 - alpha / 2)
+    se = np.sqrt(p_hat * (1 - p_hat) / n)
+    ic_lower = max(0, p_hat - z * se)
+    ic_upper = min(1, p_hat + z * se)
+
+    se_h0 = np.sqrt(p0 * (1 - p0) / n)
+    z_stat = (p_hat - p0) / se_h0
+    p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar([0], [p_hat], color='skyblue', width=0.4, label='Proporção amostra')
+    ax.errorbar([0], [p_hat], yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
+    ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0:.4f}')
+    ax.set_xticks([0])
+    ax.set_xticklabels(['Amostra'])
+    ax.set_ylim(0, max(ic_upper * 1.2, p_hat * 1.2, p0 * 1.2))
+    ax.set_ylabel('Proporção')
+    ax.legend()
+    ax.set_title('Proporção com Intervalo de Confiança')
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**1 Proporção**
+- N: {n}
+- Sucessos: {sucesso}
+- Proporção amostra: {p_hat:.4f}
+- Proporção referência (H0): {p0:.4f}
+- Nível de confiança: {nivel_conf:.1f}%
+- Intervalo: [{ic_lower:.4f}, {ic_upper:.4f}]
+- Estatística Z: {z_stat:.4f}
+- p-valor: {p_valor:.4f}
+
+**Conclusão**
+{"✅ Rejeitamos H0: proporção diferente da referência." if p_valor < alpha else "⚠ Não rejeitamos H0: proporção não difere significativamente da referência."}
+"""
+
+    return texto.strip(), grafico_base64
+
+    
+def analise_2_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
+    if len(lista_y) != 2:
+        return "❌ O teste 2 Proporções requer exatamente 2 colunas Y.", None
+
+    col1, col2 = lista_y
+    dados1 = df[col1].dropna()
+    dados2 = df[col2].dropna()
+
+    if len(dados1) < 5 or len(dados2) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
+
+    try:
+        nivel_conf = float(field_conf)
+        if nivel_conf <= 1:
+            nivel_conf *= 100
+        if not (50 <= nivel_conf < 100):
+            return "❌ O nível de confiança deve ser entre 50 e 99.9.", None
+    except:
+        return "❌ Valor do nível de confiança inválido. Informe um número como 95 no campo Field.", None
+
+    alpha = 1 - (nivel_conf / 100)
+
+    n1, n2 = len(dados1), len(dados2)
+    sucesso1, sucesso2 = np.sum(dados1), np.sum(dados2)
+    p1, p2 = sucesso1 / n1, sucesso2 / n2
+
+    p_pool = (sucesso1 + sucesso2) / (n1 + n2)
+    se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+    z_stat = (p1 - p2) / se
+    p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+
+    se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+    z = stats.norm.ppf(1 - alpha / 2)
+    diff = p1 - p2
+    ic_lower = diff - z * se_diff
+    ic_upper = diff + z * se_diff
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
+    ax.errorbar([0, 1], [p1, p2],
+                yerr=[[p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)),
+                       p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2))],
+                      [min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1,
+                       min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2]],
+                fmt='o', color='black', capsize=5)
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels([col1, col2])
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("Proporção")
+    ax.set_title(f"2 Proporções - IC {nivel_conf:.1f}% e Teste H0: p1 = p2")
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**2 Proporções**
+- Proporção {col1}: {p1:.4f}
+- Proporção {col2}: {p2:.4f}
+- Diferença: {diff:.4f}
+- Nível de confiança: {nivel_conf:.1f}%
+- Intervalo da diferença: [{ic_lower:.4f}, {ic_upper:.4f}]
+- Estatística Z: {z_stat:.4f}
+- p-valor: {p_valor:.4f}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as proporções são diferentes." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre as proporções."}
+"""
+
+    return texto.strip(), grafico_base64
+
+def analise_k_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
+    if len(lista_y) < 2:
+        return "❌ O teste K Proporções requer pelo menos 2 colunas Y (grupos).", None
+
+    sucessos = []
+    totais = []
+    proporcoes = {}
+    for col in lista_y:
+        if col not in df.columns:
+            return f"❌ A coluna {col} não foi encontrada no arquivo.", None
+        dados = df[col].dropna()
+        if len(dados) < 5:
+            return f"❌ O grupo {col} requer ao menos 5 valores não nulos.", None
+        sucesso = np.sum(dados)
+        total = len(dados)
+        sucessos.append(sucesso)
+        totais.append(total)
+        proporcoes[col] = sucesso / total
+
+    table = np.array([sucessos, [t - s for s, t in zip(sucessos, totais)]])
+    stat, p_valor, dof, expected = stats.chi2_contingency(table.T)
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar(range(len(lista_y)), [proporcoes[c] for c in lista_y], color='skyblue')
+    ax.set_xticks(range(len(lista_y)))
+    ax.set_xticklabels(lista_y)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("Proporção")
+    ax.set_title("K Proporções - Proporção por Grupo")
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    proporcao_texto = "\n".join([f"- {col}: {proporcoes[col]:.4f}" for col in lista_y])
+
+    texto = f"""
+**K Proporções - Teste de Homogeneidade**
+{proporcao_texto}
+- Estatística Qui-quadrado: {stat:.4f}
+- p-valor: {p_valor:.4f}
+- Graus de liberdade: {dof}
+
+**Conclusão**
+{"✅ Rejeitamos H0: as proporções não são todas iguais." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as proporções dos grupos."}
+"""
+
+    return texto.strip(), grafico_base64
+
+def analise_associacao(df: pd.DataFrame, coluna_y, lista_x, subgrupo):
+    if not coluna_y or not lista_x or len(lista_x) != 1:
+        return "❌ A análise de associação requer exatamente 1 coluna Y e 1 coluna X.", None
+
+    y_col = coluna_y
+    x_col = lista_x[0]
+
+    if y_col not in df.columns or x_col not in df.columns:
+        return "❌ As colunas informadas não foram encontradas no arquivo.", None
+
+    df_valid = df[[y_col, x_col]].dropna()
+    if df_valid.empty:
+        return "❌ Não há dados suficientes após remoção de valores nulos.", None
+
+    table = pd.crosstab(df_valid[y_col], df_valid[x_col])
+    y_labels = table.index.tolist()
+    x_labels = table.columns.tolist()
+    table_values = table.to_numpy()
+
+    stat, p_valor, dof, expected = stats.chi2_contingency(table_values)
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    proporcoes = table_values / table_values.sum()
+    im = ax.imshow(proporcoes, cmap='Blues', aspect='auto')
+
+    ax.set_xticks(range(len(x_labels)))
+    ax.set_xticklabels(x_labels)
+    ax.set_yticks(range(len(y_labels)))
+    ax.set_yticklabels(y_labels)
+    ax.set_title("Mapa de calor das proporções")
+
+    for i in range(proporcoes.shape[0]):
+        for j in range(proporcoes.shape[1]):
+            ax.text(j, i, f"{proporcoes[i, j]:.2f}", ha="center", va="center", color="black")
+
+    fig.colorbar(im, ax=ax)
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+**Análise de Associação (Qui-quadrado)**
+- Estatística Qui-quadrado: {stat:.4f}
+- p-valor: {p_valor:.4f}
+- Graus de liberdade: {dof}
+
+**Conclusão**
+{"✅ Rejeitamos H0: existe associação entre as variáveis." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há evidência de associação entre as variáveis."}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+ANALISES = {
+    "1 Sample T": analise_1_sample_t,
+    "2 Sample T": analise_2_sample_t,
+    "2 Paired Test": analise_paired_t,
+    "One way ANOVA": analise_one_way_anova,
+    "1 Wilcoxon": analise_1_wilcoxon,
+    "2 Mann-Whitney": analise_2_mann_whitney,
+    "Kruskal-Wallis": analise_kruskal_wallis,
+    "Friedman Pareado": analise_friedman_pareado,
+    "1 Intervalo de Confianca": analise_1_intervalo_confianca,
+    "1 Intervalo Interquartilico": analise_1_intervalo_interquartilico,
+    "2 Variancas": analise_2_variancas,
+    "2 Variancas Brown-Forsythe": analise_2_variancas_brown_forsythe,
+    "Bartlett": analise_bartlett,
+    "Brown-Forsythe": analise_brown_forsythe,
+    "1 Intervalo de Confianca Variancia": analise_1_intervalo_confianca_variancia,
+    "1 Proporcao": analise_1_proporcao,
+    "2 Proporcoes": analise_2_proporcoes,
+    "K Proporcoes": analise_k_proporcoes,
+    "Qui-quadrado": analise_associacao
+  
+
+}
