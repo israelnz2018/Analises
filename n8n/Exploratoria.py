@@ -404,48 +404,54 @@ def analise_estabilidade(df, coluna_y):
 
 
 
-
-
 def analise_limpeza_dados(df):
     import numpy as np
     import pandas as pd
+    import string
 
     linhas_total = len(df)
     colunas_total = df.shape[1]
     linhas_duplicadas = df.duplicated().sum()
 
+    # Mapeia colunas para letras A, B, C...
+    letras_colunas = {col: string.ascii_uppercase[i] for i, col in enumerate(df.columns)}
+
     resultado = [
+        "📊 <strong>Análise de Limpeza de Dados</strong><br>",
         f"<strong>Total de linhas esperadas:</strong> {linhas_total}",
         f"<strong>Total de colunas:</strong> {colunas_total}",
         f"<strong>Linhas duplicadas detectadas:</strong> {linhas_duplicadas}<br>"
     ]
 
+    colunas_aptas = []
+    colunas_problemas = []
+
     for coluna in df.columns:
+        letra = letras_colunas[coluna]
         n_valores = df[coluna].notnull().sum()
         n_gaps = linhas_total - n_valores
+        problemas = []
 
         # Linhas faltando
         if n_gaps > 0:
             idx_gaps = df[df[coluna].isnull()].index
             primeira_linha_gap = idx_gaps[0] + 2 if len(idx_gaps) > 0 else "?"
-            resultado.append(
-                f"Coluna <strong>{coluna}</strong>: {n_gaps} célula(s) vazia(s) (primeira ocorrência na linha {primeira_linha_gap})"
-            )
+            problemas.append(f"{n_gaps} célula(s) vazia(s) (primeira ocorrência na linha {primeira_linha_gap})")
 
         # Coluna totalmente vazia
         if n_valores == 0:
-            resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ Totalmente vazia")
+            problemas.append("⚠ Totalmente vazia")
 
         # Coluna sem variação
         if df[coluna].nunique(dropna=True) <= 1:
-            resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ Sem variação (todos os valores iguais)")
+            problemas.append("⚠ Sem variação (todos os valores iguais)")
 
-        # Dados não numéricos em colunas que parecem numéricas
+        # Dados não numéricos em colunas object
         if df[coluna].dtype == object:
             try:
                 pd.to_numeric(df[coluna].dropna())
             except:
-                resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ Contém dados não numéricos suspeitos")
+                problemas.append("⚠ Contém dados não numéricos suspeitos")
 
         # Outliers extremos
         if pd.api.types.is_numeric_dtype(df[coluna]):
@@ -454,21 +460,37 @@ def analise_limpeza_dados(df):
             if sigma > 0:
                 extremos = df[(df[coluna] > media + 10 * sigma) | (df[coluna] < media - 10 * sigma)]
                 if not extremos.empty:
-                    resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ {len(extremos)} valor(es) extremamente fora do padrão")
+                    problemas.append(f"⚠ {len(extremos)} valor(es) extremamente fora do padrão")
+
+        if problemas:
+            resultado.append(f"Coluna {letra}: " + "; ".join(problemas))
+            colunas_problemas.append(letra)
+        else:
+            colunas_aptas.append(letra)
 
     # Colunas duplicadas
     colunas_duplicadas = []
     for i in range(len(df.columns)):
         for j in range(i + 1, len(df.columns)):
             if df[df.columns[i]].equals(df[df.columns[j]]):
-                colunas_duplicadas.append(f"{df.columns[i]} / {df.columns[j]}")
+                colunas_duplicadas.append(f"{letras_colunas[df.columns[i]]} / {letras_colunas[df.columns[j]]}")
     if colunas_duplicadas:
         resultado.append(f"⚠ Colunas duplicadas detectadas: {colunas_duplicadas}")
+        colunas_problemas.extend([c.split(' / ')[0] for c in colunas_duplicadas])
+        colunas_problemas.extend([c.split(' / ')[1] for c in colunas_duplicadas])
     else:
         resultado.append("✅ Nenhuma coluna duplicada")
 
+    # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
+    conclusao = "🔎 <strong>Conclusão:</strong><br>"
+    conclusao += f"✅ <strong>Colunas aptas para análises:</strong> {', '.join(colunas_aptas) if colunas_aptas else 'Nenhuma'}<br>"
+    conclusao += f"⚠ <strong>Colunas para serem analisadas/melhoradas:</strong> {', '.join(set(colunas_problemas)) if colunas_problemas else 'Nenhuma'}"
+
+    resultado.append("<br>" + conclusao)
+
     texto_final = "<br>".join(resultado)
     return texto_final, None
+
 
 
 
