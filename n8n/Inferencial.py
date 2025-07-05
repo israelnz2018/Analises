@@ -1,6 +1,12 @@
 from suporte import *
 
 def analise_1_sample_t(df, coluna_y, field, field_conf=None):
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from scipy import stats
+    from suporte import aplicar_estilo_minitab
+
     if not coluna_y:
         return "⚠ É obrigatório informar a coluna Y.", []
 
@@ -28,40 +34,43 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     n = len(dados)
     media = dados.mean()
     desvio = dados.std(ddof=1)
-    erro_media = desvio / (n ** 0.5)
-    ic_low, ic_up = stats.t.interval(1 - alpha, n - 1, loc=media, scale=erro_media)
+    ic_low, ic_up = stats.t.interval(1 - alpha, n - 1, loc=media, scale=desvio / (n ** 0.5))
 
     t_stat, p_value = stats.ttest_1samp(dados, ref)
 
+    # 🔷 Ajuste para vírgula no padrão BR
+    def br(value):
+        return str(round(value, 2)).replace('.', ',')
+
     resultado = (
-        f"**Estatísticas Descritivas**\n"
-        f"N: {n}\n"
-        f"Média: {media:.2f}\n"
-        f"Desvio Padrão: {desvio:.2f}\n"
-        f"Erro Padrão da Média: {erro_media:.2f}\n"
-        f"IC {confidence:.1f}% para μ: ({ic_low:.2f}, {ic_up:.2f})\n\n"
-        f"**Teste t para uma amostra (1 Sample T)**\n"
-        f"H₀: μ = {ref}\n"
-        f"H₁: μ ≠ {ref}\n"
-        f"T-Valor: {t_stat:.2f}\n"
-        f"P-Valor: {p_value:.3f}\n"
+        f"📊 **Análise – Teste T para uma Amostra ({coluna_y})**\n\n"
+        f"🔎 **Estatísticas Descritivas:**\n"
+        f"- **N:** {n}\n"
+        f"- **Média:** {br(media)}\n"
+        f"- **Desvio Padrão:** {br(desvio)}\n"
+        f"- **IC {confidence:.0f}% para μ:** ({br(ic_low)} ; {br(ic_up)})\n\n"
+        f"🔎 **Teste T (1 Sample T):**\n"
+        f"- **Hipótese Conservadora (H₀):** μ = {br(ref)}\n"
+        f"- **Hipótese Alternativa (H₁):** μ ≠ {br(ref)}\n"
+        f"- **T-Valor:** {br(t_stat)}\n"
+        f"- **P-Valor:** {br(p_value)}\n\n"
     )
 
     if p_value < alpha:
-        resultado += "➡ Resultado: Rejeita H0 (diferença significativa)."
+        resultado += f"🔎 **Conclusão:**\nCom {confidence:.0f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferença estatisticamente significativa entre a média amostral ({br(media)}) e o valor {br(ref)}."
     else:
-        resultado += "➡ Resultado: Não rejeita H0 (sem diferença significativa)."
+        resultado += f"🔎 **Conclusão:**\nCom {confidence:.0f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferença estatisticamente significativa entre a média amostral ({br(media)}) e o valor {br(ref)}."
 
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
 
     ax.plot(media, 1, 'kx', markersize=12, label="Média")
-    ax.hlines(1, ic_low, ic_up, colors='blue', lw=3, label=f"IC {confidence:.1f}%")
+    ax.hlines(1, ic_low, ic_up, colors='blue', lw=3, label=f"IC {confidence:.0f}%")
     ax.plot(ref, 1, 'ro', label="H0")
     ax.text(ref, 1.05, 'H0', color='red')
 
-    ax.set_title(f"Boxplot de {coluna_y}\n(com H0 e intervalo de confiança de {confidence:.1f}% para a média)")
+    ax.set_title(f"Boxplot de {coluna_y}\n(com H0 e intervalo de confiança de {confidence:.0f}% para a média)")
     ax.set_xlabel(coluna_y)
     ax.legend()
 
@@ -73,6 +82,7 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return resultado, [imagem_base64]
+
 
 
 
