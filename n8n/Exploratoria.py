@@ -308,11 +308,10 @@ def analise_estabilidade(df, coluna_y):
     axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=10, color="red")
     axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=10, color="red")
 
-    crit1_flag = False
+    crit1_flag_I = any((y > UCL_I) | (y < LCL_I))
     for xi, yi in zip(x, y):
         if yi > UCL_I or yi < LCL_I:
             axs[0].scatter(xi, yi, color="red")
-            crit1_flag = True
 
     # Carta MR
     x_mr = dados["Subgrupo"].values[1:]
@@ -329,41 +328,73 @@ def analise_estabilidade(df, coluna_y):
     axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=10, color="red")
     axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=10, color="red")
 
-    crit1_mr_flag = False
+    crit1_flag_MR = any(y_mr > UCL_MR)
     for xi, yi in zip(x_mr, y_mr):
         if yi > UCL_MR:
             axs[1].scatter(xi, yi, color="red")
-            crit1_mr_flag = True
 
     plt.tight_layout()
 
-    # Critérios (exemplos com indicação de Carta I ou MR)
-    def check_crit2(): return False
-    def check_crit3(): return False
-    def check_crit4(): return False
-    def check_crit5(): return False
-    def check_crit6(): return False
-    def check_crit7(): return False
-    def check_crit8(): return False
-    def check_crit9(): return False
+    # Funções de checagem (substitua pelas reais)
+    def check_crit2(y): return False
+    def check_crit3(y): return False
+    def check_crit4(y): return False
+    def check_crit5(y): return False
+    def check_crit6(y): return False
+    def check_crit7(y): return False
+    def check_crit8(y): return False
+    def check_crit9(y): return False
+    def check_crit2_mr(y_mr): return False
+    def check_crit3_mr(y_mr): return False
+    def check_crit4_mr(y_mr): return False
+    def check_crit5_mr(y_mr): return False
+    def check_crit6_mr(y_mr): return False
+    def check_crit7_mr(y_mr): return False
+    def check_crit8_mr(y_mr): return False
+    def check_crit9_mr(y_mr): return False
 
     # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
     texto_resumo = f"📊 **Análise de Estabilidade – Carta I-MR ({nome_coluna_y})**\n"
     texto_resumo += "🔎 **Critérios avaliados:**\n"
 
-    texto_resumo += f"1. Critério 1 – Pontos fora dos limites (Carta I): {'❌ Detectado' if crit1_flag else '✅ Nenhum ponto fora dos limites'}\n"
-    texto_resumo += f"2. Critério 1 – Pontos fora dos limites (Carta MR): {'❌ Detectado' if crit1_mr_flag else '✅ Nenhum ponto fora dos limites'}\n"
-    texto_resumo += f"3. Critério 2 – 9 pontos do mesmo lado da média (Carta I): {'❌ Detectado' if check_crit2() else '✅ OK'}\n"
-    texto_resumo += f"4. Critério 3 – 6 pontos subindo ou descendo (Carta I): {'❌ Detectado' if check_crit3() else '✅ OK'}\n"
-    texto_resumo += f"5. Critério 4 – 14 pontos alternando (Carta I): {'❌ Detectado' if check_crit4() else '✅ OK'}\n"
-    texto_resumo += f"6. Critério 5 – 2 de 3 pontos além de 2σ no mesmo lado (Carta I): {'❌ Detectado' if check_crit5() else '✅ OK'}\n"
-    texto_resumo += f"7. Critério 6 – 4 de 5 pontos além de 1σ no mesmo lado (Carta I): {'❌ Detectado' if check_crit6() else '✅ OK'}\n"
-    texto_resumo += f"8. Critério 7 – 15 pontos dentro de 1σ (Carta I): {'❌ Detectado' if check_crit7() else '✅ OK'}\n"
-    texto_resumo += f"9. Critério 8 – 8 pontos fora de 1σ (Carta I): {'❌ Detectado' if check_crit8() else '✅ OK'}\n"
-    texto_resumo += f"10. Critério 9 – 12 pontos alternando (Carta I): {'❌ Detectado' if check_crit9() else '✅ OK'}\n"
+    # Critério 1
+    if crit1_flag_I and crit1_flag_MR:
+        texto_resumo += "1. Critério 1 – Pontos fora dos limites: ❌ Detectado (Carta I e MR)\n"
+    elif crit1_flag_I:
+        texto_resumo += "1. Critério 1 – Pontos fora dos limites: ❌ Detectado (Carta I)\n"
+    elif crit1_flag_MR:
+        texto_resumo += "1. Critério 1 – Pontos fora dos limites: ❌ Detectado (Carta MR)\n"
+    else:
+        texto_resumo += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    # Critérios 2-9
+    nomes_criterios = {
+        2: "9 pontos do mesmo lado da média",
+        3: "6 pontos subindo ou descendo",
+        4: "14 pontos alternando",
+        5: "2 de 3 pontos além de 2σ no mesmo lado",
+        6: "4 de 5 pontos além de 1σ no mesmo lado",
+        7: "15 pontos dentro de 1σ",
+        8: "8 pontos fora de 1σ",
+        9: "12 pontos alternando"
+    }
+
+    for i in range(2, 10):
+        func_i = globals()[f'check_crit{i}']
+        func_mr = globals()[f'check_crit{i}_mr']
+        flag_I = func_i(y)
+        flag_MR = func_mr(y_mr)
+        if flag_I and flag_MR:
+            texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ❌ Detectado (Carta I e MR)\n"
+        elif flag_I:
+            texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ❌ Detectado (Carta I)\n"
+        elif flag_MR:
+            texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ❌ Detectado (Carta MR)\n"
+        else:
+            texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ✅ OK\n"
 
     # Conclusão
-    if any([crit1_flag, crit1_mr_flag, check_crit2(), check_crit3(), check_crit4(), check_crit5(), check_crit6(), check_crit7(), check_crit8(), check_crit9()]):
+    if any([crit1_flag_I, crit1_flag_MR] + [globals()[f'check_crit{i}'](y) or globals()[f'check_crit{i}_mr'](y_mr) for i in range(2,10)]):
         texto_resumo += "🔎 **Conclusão:** Causa especial detectada. Investigue o processo para entender e remover a causa especial identificada.\n"
     else:
         texto_resumo += "🔎 **Conclusão:** Processo está estável. Nenhuma causa especial detectada.\n"
@@ -375,6 +406,7 @@ def analise_estabilidade(df, coluna_y):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
+
 
 
 
