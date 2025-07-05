@@ -61,18 +61,32 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     else:
         resultado += f"🔎 **Conclusão:**\nCom {confidence:.0f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferença estatisticamente significativa entre a média amostral ({br(media)}) e o valor {br(ref)}."
 
+    # 🔷 Gráfico no estilo Minitab
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(8, 4))
-    ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
 
-    ax.plot(media, 1, 'kx', markersize=12, label="Média")
-    ax.hlines(1, ic_low, ic_up, colors='blue', lw=3, label=f"IC {confidence:.0f}%")
-    ax.plot(ref, 1, 'ro', label="H0")
-    ax.text(ref, 1.05, 'H0', color='red')
+    # Boxplot cinza neutro
+    ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightgrey', color='black'), medianprops=dict(color='black'))
 
-    ax.set_title(f"Boxplot de {coluna_y}\n(com H0 e intervalo de confiança de {confidence:.0f}% para a média)")
-    ax.set_xlabel(coluna_y)
-    ax.legend()
+    # Marca média (x̄) abaixo do boxplot
+    ax.plot(media, 0.85, 'kx', markersize=10)
+    ax.text(media, 0.80, 'x̄', ha='center', fontsize=10)
+
+    # Desenha IC abaixo do boxplot
+    ax.hlines(0.75, ic_low, ic_up, colors='blue', lw=2)
+    ax.text(media, 0.70, f"IC {confidence:.0f}%", ha='center', fontsize=9, color='blue')
+
+    # Marca H0 como bolinha vermelha abaixo do IC
+    ax.plot(ref, 0.65, 'ro')
+    ax.text(ref, 0.60, 'H0', ha='center', fontsize=9, color='red')
+
+    # Ajusta limites y para mostrar tudo
+    ax.set_ylim(0.5, 1.5)
+
+    # Ajusta título no padrão Minitab
+    ax.set_title(f"Boxplot de {coluna_y}\n(com H0 e intervalo de confiança de {confidence:.0f}% para a média)", fontsize=11)
+    ax.set_xlabel(coluna_y, fontsize=10)
+    ax.set_yticks([])
 
     plt.tight_layout()
     buf = BytesIO()
@@ -82,9 +96,6 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return resultado, [imagem_base64]
-
-
-
 
 
 
