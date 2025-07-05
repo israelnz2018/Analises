@@ -1014,13 +1014,14 @@ def gerar_dispersao(df, coluna_y, coluna_x, subgrupo=None):
         return f"❌ Erro ao gerar o gráfico de dispersão: {str(e)}", None, None
 
 
-def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0):
+def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", titulo_y="", titulo_grafico="", tamanho_fonte=12, inclinacao_x=0, subgrupo=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
     from io import BytesIO
     from suporte import aplicar_estilo_minitab
     import matplotlib.colors as mcolors
+    import pandas as pd
 
     aplicar_estilo_minitab()
 
@@ -1030,7 +1031,13 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
         return None, None
 
     plt.figure(figsize=(10, 6))
-    plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
+
+    # 🔧 Regra: se subgrupo NÃO foi escolhido → aplica cor personalizada
+    # 🔧        se subgrupo FOI escolhido → usa cores padrão do seaborn (ignora 'cor')
+    if not subgrupo:
+        plot = sns.scatterplot(x=coluna_x, y=coluna_y, data=df, color=cor)
+    else:
+        plot = sns.scatterplot(x=coluna_x, y=coluna_y, hue=subgrupo, data=df)
 
     # 🔧 Captura a cor real usada em hexadecimal
     colecoes = plot.collections
@@ -1071,6 +1078,7 @@ def personalizar_dispersao(df, coluna_y, coluna_x, cor="#000000", titulo_x="", t
     }
 
     return imagem_base64, info_grafico
+
 
 
 
