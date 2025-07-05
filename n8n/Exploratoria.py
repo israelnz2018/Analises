@@ -270,6 +270,10 @@ def analise_estabilidade(df, coluna_y):
     if not nome_coluna_y or nome_coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
+    # Verifica se a coluna é numérica
+    if not pd.api.types.is_numeric_dtype(df[nome_coluna_y]):
+        return f"❌ A coluna '{nome_coluna_y}' contém dados não numéricos e não pode ser usada na análise de estabilidade.", None
+
     dados = df[[nome_coluna_y]].dropna().copy()
     dados["Subgrupo"] = range(1, len(dados) + 1)
 
@@ -286,30 +290,29 @@ def analise_estabilidade(df, coluna_y):
     mr_mean = mr[1:].mean()
     UCL_MR = mr_mean * 3.267
 
-    # Gráficos
+    # Gráficos – aparência Minitab clean
     fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
 
-    axs[0].plot(dados["Subgrupo"], dados[nome_coluna_y], marker="o", linestyle="-")
-    axs[0].axhline(media, color="black", linestyle="--", label="Média")
-    axs[0].axhline(UCL_I, color="red", linestyle="--", label="Limite Superior")
-    axs[0].axhline(LCL_I, color="red", linestyle="--", label="Limite Inferior")
-    axs[0].set_title("Carta Individual (I)")
-    axs[0].set_ylabel("Valor")
-    axs[0].legend()
+    axs[0].plot(dados["Subgrupo"], dados[nome_coluna_y], marker="o", linestyle="-", color="black")
+    axs[0].axhline(media, color="green", linestyle="-", label=f"X̄ = {media:.3f}")
+    axs[0].axhline(UCL_I, color="red", linestyle="-", label=f"UCL = {UCL_I:.3f}")
+    axs[0].axhline(LCL_I, color="red", linestyle="-", label=f"LCL = {LCL_I:.3f}")
+    axs[0].set_title(f"I Chart of {nome_coluna_y}", fontsize=12)
+    axs[0].set_ylabel("Individual Value")
+    axs[0].legend(loc="upper right", fontsize=8)
 
-    axs[1].plot(dados["Subgrupo"][1:], mr[1:], marker="o", linestyle="-")
-    axs[1].axhline(mr_mean, color="black", linestyle="--", label="Média MR")
-    axs[1].axhline(UCL_MR, color="red", linestyle="--", label="Limite Superior MR")
-    axs[1].set_title("Carta Amplitude Móvel (MR)")
-    axs[1].set_ylabel("Amplitude")
-    axs[1].legend()
+    axs[1].plot(dados["Subgrupo"][1:], mr[1:], marker="o", linestyle="-", color="black")
+    axs[1].axhline(mr_mean, color="green", linestyle="-", label=f"MR̄ = {mr_mean:.3f}")
+    axs[1].axhline(UCL_MR, color="red", linestyle="-", label=f"UCL = {UCL_MR:.3f}")
+    axs[1].set_title("MR Chart", fontsize=12)
+    axs[1].set_ylabel("Moving Range")
+    axs[1].legend(loc="upper right", fontsize=8)
 
-    texto_resumo = f"📊 **Análise de Estabilidade da coluna '{nome_coluna_y}'**\n"
-    texto_resumo += "- Carta I-MR usada (dados individuais).\n"
-
-    y = dados[nome_coluna_y].values
+    plt.tight_layout()
 
     # Critérios
+    y = dados[nome_coluna_y].values
+
     def check_crit1():
         return np.any((y > UCL_I) | (y < LCL_I))
 
@@ -375,66 +378,30 @@ def analise_estabilidade(df, coluna_y):
                 alt = 1
         return False
 
-    def check_crit10():
-        return False  # Minitab original não define critério 10 padrão, deixamos reservado
+    # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
+    texto_resumo = f"📊 **Análise de Estabilidade – Carta I-MR ({nome_coluna_y})**\n"
+    texto_resumo += "🔎 **Critérios avaliados:**\n"
 
-    # Aplica critérios
-    if check_crit1():
-        texto_resumo += "- ⚠ Critério 1: Ponto fora dos limites de controle.\n"
-    else:
-        texto_resumo += "- ✅ Critério 1: Nenhum ponto fora dos limites.\n"
+    texto_resumo += f"1. Critério 1 – Pontos fora dos limites: {'❌ Ponto fora detectado.' if check_crit1() else '✅ Nenhum ponto fora dos limites.'}\n"
+    texto_resumo += f"2. Critério 2 – 9 pontos do mesmo lado da média: {'❌ Sequência detectada.' if check_crit2() else '✅ OK.'}\n"
+    texto_resumo += f"3. Critério 3 – 6 pontos subindo ou descendo: {'❌ Tendência detectada.' if check_crit3() else '✅ OK.'}\n"
+    texto_resumo += f"4. Critério 4 – 14 pontos alternando: {'❌ Alternância detectada.' if check_crit4() else '✅ OK.'}\n"
+    texto_resumo += f"5. Critério 5 – 2 de 3 pontos além de 2σ no mesmo lado: {'❌ Padrão detectado.' if check_crit5() else '✅ OK.'}\n"
+    texto_resumo += f"6. Critério 6 – 4 de 5 pontos além de 1σ no mesmo lado: {'❌ Padrão detectado.' if check_crit6() else '✅ OK.'}\n"
+    texto_resumo += f"7. Critério 7 – 15 pontos dentro de 1σ: {'❌ Padrão detectado.' if check_crit7() else '✅ OK.'}\n"
+    texto_resumo += f"8. Critério 8 – 8 pontos fora de 1σ: {'❌ Padrão detectado.' if check_crit8() else '✅ OK.'}\n"
+    texto_resumo += f"9. Critério 9 – 12 pontos alternando: {'❌ Padrão detectado.' if check_crit9() else '✅ OK.'}\n"
 
-    if check_crit2():
-        texto_resumo += "- ⚠ Critério 2: 9 pontos seguidos do mesmo lado da média.\n"
-    else:
-        texto_resumo += "- ✅ Critério 2: Nenhuma sequência longa de um lado.\n"
-
-    if check_crit3():
-        texto_resumo += "- ⚠ Critério 3: 6 pontos seguidos subindo ou descendo.\n"
-    else:
-        texto_resumo += "- ✅ Critério 3: Nenhuma tendência longa.\n"
-
-    if check_crit4():
-        texto_resumo += "- ⚠ Critério 4: 14 pontos alternando.\n"
-    else:
-        texto_resumo += "- ✅ Critério 4: Nenhuma alternância suspeita.\n"
-
-    if check_crit5():
-        texto_resumo += "- ⚠ Critério 5: 2 de 3 pontos consecutivos além de 2 sigma no mesmo lado.\n"
-    else:
-        texto_resumo += "- ✅ Critério 5: OK.\n"
-
-    if check_crit6():
-        texto_resumo += "- ⚠ Critério 6: 4 de 5 pontos além de 1 sigma no mesmo lado.\n"
-    else:
-        texto_resumo += "- ✅ Critério 6: OK.\n"
-
-    if check_crit7():
-        texto_resumo += "- ⚠ Critério 7: 15 pontos dentro de 1 sigma.\n"
-    else:
-        texto_resumo += "- ✅ Critério 7: OK.\n"
-
-    if check_crit8():
-        texto_resumo += "- ⚠ Critério 8: 8 pontos fora de 1 sigma.\n"
-    else:
-        texto_resumo += "- ✅ Critério 8: OK.\n"
-
-    if check_crit9():
-        texto_resumo += "- ⚠ Critério 9: 12 pontos alternando.\n"
-    else:
-        texto_resumo += "- ✅ Critério 9: OK.\n"
-
-    # critério 10 reservado
-    texto_resumo += "- ℹ Critério 10: Não implementado (padrão Minitab reservado).\n"
+    texto_resumo += "🔎 **Conclusão:** Análise concluída.\n"
 
     buffer = BytesIO()
-    plt.tight_layout()
     plt.savefig(buffer, format="png")
     plt.close(fig)
     buffer.seek(0)
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
+
 
 
 
