@@ -119,38 +119,66 @@ def analise_correlacao_person(df, coluna_y, lista_x):
     if coluna_y not in nomes_df:
         return f"❌ A coluna Y '{coluna_y}' não foi encontrada no arquivo.", None
 
+    # Verifica se coluna Y é numérica
+    if not pd.api.types.is_numeric_dtype(df[coluna_y]):
+        return f"❌ A coluna Y '{coluna_y}' contém dados não numéricos e não pode ser usada na correlação de Pearson.", None
+
     serie_y = df[coluna_y].dropna()
     if serie_y.empty:
         return f"❌ A coluna Y '{coluna_y}' não contém dados válidos.", None
 
     linhas = []
+    conclusoes = []
     for nome_x in lista_x:
         if nome_x not in nomes_df:
-            linhas.append(f"- {nome_x}: ❌ A coluna X não foi encontrada no arquivo.")
+            linhas.append(f"{coluna_y} x {nome_x}\n❌ A coluna X não foi encontrada no arquivo.")
+            continue
+
+        # Verifica se coluna X é numérica
+        if not pd.api.types.is_numeric_dtype(df[nome_x]):
+            linhas.append(f"{coluna_y} x {nome_x}\n❌ A coluna X '{nome_x}' contém dados não numéricos e não pode ser usada na correlação de Pearson.")
             continue
 
         serie_x = df[nome_x].dropna()
         if serie_x.empty:
-            linhas.append(f"- {nome_x}: ❌ Dados X inválidos.")
+            linhas.append(f"{coluna_y} x {nome_x}\n❌ Dados X inválidos.")
             continue
 
         data = pd.concat([serie_y, serie_x], axis=1).dropna()
         if data.empty or len(data) < 2:
-            linhas.append(f"- {nome_x}: ❌ Sem dados pareados suficientes.")
+            linhas.append(f"{coluna_y} x {nome_x}\n❌ Sem dados pareados suficientes.")
             continue
 
         r, p = stats.pearsonr(data.iloc[:, 0], data.iloc[:, 1])
-        forca = "fraca" if abs(r) < 0.3 else "moderada" if abs(r) < 0.7 else "forte"
-        dependencia = "existe dependência estatística" if p < 0.05 else "não há dependência estatística"
+        forca = "fraca" if abs(r) < 0.3 else "média" if abs(r) < 0.7 else "forte"
+        sentido = "positiva" if r >= 0 else "negativa"
+        significancia = "são estatisticamente correlacionadas" if p < 0.05 else "não são estatisticamente correlacionadas"
 
-        linhas.append(f"- {nome_x}: Coeficiente de Pearson = {r:.2f}, p-valor = {p:.4f} → Correlação {forca}, {dependencia}.")
+        if p < 0.05:
+            conclusoes.append(nome_x)
 
-    resumo = f"""📊 **Análise de Correlação de Pearson**
-Coluna Y: **{coluna_y}**
-Resultados:
-""" + "\n".join(linhas)
+        linhas.append(
+            f"{coluna_y} x {nome_x}\n"
+            f"Coeficiente de Pearson = {r:.2f} → Correlação {forca}, {sentido}.\n"
+            f"P-value: {p:.4f} → As variáveis {coluna_y} e {nome_x} {significancia}."
+        )
+
+    if conclusoes:
+        conclusao_final = f"Conclusão: Apenas as variáveis {', '.join(conclusoes)} são estatisticamente correlacionadas com {coluna_y}."
+    else:
+        conclusao_final = f"Conclusão: Nenhuma das variáveis apresenta correlação estatisticamente significativa com {coluna_y}."
+
+    # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
+    resumo = (
+        f"📊 **Análise de Correlação de Pearson**\n"
+        f"Variáveis analisadas:\n\n"
+        + "\n\n".join(linhas)
+        + "\n\n"
+        + conclusao_final
+    )
 
     return resumo, None
+
 
 
 def analise_matrix_correlacao(df, coluna_y, lista_x):
