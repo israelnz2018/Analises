@@ -360,6 +360,14 @@ Com {confidence:.0f}% de confiança, {"podemos rejeitar a hipótese conservadora
 
 
 def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
+    import pandas as pd
+    import numpy as np
+    from scipy import stats
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from suporte import aplicar_estilo_minitab
+
     ys = [c for c in lista_y if c not in ["", "Subgrupo"]]
     x = subgrupo if subgrupo and subgrupo in df.columns else None
 
@@ -390,26 +398,51 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_
         if len(grupos) < 2:
             return "❌ O One way ANOVA requer pelo menos 2 colunas Y com dados.", None
 
+    # 🔎 Estatísticas ANOVA
     f_stat, p_valor = stats.f_oneway(*grupos)
 
+    # 🔎 Testes de normalidade (Anderson-Darling, Shapiro-Wilk, Kolmogorov-Smirnov)
     concatenado = np.concatenate(grupos)
     residuos = concatenado - np.mean(concatenado)
-    normalidade = stats.anderson(residuos)
-    ad_stat = normalidade.statistic
-    ad_crit = normalidade.critical_values
-    ad_sig = list(normalidade.significance_level)
-    if 5 in ad_sig:
-        idx = ad_sig.index(5)
-        ad_aprovado = ad_stat < ad_crit[idx]
-    else:
-        ad_aprovado = False
 
-    conclusao = "✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ Resíduos podem não ser normais (Anderson-Darling)."
+    ad_stat, ad_crit, ad_sig = stats.anderson(residuos)
+    ad_pass = ad_stat < ad_crit[list(ad_sig).index(5)] if 5 in ad_sig else False
+
+    sw_stat, sw_p = stats.shapiro(residuos)
+    sw_pass = sw_p > alpha
+
+    ks_stat, ks_p = stats.kstest(residuos, 'norm', args=(np.mean(residuos), np.std(residuos)))
+    ks_pass = ks_p > alpha
+
+    normalidade_geral = ad_pass or sw_pass or ks_pass
+
+    # 🔎 Conclusão
     if p_valor < alpha:
-        conclusao += f" ✅ Rejeitamos H0 (p = {p_valor:.4f}). Existem diferenças significativas entre as médias dos grupos."
+        conclusao = f"Com {confidence:.1f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferenças estatisticamente significativas entre as médias dos grupos."
     else:
-        conclusao += f" ⚠ Não rejeitamos H0 (p = {p_valor:.4f}). Não há diferenças significativas entre as médias dos grupos."
+        conclusao = f"Com {confidence:.1f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferenças estatisticamente significativas entre as médias dos grupos."
 
+    # 📊 Texto Final
+    texto = f"""
+📊 **Análise – One Way ANOVA**
+
+🔹 **Hipóteses:**
+- H₀: As médias dos grupos são iguais
+- H₁: Pelo menos uma média de grupo é diferente
+
+🔎 **Estatísticas ANOVA:**
+- Estatística F = {f_stat:.4f}
+- p-valor = {p_valor:.4f}
+- Nível de confiança = {confidence:.1f}%
+
+🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, Kolmogorov-Smirnov):**
+- Resíduos: {"✅ Podem ser considerados normais" if normalidade_geral else "❌ Podem não ser normais"}
+
+🔎 **Conclusão:**
+{conclusao}
+""".strip()
+
+    # 🔷 Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     if x:
@@ -421,7 +454,7 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_
         medias = [np.mean(g) for g in grupos]
         ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
 
-    ax.set_title(f"One Way ANOVA - Boxplot por Grupo (IC {confidence:.1f}%)")
+    ax.set_title(f"One Way ANOVA – Boxplot por Grupo (IC {confidence:.1f}%)", fontsize=10)
     ax.set_xlabel("Grupo")
     ax.set_ylabel("Valor")
     plt.suptitle("")
@@ -433,18 +466,8 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    texto = f"""
-**One Way ANOVA**
-- Estatística F: {f_stat:.4f}
-- p-valor: {p_valor:.4f}
-- Nível de confiança: {confidence:.1f}%
-- Anderson-Darling (resíduos): estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_aprovado else 'Reprovada'}
+    return texto, grafico_base64
 
-**Conclusão**
-{conclusao}
-"""
-
-    return texto.strip(), grafico_base64
 
 
 
