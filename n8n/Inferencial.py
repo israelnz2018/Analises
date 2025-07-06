@@ -64,8 +64,10 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(8, 4))
 
-    # Boxplot cinza neutro
-    bplot = ax.boxplot(dados, vert=False, patch_artist=True, boxprops=dict(facecolor='lightgrey', color='black'), medianprops=dict(color='black'))
+    # Boxplot cinza neutro COM outliers
+    ax.boxplot(dados, vert=False, patch_artist=True,
+               boxprops=dict(facecolor='lightgrey', color='black'),
+               medianprops=dict(color='black'))
 
     # 🔴 Linha da média no próprio boxplot (vermelha pontilhada) desde topo do boxplot até IC
     box_y = 1  # posição y do boxplot
@@ -78,9 +80,9 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     ax.vlines(ic_up, 0.82, 0.88, colors='blue', lw=2)
     ax.text(media, 0.80, f"IC {confidence:.0f}%", ha='center', fontsize=9, color='blue')
 
-    # 🔴 Marca H0 como bolinha vermelha abaixo do IC
-    ax.plot(ref, 0.75, 'ro')
-    ax.text(ref, 0.70, 'H0', ha='center', fontsize=9, color='red')
+    # 🔴 Marca H0 como bolinha vermelha NO MESMO NÍVEL DA LINHA AZUL DO IC
+    ax.plot(ref, 0.85, 'ro')
+    ax.text(ref, 0.80, 'H0', ha='center', fontsize=9, color='red')
 
     # Ajusta limites y para mostrar tudo
     ax.set_ylim(0.65, 1.3)
@@ -96,6 +98,8 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     plt.close(fig)
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+
 
     return resultado, [imagem_base64]
 
