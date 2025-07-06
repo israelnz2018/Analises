@@ -114,6 +114,16 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
 from suporte import *
 
 def analise_2_sample_t(df, lista_y, field_conf=None):
+    import numpy as np
+    import pandas as pd
+    from scipy import stats
+    from scipy.stats import anderson, shapiro, kstest, norm
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+    from suporte import aplicar_estilo_minitab
+
     if len(lista_y) != 2:
         return "❌ É necessário selecionar exatamente duas colunas Y numéricas para o Teste 2 Sample T.", None
 
@@ -133,37 +143,74 @@ def analise_2_sample_t(df, lista_y, field_conf=None):
 
     alpha = 1 - (confidence / 100)
 
-    ad1 = anderson(serie1)
-    ad2 = anderson(serie2)
-    lim1 = ad1.critical_values[2]
-    lim2 = ad2.critical_values[2]
-    normal1 = ad1.statistic < lim1
-    normal2 = ad2.statistic < lim2
+    # Função para normalidade consolidada
+    def normalidade_consolidada(serie):
+        # Anderson-Darling
+        ad = anderson(serie)
+        normal_ad = ad.statistic < ad.critical_values[2]
 
+        # Ryan-Joiner (Shapiro)
+        stat_shapiro, p_shapiro = shapiro(serie)
+        normal_shapiro = p_shapiro > 0.05
+
+        # Kolmogorov-Smirnov
+        stat_ks, p_ks = kstest(serie, 'norm', args=(serie.mean(), serie.std(ddof=1)))
+        normal_ks = p_ks > 0.05
+
+        normal = normal_ad or normal_shapiro or normal_ks
+        return normal
+
+    normal1 = normalidade_consolidada(serie1)
+    normal2 = normalidade_consolidada(serie2)
+
+    # Teste F
     stat_f = np.var(serie1, ddof=1) / np.var(serie2, ddof=1)
     df1, df2 = len(serie1)-1, len(serie2)-1
     p_f = 2 * min(stats.f.cdf(stat_f, df1, df2), 1 - stats.f.cdf(stat_f, df1, df2))
     equal_var = p_f > alpha
 
+    # Teste T
     t_stat, p_valor = stats.ttest_ind(serie1, serie2, equal_var=equal_var)
 
-    texto = f"""📊 **Teste T para 2 Amostras Independentes**
+    # 🔷 Ajuste para vírgula no padrão BR
+    def br(value):
+        return str(round(value, 2)).replace('.', ',')
 
-🔹 Nível de confiança: {confidence:.1f}%  
-🔹 Coluna 1: {col1}  
-🔹 Coluna 2: {col2}  
+    texto = f"""📊 **Análise – Teste T para 2 Amostras Independentes**
 
-🔹 Teste de normalidade (Anderson-Darling, 5%):  
-- {col1}: {"✅ Normal" if normal1 else "❌ Não normal"} (estatística = {ad1.statistic:.4f}, limite crítico = {lim1:.4f})  
-- {col2}: {"✅ Normal" if normal2 else "❌ Não normal"} (estatística = {ad2.statistic:.4f}, limite crítico = {lim2:.4f})  
+🔎 **Estatísticas Descritivas:**
 
-🔹 Teste F para igualdade de variâncias:  
-- Estatística F = {stat_f:.4f}, p = {p_f:.4f} → {"✅ Variâncias iguais" if equal_var else "❌ Variâncias diferentes"}
+**{col1}:**
+N = {len(serie1)}
+Média = {br(serie1.mean())}
+Desvio Padrão = {br(serie1.std(ddof=1))}
 
-🔹 Resultado do Teste T:  
-- Estatística t = {t_stat:.4f}, p = {p_valor:.4f}  
-- {"✅ Não há diferença significativa" if p_valor > alpha else "❌ Diferença estatisticamente significativa entre as médias"}"""
+**{col2}:**
+N = {len(serie2)}
+Média = {br(serie2.mean())}
+Desvio Padrão = {br(serie2.std(ddof=1))}
 
+🔎 **Testes de Normalidade (Anderson-Darling, Ryan-Joiner, Kolmogorov-Smirnov):**
+- {col1}: {"✅ Os dados podem ser considerados normais" if normal1 else "❌ Os dados não são normais"}
+- {col2}: {"✅ Os dados podem ser considerados normais" if normal2 else "❌ Os dados não são normais"}
+
+🔎 **Teste F para igualdade de variâncias:**
+Estatística F = {br(stat_f)}
+p-valor = {br(p_f)}
+{"✅ Variâncias iguais, será usado o Teste T padrão" if equal_var else "❌ Variâncias diferentes, será usado o Teste T de Welch"}
+
+🔎 **Teste T para 2 Amostras:**
+Estatística t = {br(t_stat)}
+p-valor = {br(p_valor)}
+
+🔎 **Conclusão:**
+Com {confidence:.0f}% de confiança, {"podemos rejeitar a hipótese conservadora. Logo, há diferença estatisticamente significativa entre as médias" if p_valor < alpha else "não podemos rejeitar a hipótese conservadora. Logo, não há diferença estatisticamente significativa entre as médias"} de {col1} ({br(serie1.mean())}) e {col2} ({br(serie2.mean())}).
+"""
+
+    if not normal1 or not normal2:
+        texto += "\n⚠️ Como pelo menos um dos conjuntos de dados não é normal, recomenda-se coletar mais dados e/ou verificar a estabilidade do processo."
+
+    # Gráfico
     try:
         aplicar_estilo_minitab()
         fig, ax = plt.subplots(figsize=(6, 6))
@@ -193,6 +240,7 @@ def analise_2_sample_t(df, lista_y, field_conf=None):
         imagem_base64 = None
 
     return texto, imagem_base64
+
 
 
 
