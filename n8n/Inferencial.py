@@ -566,6 +566,14 @@ def analise_1_intervalo_confianca(df: pd.DataFrame, coluna_y, field_conf=None):
 
 
 def analise_1_wilcoxon(df: pd.DataFrame, coluna_y, field, field_conf=None):
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from scipy import stats
+    from suporte import aplicar_estilo_minitab
+
     if not coluna_y:
         return "❌ O teste 1 Wilcoxon requer exatamente 1 coluna Y.", None
 
@@ -622,10 +630,17 @@ def analise_1_wilcoxon(df: pd.DataFrame, coluna_y, field, field_conf=None):
     # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+    box = ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+
+    # Linha da mediana amostra apenas dentro do boxplot
+    for line in box['medians']:
+        x, y_med = line.get_xydata()[0]
+        ax.vlines(x, y_med - 0.2, y_med + 0.2, color='blue', linestyle='-', label=f'Mediana amostra: {mediana_amostra:.2f}')
+
+    # Linha vermelha pontilhada para mediana H0
     ax.axvline(valor_ref, color='red', linestyle='--', label=f'Mediana H0 ({valor_ref})')
-    ax.axvline(mediana_amostra, color='blue', linestyle='-', label=f'Mediana amostra: {mediana_amostra:.2f}')
-    ax.set_title(f"1 Wilcoxon - Boxplot com Mediana H0 (IC {confidence:.1f}%)")
+
+    ax.set_title(f"1 Wilcoxon - Boxplot com Mediana H0 (IC {confidence:.1f}%)", fontsize=10)
     ax.set_xlabel(coluna_y)
     ax.legend()
     plt.tight_layout()
@@ -636,25 +651,29 @@ def analise_1_wilcoxon(df: pd.DataFrame, coluna_y, field, field_conf=None):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-**1 Wilcoxon - Teste de Mediana**
-- Mediana amostra: {mediana_amostra:.4f}
-- Valor de referência (H0): {valor_ref}
+📊 **Análise – Teste de Mediana (Wilcoxon)**
+
+🔹 **Hipóteses:**
+- H₀: A mediana populacional é igual a {valor_ref}
+- H₁: A mediana populacional é diferente de {valor_ref}
+
+🔎 **Resultados:**
+- Mediana amostra: {mediana_amostra:.2f}
 - Estatística W: {w_stat:.4f}
 - p-valor: {p_valor:.4f}
 - Nível de confiança: {confidence:.1f}%
 
-**Normalidade dos dados**
-- Anderson-Darling: estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
+{"✅ Os dados podem ser considerados normais" if (ad_normal or sw_normal or dp_normal) else "⚠ Os dados podem não seguir distribuição normal"}
 
 {recomendacao}
 
-**Conclusão**
-{"✅ Rejeitamos H0: mediana diferente do valor de referência." if p_valor < alpha else "⚠ Não rejeitamos H0: mediana não difere significativamente do valor de referência."}
+🔎 **Conclusão:**
+{"✅ Rejeitamos H0. A mediana populacional difere significativamente de " + str(valor_ref) + "." if p_valor < alpha else "⚠ Não rejeitamos H0. A mediana populacional não difere significativamente de " + str(valor_ref) + "."}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
