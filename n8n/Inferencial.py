@@ -1770,6 +1770,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 
     categorias = x.value_counts()
     resultados = []
+    graficos_base64 = []
 
     for categoria, sucesso in categorias.items():
         p_hat = sucesso / n
@@ -1785,11 +1786,10 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
         z_stat = (p_hat - p0) / se_h0
         p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
-        conclusao = (
-            f"✅ Rejeitamos H0: proporção diferente da referência."
-            if p_valor < alpha
-            else "⚠️ Não rejeitamos H0: proporção não difere significativamente da referência."
-        )
+        if p_valor < alpha:
+            conclusao = f"✅ Com {nivel_conf:.1f}% de confiança, rejeitamos H0. A proporção observada ({p_hat:.2f}) é estatisticamente diferente da referência ({p0:.2f})."
+        else:
+            conclusao = f"⚠️ Com {nivel_conf:.1f}% de confiança, não rejeitamos H0. A proporção observada ({p_hat:.2f}) não difere significativamente da referência ({p0:.2f})."
 
         resultados.append(f"""
 🔹 **Categoria: {categoria}**
@@ -1804,31 +1804,25 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 {conclusao}
 """)
 
-    # gera gráfico apenas para a primeira categoria como exemplo
-    primeira_categoria = categorias.index[0]
-    sucesso = categorias.iloc[0]
-    p_hat = sucesso / n
-    se = np.sqrt(p_hat * (1 - p_hat) / n)
-    ic_lower = max(0, p_hat - z * se)
-    ic_upper = min(1, p_hat + z * se)
+        # gerar gráfico para cada categoria
+        aplicar_estilo_minitab()
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.bar([0], [p_hat], color='skyblue', width=0.4, label=f'Proporção {categoria}')
+        ax.errorbar([0], [p_hat], yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
+        ax.axhline(p0, color='red', linestyle='--', label=f'Referência: {p0:.2f}')
+        ax.set_xticks([0])
+        ax.set_xticklabels([categoria])
+        ax.set_ylim(0, max(ic_upper * 1.2, p_hat * 1.2, p0 * 1.2))
+        ax.set_ylabel('Proporção')
+        ax.legend()
+        ax.set_title(f'Proporção {categoria} com IC {nivel_conf:.1f}%')
+        plt.tight_layout()
 
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar([0], [p_hat], color='skyblue', width=0.4, label=f'Proporção {primeira_categoria}')
-    ax.errorbar([0], [p_hat], yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
-    ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0:.2f}')
-    ax.set_xticks([0])
-    ax.set_xticklabels([primeira_categoria])
-    ax.set_ylim(0, max(ic_upper * 1.2, p_hat * 1.2, p0 * 1.2))
-    ax.set_ylabel('Proporção')
-    ax.legend()
-    ax.set_title('Proporção com Intervalo de Confiança')
-    plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close(fig)
+        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        graficos_base64.append(grafico_base64)
 
     texto = f"""
 📊 **Análise – Teste de 1 Proporção**
@@ -1836,7 +1830,8 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 {"".join(resultados)}
 """
 
-    return texto.strip(), grafico_base64
+    return texto.strip(), graficos_base64
+
 
 
     
