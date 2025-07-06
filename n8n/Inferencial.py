@@ -1012,11 +1012,10 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
 
 def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
     import numpy as np
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    import base64
-    from io import BytesIO
     from scipy import stats
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
     from suporte import aplicar_estilo_minitab
 
     ys = [c for c in lista_y if c != ""]
@@ -1043,7 +1042,7 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
             return "❌ O Friedman requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
 
         grupos = [pivot[col].values for col in pivot.columns]
-        labels = list(pivot.columns)
+        labels = pivot.columns.tolist()
     else:
         df_valid = df[ys].dropna()
         if df_valid.shape[1] < 2:
@@ -1052,14 +1051,22 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
         grupos = [df_valid[col].values for col in df_valid.columns]
         labels = ys
 
+    # Verificar se realmente é pareado (mesmo número de observações em todos os grupos)
+    if not all(len(g) == len(grupos[0]) for g in grupos):
+        return "❌ O teste Friedman Pareado requer que todos os grupos tenham o mesmo número de observações (dados pareados).", None
+
+    # Teste Friedman
     stat, p_valor = stats.friedmanchisquare(*grupos)
 
-    # Normalidade dos resíduos
-    residuos = np.array(grupos).T - np.mean(grupos, axis=0)
+    # Normalidade dos resíduos (como no Kruskal-Wallis)
+    dados_matrix = np.array(grupos).T  # shape (n_obs, n_grupos)
+    residuos = dados_matrix - np.mean(dados_matrix, axis=1, keepdims=True)
     residuos_flat = residuos.flatten()
+
     ad = stats.anderson(residuos_flat)
     sw_stat, sw_p = stats.shapiro(residuos_flat)
     dp_stat, dp_p = stats.normaltest(residuos_flat)
+
     ad_crit = ad.critical_values
     ad_sig = list(ad.significance_level)
     if 5 in ad_sig:
@@ -1070,28 +1077,23 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
     sw_normal = sw_p > 0.05
     dp_normal = dp_p > 0.05
 
-    normal_text = "✅ Os resíduos podem ser considerados normais." if (ad_normal or sw_normal or dp_normal) else "⚠ Os resíduos não seguem distribuição normal."
+    normalidade_residuos = "✅ Os resíduos podem ser considerados normais." if ad_normal or sw_normal or dp_normal else "⚠ Os resíduos não seguem distribuição normal."
 
+    # Recomendação
     recomendacao = ""
-    if ad_normal or sw_normal or dp_normal:
-        recomendacao = "⚠ Observação: Os resíduos apresentaram indícios de normalidade. Caso os pressupostos sejam atendidos, considere usar ANOVA Repeated Measures."
+    if ad_normal and sw_normal and dp_normal:
+        recomendacao = "⚠ Observação: Como os resíduos apresentaram indícios de normalidade, recomenda-se considerar o uso do teste paramétrico ANOVA Repeated Measures, caso os pressupostos sejam atendidos."
 
     # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
-    if x:
-        df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
-        medianas = df_valid.groupby(x)[y_col].median()
-        ax.plot(range(1, len(medianas) + 1), medianas.values, color='blue', marker='o', linestyle='-', label='Medianas')
-    else:
-        ax.boxplot(grupos, labels=labels)
-        medianas = [np.median(g) for g in grupos]
-        ax.plot(range(1, len(medianas) + 1), medianas, color='blue', marker='o', linestyle='-', label='Medianas')
+    ax.boxplot(grupos, labels=labels, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+    medianas = [np.median(g) for g in grupos]
+    ax.plot(range(1, len(medianas) + 1), medianas, color='blue', marker='o', linestyle='-', label='Medianas')
 
-    ax.set_title(f"Friedman Pareado - Boxplot por Grupo")
+    ax.set_title("Friedman Pareado - Boxplot por Grupo", fontsize=10)
     ax.set_xlabel("Grupo")
-    ax.set_ylabel("Valor")
-    plt.suptitle("")
+    ax.set_ylabel("Valores")
     ax.legend()
     plt.tight_layout()
 
@@ -1100,29 +1102,30 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Reporte no padrão ANOVA
+    # Reporte padronizado
     texto = f"""
 📊 **Análise – Friedman Pareado**
 
 🔹 **Hipóteses:**
-- H₀: As distribuições dos grupos são iguais
-- H₁: Pelo menos um grupo tem distribuição diferente
+- H₀: As medianas dos grupos são iguais
+- H₁: Pelo menos uma mediana de grupo é diferente
 
-🔎 **Estatísticas do Teste:**
+🔎 **Estatísticas Friedman:**
 - Estatística = {stat:.4f}
 - p-valor = {p_valor:.4f}
 - Nível de confiança = {confidence:.1f}%
 
-🔎 **Normalidade dos Resíduos (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
-- {normal_text}
+🔎 **Normalidade dos resíduos (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
+- {normalidade_residuos}
 
 {recomendacao}
 
 🔎 **Conclusão:**
-{"Com {confidence:.1f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferenças estatisticamente significativas entre os grupos." if p_valor < alpha else f"Com {confidence:.1f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferenças estatisticamente significativas entre os grupos."}
+{"✅ Com {confidence:.1f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferenças estatisticamente significativas entre as medianas dos grupos." if p_valor < alpha else f"⚠ Com {confidence:.1f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferenças estatisticamente significativas entre as medianas dos grupos."}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
