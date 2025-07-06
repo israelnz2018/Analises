@@ -82,7 +82,7 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
 
     # 🔴 Marca H0 como bolinha vermelha NO MESMO NÍVEL DA LINHA AZUL DO IC
     ax.plot(ref, 0.85, 'ro')
-    ax.text(ref, 0.80, 'H0', ha='center', fontsize=9, color='red')
+    ax.text(ref, 0.65, 'H0', ha='center', fontsize=9, color='red')
 
     # Ajusta limites y para mostrar tudo
     ax.set_ylim(0.65, 1.3)
