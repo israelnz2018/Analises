@@ -1140,7 +1140,6 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
 
     return texto.strip(), grafico_base64
 
-
 def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=None):
     if not coluna_y:
         return "❌ O intervalo interquartílico requer exatamente 1 coluna Y.", None
@@ -1153,7 +1152,6 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     if len(y) < 5:
         return "❌ O teste requer ao menos 5 valores não nulos.", None
 
-    # Estatísticas
     mediana = np.median(y)
     q1 = np.percentile(y, 25)
     q3 = np.percentile(y, 75)
@@ -1162,7 +1160,6 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     maximo = np.max(y)
     n = len(y)
 
-    # Normalidade
     ad = stats.anderson(y)
     sw_stat, sw_p = stats.shapiro(y)
     dp_stat, dp_p = stats.normaltest(y)
@@ -1177,17 +1174,28 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     sw_normal = sw_p > 0.05
     dp_normal = dp_p > 0.05
 
-    normalidade_texto = "✅ Os dados podem ser considerados normais." if (ad_normal or sw_normal or dp_normal) else "⚠ Os dados não seguem distribuição normal."
+    recomendacao = ""
+    if ad_normal or sw_normal or dp_normal:
+        recomendacao = "⚠ Os dados podem ser normais. Considere também o cálculo do intervalo de confiança da média."
 
-    # Gráfico estilo IC mediana
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 2))
+
+    # Boxplot tradicional
     ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
-    ax.axvline(mediana, color='blue', linestyle='-', label=f'Mediana: {mediana:.2f}')
-    ax.hlines(-0.5, q1, q3, color='black', lw=4, label=f'IQR: {iqr:.2f}')
-    ax.set_title(f"1 Intervalo Interquartílico - Boxplot")
+
+    # Linha vertical da mediana
+    ax.axvline(mediana, color='blue', linestyle='-', linewidth=1)
+    ax.text(mediana, 1.1, f'Mediana: {mediana:.2f}', color='blue', ha='center', fontsize=8)
+
+    # Barra do IQR abaixo do boxplot
+    ax.hlines(-0.3, q1, q3, color='black', lw=4, label=f'IQR: {iqr:.2f}')
+    ax.text((q1+q3)/2, -0.5, f'IQR: {iqr:.2f}', ha='center', fontsize=8)
+
+    ax.set_title("1 Intervalo Interquartílico - Boxplot", fontsize=10)
     ax.set_xlabel(coluna_y)
-    ax.legend()
+    ax.set_yticks([])
+
     plt.tight_layout()
 
     buf = BytesIO()
@@ -1195,27 +1203,28 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto do relatório
     texto = f"""
 📊 **Análise – Intervalo Interquartílico**
 
-🔹 **Estatísticas:**
-- Mediana = {mediana:.2f}
-- Q1 (25%) = {q1:.2f}
-- Q3 (75%) = {q3:.2f}
-- IQR (Q3 - Q1) = {iqr:.2f}
-- Mínimo = {minimo:.2f}
-- Máximo = {maximo:.2f}
-- N = {n}
+🔎 **Estatísticas Descritivas:**
+- Mediana: {mediana:.4f}
+- Q1 (25%): {q1:.4f}
+- Q3 (75%): {q3:.4f}
+- Intervalo Interquartílico (IQR): {iqr:.4f}
+- Mínimo: {minimo:.4f}
+- Máximo: {maximo:.4f}
+- N: {n}
 
 🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
-- {normalidade_texto}
+- {'✅ Os dados podem ser considerados normais.' if ad_normal or sw_normal or dp_normal else '⚠ Os dados não seguem distribuição normal.'}
 
 🔎 **Conclusão:**
-O intervalo interquartílico (IQR) indica que o valor central (mediana) é {mediana:.2f}, com dispersão entre {q1:.2f} e {q3:.2f}. {normalidade_texto}
+O IQR indica que os 50% centrais dos dados estão distribuídos em um intervalo de {iqr:.2f} unidades. {recomendacao}
 """
 
     return texto.strip(), grafico_base64
+
+
 
 
 
