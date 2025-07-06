@@ -896,82 +896,85 @@ def analise_2_wilcoxon_paired(df: pd.DataFrame, lista_y: list, field_conf=None):
 
 
 def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
-    if not lista_y or len(lista_y) != 1:
-        return "❌ A análise Kruskal-Wallis requer exatamente 1 coluna Y.", None
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    from scipy import stats
+    import base64
+    from io import BytesIO
+    from suporte import aplicar_estilo_minitab
 
-    coluna_y = lista_y[0]
-    x = subgrupo if subgrupo and subgrupo in df.columns else None
+    # Validação básica
+    if not lista_y:
+        return "❌ É necessário selecionar pelo menos 1 coluna Y.", None
 
-    if coluna_y not in df.columns:
-        return f"❌ A coluna {coluna_y} não foi encontrada no DataFrame.", None
+    if len(lista_y) == 1 and not subgrupo:
+        return "❌ Se apenas 1 coluna Y for selecionada, é obrigatório informar uma coluna Subgrupo.", None
 
-    if x:
-        df_valid = df[[coluna_y, x]].dropna()
-        grupos = [grupo[1].values for grupo in df_valid.groupby(x)[coluna_y]]
+    # Definição dos grupos
+    if len(lista_y) > 1:
+        # Cenário 1: várias colunas Y (cada coluna é um grupo)
+        grupos = []
+        for col in lista_y:
+            if col not in df.columns:
+                return f"❌ A coluna {col} não foi encontrada no DataFrame.", None
+            grupo = df[col].dropna().values
+            if len(grupo) < 2:
+                return f"❌ O grupo {col} não possui dados suficientes.", None
+            grupos.append(grupo)
+        nomes_grupos = lista_y
 
-        if len(grupos) < 2:
-            return "❌ O Kruskal-Wallis requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
     else:
-        grupos = [df[coluna_y].dropna().values]
-        if len(grupos[0]) < 2:
-            return "❌ O Kruskal-Wallis requer ao menos uma coluna Y com dados suficientes.", None
+        # Cenário 2: 1 coluna Y + subgrupo X
+        y_col = lista_y[0]
+        if subgrupo not in df.columns:
+            return f"❌ A coluna Subgrupo ({subgrupo}) não foi encontrada no DataFrame.", None
+        df_valid = df[[y_col, subgrupo]].dropna()
+        if df_valid[subgrupo].nunique() < 2:
+            return "❌ O Subgrupo deve ter pelo menos 2 categorias diferentes.", None
+        grupos = [g[1].values for g in df_valid.groupby(subgrupo)[y_col]]
+        nomes_grupos = df_valid[subgrupo].unique()
 
-    # Calcula o teste Kruskal-Wallis
+    # Teste Kruskal-Wallis
     h_stat, p_valor = stats.kruskal(*grupos)
 
-    # Testes de normalidade dos grupos
+    # Teste de normalidade em cada grupo
     normal_flag = True
-    if x:
-        for nome, g in df_valid.groupby(x)[coluna_y]:
-            dados = g.dropna()
-            if len(dados) >= 5:
-                ad = stats.anderson(dados)
-                sw_stat, sw_p = stats.shapiro(dados)
-                dp_stat, dp_p = stats.normaltest(dados)
-                ad_crit = ad.critical_values
-                ad_sig = list(ad.significance_level)
-                if 5 in ad_sig:
-                    idx = ad_sig.index(5)
-                    ad_normal = ad.statistic < ad_crit[idx]
-                else:
-                    ad_normal = False
-                sw_normal = sw_p > 0.05
-                dp_normal = dp_p > 0.05
-                normal_flag = normal_flag and (ad_normal or sw_normal or dp_normal)
-    else:
-        for g in grupos:
-            if len(g) >= 5:
-                ad = stats.anderson(g)
-                sw_stat, sw_p = stats.shapiro(g)
-                dp_stat, dp_p = stats.normaltest(g)
-                ad_crit = ad.critical_values
-                ad_sig = list(ad.significance_level)
-                if 5 in ad_sig:
-                    idx = ad_sig.index(5)
-                    ad_normal = ad.statistic < ad_crit[idx]
-                else:
-                    ad_normal = False
-                sw_normal = sw_p > 0.05
-                dp_normal = dp_p > 0.05
-                normal_flag = normal_flag and (ad_normal or sw_normal or dp_normal)
+    for g in grupos:
+        if len(g) >= 5:
+            ad = stats.anderson(g)
+            sw_stat, sw_p = stats.shapiro(g)
+            dp_stat, dp_p = stats.normaltest(g)
+            ad_crit = ad.critical_values
+            ad_sig = list(ad.significance_level)
+            if 5 in ad_sig:
+                idx = ad_sig.index(5)
+                ad_normal = ad.statistic < ad_crit[idx]
+            else:
+                ad_normal = False
+            sw_normal = sw_p > 0.05
+            dp_normal = dp_p > 0.05
+            if not (ad_normal or sw_normal or dp_normal):
+                normal_flag = False
 
+    # Recomendação ANOVA
     recomendacao = ""
     if normal_flag:
-        recomendacao = "⚠ Observação: Como os três grupos de dados apresentaram indícios de normalidade, recomenda-se considerar o uso do teste paramétrico One Way ANOVA, caso os pressupostos sejam atendidos."
+        recomendacao = "⚠ Observação: Como todos os grupos apresentaram indícios de normalidade, recomenda-se considerar o uso do teste paramétrico One Way ANOVA, caso os pressupostos sejam atendidos."
 
     # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
-    if x:
-        df_valid.boxplot(column=coluna_y, by=x, ax=ax, grid=False)
-        medianas = df_valid.groupby(x)[coluna_y].median()
-        ax.plot(range(1, len(medianas) + 1), medianas.values, color='blue', marker='o', linestyle='-', label='Medianas')
+    if len(lista_y) > 1:
+        ax.boxplot(grupos, labels=nomes_grupos)
+        medias = [np.mean(g) for g in grupos]
+        ax.plot(range(1, len(medias)+1), medias, color='blue', marker='o', linestyle='-', label='Médias')
     else:
-        ax.boxplot(grupos, labels=[coluna_y])
-        medianas = [np.median(g) for g in grupos]
-        ax.plot(range(1, len(medianas) + 1), medianas, color='blue', marker='o', linestyle='-', label='Medianas')
+        df_valid.boxplot(column=y_col, by=subgrupo, ax=ax, grid=False)
+        medias = df_valid.groupby(subgrupo)[y_col].mean()
+        ax.plot(range(1, len(medias)+1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
 
-    ax.set_title("Kruskal-Wallis - Boxplot por Grupo", fontsize=10)
+    ax.set_title("Kruskal-Wallis - Boxplot por Grupo")
     ax.set_xlabel("Grupo")
     ax.set_ylabel("Valor")
     plt.suptitle("")
@@ -983,13 +986,13 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Report no padrão aprovado
+    # Texto do relatório
     texto = f"""
 📊 Análise – Kruskal-Wallis
 
 🔹 Hipóteses:
-- H₀: As distribuições (medianas) dos grupos são iguais
-- H₁: Pelo menos um grupo possui distribuição (mediana) diferente
+- H₀: As medianas dos grupos são iguais
+- H₁: Pelo menos uma mediana de grupo é diferente
 
 🔎 Estatísticas Kruskal-Wallis:
 - Estatística H = {h_stat:.4f}
@@ -998,10 +1001,11 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
 {recomendacao}
 
 🔎 Conclusão:
-{"✅ Rejeitamos H0. Há diferenças estatisticamente significativas entre as medianas dos grupos." if p_valor < 0.05 else "⚠ Não rejeitamos H0. Não há evidências de diferenças estatísticas significativas entre as medianas dos grupos."}
+{"✅ Rejeitamos H0: há diferença estatisticamente significativa entre as medianas dos grupos." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença estatisticamente significativa entre as medianas dos grupos."}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
