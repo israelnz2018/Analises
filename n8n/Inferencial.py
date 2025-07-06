@@ -1686,6 +1686,7 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
     ic_lower = (n - 1) * s2 / chi2_upper
     ic_upper = (n - 1) * s2 / chi2_lower
 
+    # normalidade
     ad = stats.anderson(y)
     sw_stat, sw_p = stats.shapiro(y)
     dp_stat, dp_p = stats.normaltest(y)
@@ -1699,10 +1700,11 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
         ad_normal = False
     sw_normal = sw_p > 0.05
     dp_normal = dp_p > 0.05
+    algum_normal = ad_normal or sw_normal or dp_normal
 
     recomendacao = ""
-    if not (ad_normal or sw_normal or dp_normal):
-        recomendacao = "⚠ Os dados podem não ser normais. O intervalo de confiança da variância pode não ser confiável."
+    if not algum_normal:
+        recomendacao = "⚠️ Os dados não são normais. O intervalo de confiança da variância pode não ser confiável."
 
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 2))
@@ -1721,21 +1723,27 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-**1 Intervalo de Confiança da Variância**
-- Variância amostra: {s2:.4f}
-- N: {n}
-- Nível de confiança: {nivel_conf:.1f}%
-- Intervalo: [{ic_lower:.4f}, {ic_upper:.4f}]
+📊 **Análise – Intervalo de Confiança da Variância**
 
-**Normalidade dos dados**
-- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+🔹 **Descrição:**
+Coluna = {coluna_y}
+N = {n}
+Variância amostral = {s2:.2f}
+
+🔎 **Intervalo de Confiança ({nivel_conf:.1f}%):**
+[{ic_lower:.2f}, {ic_upper:.2f}]
+
+🔎 **Testes de Normalidade:**
+{coluna_y}: {"✅ Os dados parecem ser normais." if algum_normal else "❌ Os dados não são normais."}
+
+🔎 **Conclusão:**
+O intervalo de confiança da variância foi calculado assumindo normalidade dos dados.
 
 {recomendacao}
 """
 
     return texto.strip(), grafico_base64
+
 
 def analise_1_proporcao(df: pd.DataFrame, coluna_y, field_conf=None):
     if not coluna_y:
