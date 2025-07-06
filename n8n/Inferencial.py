@@ -1279,59 +1279,47 @@ def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
             ad_normal = False
         sw_normal = sw_p > 0.05
         dp_normal = dp_p > 0.05
-        return ad, ad_normal, sw_p, sw_normal, dp_p, dp_normal
+        algum_normal = ad_normal or sw_normal or dp_normal
+        return algum_normal
 
-    ad1, ad1_normal, sw1_p, sw1_normal, dp1_p, dp1_normal = normalidade(dados1)
-    ad2, ad2_normal, sw2_p, sw2_normal, dp2_p, dp2_normal = normalidade(dados2)
+    normal1 = normalidade(dados1)
+    normal2 = normalidade(dados2)
 
     recomendacao = ""
-    if not (ad1_normal and ad2_normal and sw1_normal and sw2_normal and dp1_normal and dp2_normal):
-        recomendacao = "⚠ Os dados podem não ser normais. Considere o uso do teste de Levene ou Brown-Forsythe."
-
-    aplicar_estilo_minitab()
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-
-    axes[0].boxplot([dados1, dados2], labels=[col1, col2], patch_artist=True,
-                    boxprops=dict(facecolor='lightblue'))
-    axes[0].set_title("Boxplot por Grupo")
-    axes[0].set_ylabel("Valores")
-
-    axes[1].bar([col1, col2], [var1, var2], color=['skyblue', 'lightgreen'])
-    axes[1].set_title("Comparação das Variâncias")
-    axes[1].set_ylabel("Variância")
-
-    plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    if not (normal1 and normal2):
+        recomendacao = "⚠️ Como pelo menos um dos conjuntos de dados não é normal, recomenda-se utilizar o teste de Levene ou Brown-Forsythe para confirmação."
 
     texto = f"""
-**2 Variâncias**
-- Variância {col1}: {var1:.4f}
-- Variância {col2}: {var2:.4f}
-- Estatística F: {f_stat:.4f}
-- p-valor: {p_valor:.4f}
-- Nível de confiança: {confidence:.1f}%
+📊 Análise – Teste F para Igualdade de Variâncias
 
-**Normalidade {col1}**
-- Anderson-Darling: estatística={ad1.statistic:.4f}, normalidade={'Aprovada' if ad1_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor={sw1_p:.4f}, normalidade={'Aprovada' if sw1_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor={dp1_p:.4f}, normalidade={'Aprovada' if dp1_normal else 'Reprovada'}
+🔹 Hipóteses:
+- H₀: As variâncias de {col1} e {col2} são iguais
+- H₁: As variâncias de {col1} e {col2} são diferentes
 
-**Normalidade {col2}**
-- Anderson-Darling: estatística={ad2.statistic:.4f}, normalidade={'Aprovada' if ad2_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor={sw2_p:.4f}, normalidade={'Aprovada' if sw2_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor={dp2_p:.4f}, normalidade={'Aprovada' if dp2_normal else 'Reprovada'}
+🔎 Estatísticas Descritivas:
+
+{col1}:
+Variância = {var1:.2f}
+
+{col2}:
+Variância = {var2:.2f}
+
+🔎 Teste F para Igualdade de Variâncias:
+Estatística F = {f_stat:.2f}
+p-valor = {p_valor:.2f}
+
+🔎 Testes de Normalidade:
+{col1}: {"✅ Os dados parecem ser normais." if normal1 else "❌ Os dados não são normais."}
+{col2}: {"✅ Os dados parecem ser normais." if normal2 else "❌ Os dados não são normais."}
+
+🔎 Conclusão:
+{"Com " + str(int(confidence)) + "% de confiança, rejeitamos a hipótese conservadora. Logo, há diferença estatisticamente significativa entre as variâncias." if p_valor < alpha else "Com " + str(int(confidence)) + "% de confiança, não rejeitamos H0. Não há diferença significativa entre as variâncias."}
 
 {recomendacao}
-
-**Conclusão**
-{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
 """
 
-    return texto.strip(), grafico_base64
+    return texto.strip(), None
+
 
 
 
