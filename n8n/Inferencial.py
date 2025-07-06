@@ -1840,74 +1840,73 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
     return texto.strip(), grafico_base64
 
 
-def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
-    if not coluna_x:
-        return "❌ O teste 2 Proporções requer pelo menos a coluna X.", None
+def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
+    if not coluna_x or not coluna_y:
+        return "❌ O teste 2 Proporções requer as colunas X (grupo) e Y (resultado binário).", None
 
     if coluna_x not in df.columns:
         return f"❌ A coluna {coluna_x} não foi encontrada no arquivo.", None
 
-    x = df[coluna_x].dropna()
+    if coluna_y not in df.columns:
+        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
+
+    df_valid = df[[coluna_x, coluna_y]].dropna()
+    grupos = df_valid[coluna_x].unique()
+    if len(grupos) != 2:
+        return "❌ O teste 2 Proporções requer exatamente 2 grupos distintos na coluna X.", None
 
     nivel_conf = 95.0
     alpha = 1 - (nivel_conf / 100)
     z = stats.norm.ppf(1 - alpha / 2)
 
-    if coluna_y and coluna_y in df.columns:
-        # fluxo tabela: coluna_x = grupo, coluna_y = sucesso/fracasso
-        df_valid = df[[coluna_x, coluna_y]].dropna()
-        grupos = df_valid[coluna_x].unique()
-        if len(grupos) != 2:
-            return "❌ O teste 2 Proporções com tabela requer exatamente 2 grupos na coluna X.", None
+    prop = {}
+    n = {}
+    for g in grupos:
+        sub = df_valid[df_valid[coluna_x] == g][coluna_y]
+        n[g] = len(sub)
+        if n[g] < 5:
+            return f"❌ O grupo {g} requer ao menos 5 valores não nulos.", None
+        prop[g] = np.mean(sub == sub.unique()[0])  # considera sucesso como a primeira categoria encontrada
 
-        prop = {}
-        n = {}
-        for g in grupos:
-            sub = df_valid[df_valid[coluna_x] == g][coluna_y]
-            n[g] = len(sub)
-            if n[g] < 5:
-                return f"❌ O grupo {g} requer ao menos 5 valores não nulos.", None
-            prop[g] = np.mean(sub == sub.unique()[0])
+    g1, g2 = grupos
+    p1, p2 = prop[g1], prop[g2]
+    n1, n2 = n[g1], n[g2]
 
-        g1, g2 = grupos
-        p1, p2 = prop[g1], prop[g2]
-        n1, n2 = n[g1], n[g2]
+    # cálculo estatístico - Z test
+    p_pool = (p1 * n1 + p2 * n2) / (n1 + n2)
+    se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+    z_stat = (p1 - p2) / se
+    p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
-        # cálculo estatístico - Z test
-        p_pool = (p1 * n1 + p2 * n2) / (n1 + n2)
-        se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
-        z_stat = (p1 - p2) / se
-        p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+    # IC da diferença
+    se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+    diff = p1 - p2
+    ic_lower = diff - z * se_diff
+    ic_upper = diff + z * se_diff
 
-        # IC da diferença
-        se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
-        diff = p1 - p2
-        ic_lower = diff - z * se_diff
-        ic_upper = diff + z * se_diff
+    # gráfico
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
+    ax.errorbar([0, 1], [p1, p2],
+                yerr=[[p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)),
+                       p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2))],
+                      [min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1,
+                       min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2]],
+                fmt='o', color='black', capsize=5)
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels([g1, g2])
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("Proporção")
+    ax.set_title(f"2 Proporções - IC {nivel_conf:.1f}% e Teste H0: p1 = p2")
+    plt.tight_layout()
 
-        # gráfico
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
-        ax.errorbar([0, 1], [p1, p2],
-                    yerr=[[p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)),
-                           p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2))],
-                          [min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1,
-                           min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2]],
-                    fmt='o', color='black', capsize=5)
-        ax.set_xticks([0, 1])
-        ax.set_xticklabels([g1, g2])
-        ax.set_ylim(0, 1)
-        ax.set_ylabel("Proporção")
-        ax.set_title(f"2 Proporções - IC {nivel_conf:.1f}% e Teste H0: p1 = p2")
-        plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-        buf = BytesIO()
-        plt.savefig(buf, format='png')
-        plt.close(fig)
-        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-        texto = f"""
+    texto = f"""
 📊 **Análise – Teste de 2 Proporções**
 
 🔹 **Hipóteses:**
@@ -1928,46 +1927,8 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
 {"✅ Com {nivel_conf:.1f}% de confiança, rejeitamos H0. As proporções são estatisticamente diferentes." if p_valor < alpha else f"⚠️ Com {nivel_conf:.1f}% de confiança, não rejeitamos H0. Não há diferença significativa entre as proporções."}
 """
 
-    else:
-        # fluxo sem coluna_y: qui-quadrado para 2 categorias
-        categorias = x.value_counts()
-        if len(categorias) != 2:
-            return "❌ O teste 2 Proporções requer exatamente 2 categorias na coluna X.", None
-
-        g1, g2 = categorias.index
-        obs = categorias.values
-        chi2, p_valor = stats.chisquare(obs)
-
-        aplicar_estilo_minitab()
-        fig, ax = plt.subplots(figsize=(6, 4))
-        ax.bar([0, 1], obs, color=['skyblue', 'lightgreen'])
-        ax.set_xticks([0, 1])
-        ax.set_xticklabels([g1, g2])
-        ax.set_ylabel("Frequência")
-        ax.set_title("Frequências Observadas - Teste Qui-Quadrado")
-        plt.tight_layout()
-
-        buf = BytesIO()
-        plt.savefig(buf, format='png')
-        plt.close(fig)
-        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-        texto = f"""
-📊 **Análise – Teste Qui-Quadrado para 2 Categorias**
-
-🔎 **Frequências Observadas:**
-- {g1}: {obs[0]}
-- {g2}: {obs[1]}
-
-🔎 **Teste Qui-Quadrado:**
-- Estatística χ² = {chi2:.2f}
-- p-valor = {p_valor:.2f}
-
-🔎 **Conclusão:**
-{"✅ Com 95% de confiança, rejeitamos H0. As frequências são estatisticamente diferentes." if p_valor < 0.05 else "⚠️ Com 95% de confiança, não rejeitamos H0. Não há diferença significativa entre as frequências."}
-"""
-
     return texto.strip(), grafico_base64
+
 
 
 
