@@ -1877,7 +1877,7 @@ ANALISES = {
     "Friedman Pareado": analise_friedman_pareado,
     "1 Intervalo de Confianca": analise_1_intervalo_confianca,
     "1 Intervalo Interquartilico": analise_1_intervalo_interquartilico,
-    "2 Variancas": analise_2_variancas,
+    "2 Varianças": analise_2_variancas,
     "2 Variancas Brown-Forsythe": analise_2_variancas_brown_forsythe,
     "Bartlett": analise_bartlett,
     "Brown-Forsythe": analise_brown_forsythe,
