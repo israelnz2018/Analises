@@ -1840,7 +1840,6 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
     return texto.strip(), grafico_base64
 
 
-
 def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
     if not coluna_x:
         return "❌ O teste 2 Proporções requer pelo menos a coluna X.", None
@@ -1855,6 +1854,7 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
     z = stats.norm.ppf(1 - alpha / 2)
 
     if coluna_y and coluna_y in df.columns:
+        # fluxo tabela: coluna_x = grupo, coluna_y = sucesso/fracasso
         df_valid = df[[coluna_x, coluna_y]].dropna()
         grupos = df_valid[coluna_x].unique()
         if len(grupos) != 2:
@@ -1873,48 +1873,41 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
         p1, p2 = prop[g1], prop[g2]
         n1, n2 = n[g1], n[g2]
 
-    else:
-        categorias = x.value_counts()
-        if len(categorias) != 2:
-            return "❌ O teste 2 Proporções requer exatamente 2 categorias na coluna X.", None
+        # cálculo estatístico - Z test
+        p_pool = (p1 * n1 + p2 * n2) / (n1 + n2)
+        se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+        z_stat = (p1 - p2) / se
+        p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
-        g1, g2 = categorias.index
-        n1, n2 = categorias[g1], categorias[g2]
-        total = n1 + n2
-        p1, p2 = n1 / total, n2 / total
+        # IC da diferença
+        se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+        diff = p1 - p2
+        ic_lower = diff - z * se_diff
+        ic_upper = diff + z * se_diff
 
-    p_pool = (p1 * n1 + p2 * n2) / (n1 + n2)
-    se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
-    z_stat = (p1 - p2) / se
-    p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+        # gráfico
+        aplicar_estilo_minitab()
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
+        ax.errorbar([0, 1], [p1, p2],
+                    yerr=[[p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)),
+                           p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2))],
+                          [min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1,
+                           min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2]],
+                    fmt='o', color='black', capsize=5)
+        ax.set_xticks([0, 1])
+        ax.set_xticklabels([g1, g2])
+        ax.set_ylim(0, 1)
+        ax.set_ylabel("Proporção")
+        ax.set_title(f"2 Proporções - IC {nivel_conf:.1f}% e Teste H0: p1 = p2")
+        plt.tight_layout()
 
-    se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
-    diff = p1 - p2
-    ic_lower = diff - z * se_diff
-    ic_upper = diff + z * se_diff
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close(fig)
+        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
-    ax.errorbar([0, 1], [p1, p2],
-                yerr=[[p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)),
-                       p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2))],
-                      [min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1,
-                       min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2]],
-                fmt='o', color='black', capsize=5)
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels([g1, g2])
-    ax.set_ylim(0, 1)
-    ax.set_ylabel("Proporção")
-    ax.set_title(f"2 Proporções - IC {nivel_conf:.1f}% e Teste H0: p1 = p2")
-    plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-    texto = f"""
+        texto = f"""
 📊 **Análise – Teste de 2 Proporções**
 
 🔹 **Hipóteses:**
@@ -1925,7 +1918,7 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
 - {g1}: proporção = {p1:.2f}, N = {n1}
 - {g2}: proporção = {p2:.2f}, N = {n2}
 
-🔎 **Teste de 2 Proporções:**
+🔎 **Teste de 2 Proporções (Z-test):**
 - Diferença = {diff:.2f}
 - Intervalo {nivel_conf:.1f}% = [{ic_lower:.2f}, {ic_upper:.2f}]
 - Estatística Z = {z_stat:.2f}
@@ -1935,7 +1928,47 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
 {"✅ Com {nivel_conf:.1f}% de confiança, rejeitamos H0. As proporções são estatisticamente diferentes." if p_valor < alpha else f"⚠️ Com {nivel_conf:.1f}% de confiança, não rejeitamos H0. Não há diferença significativa entre as proporções."}
 """
 
+    else:
+        # fluxo sem coluna_y: qui-quadrado para 2 categorias
+        categorias = x.value_counts()
+        if len(categorias) != 2:
+            return "❌ O teste 2 Proporções requer exatamente 2 categorias na coluna X.", None
+
+        g1, g2 = categorias.index
+        obs = categorias.values
+        chi2, p_valor = stats.chisquare(obs)
+
+        aplicar_estilo_minitab()
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.bar([0, 1], obs, color=['skyblue', 'lightgreen'])
+        ax.set_xticks([0, 1])
+        ax.set_xticklabels([g1, g2])
+        ax.set_ylabel("Frequência")
+        ax.set_title("Frequências Observadas - Teste Qui-Quadrado")
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close(fig)
+        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+        texto = f"""
+📊 **Análise – Teste Qui-Quadrado para 2 Categorias**
+
+🔎 **Frequências Observadas:**
+- {g1}: {obs[0]}
+- {g2}: {obs[1]}
+
+🔎 **Teste Qui-Quadrado:**
+- Estatística χ² = {chi2:.2f}
+- p-valor = {p_valor:.2f}
+
+🔎 **Conclusão:**
+{"✅ Com 95% de confiança, rejeitamos H0. As frequências são estatisticamente diferentes." if p_valor < 0.05 else "⚠️ Com 95% de confiança, não rejeitamos H0. Não há diferença significativa entre as frequências."}
+"""
+
     return texto.strip(), grafico_base64
+
 
 
 
