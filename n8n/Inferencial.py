@@ -1179,18 +1179,18 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
         recomendacao = "⚠ Os dados podem ser normais. Considere também o cálculo do intervalo de confiança da média."
 
     aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 2))
+    fig, ax = plt.subplots(figsize=(6, 3))
 
-    # Boxplot tradicional
+    # Boxplot tradicional (vertical para maior clareza visual)
     ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
 
-    # Linha vertical da mediana
+    # Linha vertical da mediana dentro do boxplot
     ax.axvline(mediana, color='blue', linestyle='-', linewidth=1)
-    ax.text(mediana, 1.1, f'Mediana: {mediana:.2f}', color='blue', ha='center', fontsize=8)
+    ax.text(mediana, 1.05, f'Mediana: {mediana:.2f}', color='blue', ha='center', fontsize=8)
 
     # Barra do IQR abaixo do boxplot
-    ax.hlines(-0.3, q1, q3, color='black', lw=4, label=f'IQR: {iqr:.2f}')
-    ax.text((q1+q3)/2, -0.5, f'IQR: {iqr:.2f}', ha='center', fontsize=8)
+    ax.hlines(0.5, q1, q3, color='black', lw=4)
+    ax.text((q1+q3)/2, 0.3, f'IQR: {iqr:.2f}', ha='center', fontsize=8)
 
     ax.set_title("1 Intervalo Interquartílico - Boxplot", fontsize=10)
     ax.set_xlabel(coluna_y)
@@ -1223,6 +1223,7 @@ O IQR indica que os 50% centrais dos dados estão distribuídos em um intervalo 
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
