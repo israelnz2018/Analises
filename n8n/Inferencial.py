@@ -1181,16 +1181,22 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 3))
 
-    # Boxplot tradicional (vertical para maior clareza visual)
-    ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+    # Boxplot tradicional
+    bplot = ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
 
-    # Linha vertical da mediana dentro do boxplot
-    ax.axvline(mediana, color='blue', linestyle='-', linewidth=1)
-    ax.text(mediana, 1.05, f'Mediana: {mediana:.2f}', color='blue', ha='center', fontsize=8)
+    # Linha azul da mediana apenas dentro do boxplot
+    mediana_x = mediana
+    mediana_ymin = 0.95
+    mediana_ymax = 1.05
+    ax.vlines(mediana_x, mediana_ymin, mediana_ymax, color='blue', linestyle='-', linewidth=1)
 
-    # Barra do IQR abaixo do boxplot
-    ax.hlines(0.5, q1, q3, color='black', lw=4)
-    ax.text((q1+q3)/2, 0.3, f'IQR: {iqr:.2f}', ha='center', fontsize=8)
+    # Label “Mediana” acima do boxplot
+    ax.text(mediana, 1.08, f'Mediana: {mediana:.2f}', color='blue', ha='center', fontsize=8)
+
+    # Linha preta do IQR abaixo do boxplot, mais próxima
+    ax.hlines(0.85, q1, q3, color='black', lw=4)
+    # Valor do IQR logo abaixo da linha preta
+    ax.text((q1+q3)/2, 0.80, f'IQR: {iqr:.2f}', ha='center', fontsize=8)
 
     ax.set_title("1 Intervalo Interquartílico - Boxplot", fontsize=10)
     ax.set_xlabel(coluna_y)
@@ -1223,6 +1229,7 @@ O IQR indica que os 50% centrais dos dados estão distribuídos em um intervalo 
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
