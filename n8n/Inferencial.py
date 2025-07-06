@@ -249,6 +249,15 @@ Com {confidence:.0f}% de confiança, {"podemos rejeitar a hipótese conservadora
 from suporte import *
 
 def analise_paired_t(df: pd.DataFrame, lista_y: list, field_conf=None):
+    import numpy as np
+    import pandas as pd
+    from scipy import stats
+    from scipy.stats import anderson, shapiro, kstest, norm
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from suporte import aplicar_estilo_minitab
+
     if len(lista_y) != 2:
         return "❌ O teste t pareado requer exatamente 2 colunas Y.", None
 
@@ -260,7 +269,6 @@ def analise_paired_t(df: pd.DataFrame, lista_y: list, field_conf=None):
     min_len = min(len(dados1), len(dados2))
     dados1 = dados1.iloc[:min_len]
     dados2 = dados2.iloc[:min_len]
-
     diferencas = dados1 - dados2
 
     # Nível de confiança
@@ -272,41 +280,70 @@ def analise_paired_t(df: pd.DataFrame, lista_y: list, field_conf=None):
         confidence = 95.0
     alpha = 1 - (confidence / 100)
 
-    # Teste de normalidade (Anderson-Darling)
-    normalidade = stats.anderson(diferencas)
-    ad_stat = normalidade.statistic
-    ad_crit = normalidade.critical_values
-    ad_sig = normalidade.significance_level
-    ad_aprovado = ad_stat < ad_crit[list(ad_sig).index(5)] if 5 in ad_sig else False
-
-    # Teste t pareado
-    t_stat, p_valor = stats.ttest_rel(dados1, dados2, nan_policy='omit')
+    n = len(diferencas)
     media_diff = np.mean(diferencas)
     desvio_diff = np.std(diferencas, ddof=1)
-    n = len(diferencas)
     se_diff = desvio_diff / np.sqrt(n)
     intervalo = stats.t.interval(1 - alpha, n-1, loc=media_diff, scale=se_diff)
+    t_stat, p_valor = stats.ttest_rel(dados1, dados2, nan_policy='omit')
 
-    # Conclusão
-    conclusao = "✅ As diferenças seguem distribuição normal (Anderson-Darling)." if ad_aprovado else "⚠ As diferenças podem não ser normais (Anderson-Darling)."
-    if p_valor < alpha:
-        conclusao += f" ✅ Rejeitamos H0 (p = {p_valor:.4f}). Existe diferença significativa entre as médias."
-    else:
-        conclusao += f" ⚠ Não rejeitamos H0 (p = {p_valor:.4f}). Não há diferença significativa entre as médias."
+    # Testes de normalidade consolidados
+    ad = anderson(diferencas)
+    normal_ad = ad.statistic < ad.critical_values[2]
+
+    stat_shapiro, p_shapiro = shapiro(diferencas)
+    normal_shapiro = p_shapiro > 0.05
+
+    stat_ks, p_ks = kstest(diferencas, 'norm', args=(media_diff, desvio_diff))
+    normal_ks = p_ks > 0.05
+
+    normal_final = normal_ad or normal_shapiro or normal_ks
+
+    # 🔷 Ajuste BR
+    def br(value):
+        return str(round(value, 2)).replace('.', ',')
+
+    # Reporte
+    texto = f"""
+📊 **Análise – Teste T Pareado**
+
+🔹 **Hipóteses:**
+- **H₀:** A média das diferenças entre os pares é igual a zero
+- **H₁:** A média das diferenças entre os pares é diferente de zero
+
+🔎 **Estatísticas Descritivas das Diferenças:**
+- N = {n}
+- Média = {br(media_diff)}
+- Desvio Padrão = {br(desvio_diff)}
+- Intervalo de Confiança ({confidence:.0f}%) = [{br(intervalo[0])} ; {br(intervalo[1])}]
+
+🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, Kolmogorov-Smirnov):**
+- Diferenças: {"✅ Os dados podem ser considerados normais" if normal_final else "❌ Os dados não são normais"}
+
+🔎 **Teste T Pareado:**
+- Estatística t = {br(t_stat)}
+- p-valor = {br(p_valor)}
+
+🔎 **Conclusão:**
+Com {confidence:.0f}% de confiança, {"podemos rejeitar a hipótese conservadora. Logo, há diferença estatisticamente significativa entre os pares avaliados." if p_valor < alpha else "não podemos rejeitar a hipótese conservadora. Logo, não há diferença estatisticamente significativa entre os pares avaliados."}
+"""
+
+    if not normal_final:
+        texto += "\n⚠️ Como as diferenças não são normais, recomenda-se coletar mais dados e/ou verificar a estabilidade do processo."
 
     # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.hist(diferencas, bins=8, color='skyblue', edgecolor='black')
-    ax.set_title(f"Histograma das Diferenças\n(com H0 e intervalo t {confidence:.1f}% para a média)")
+    ax.set_title(f"Histograma das Diferenças\n(com H0 e intervalo t {confidence:.0f}% para a média)")
     ax.set_xlabel("Diferenças")
     ax.set_ylabel("Frequência")
 
-    # Adiciona H0 (linha no 0)
+    # Linha H0
     ax.axvline(0, color='red', linestyle='--', label='H0')
 
-    # Adiciona intervalo de confiança
-    ax.hlines(-0.5, intervalo[0], intervalo[1], color='blue', lw=4, label=f"IC {confidence:.1f}%")
+    # Intervalo de confiança
+    ax.hlines(-0.5, intervalo[0], intervalo[1], color='blue', lw=4, label=f"IC {confidence:.0f}%")
     ax.text(media_diff, -1, "X̄", color='blue', ha='center')
 
     ax.legend()
@@ -317,22 +354,8 @@ def analise_paired_t(df: pd.DataFrame, lista_y: list, field_conf=None):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto da análise
-    texto = f"""
-**Teste t Pareado**
-- Média das diferenças: {media_diff:.4f}
-- Desvio padrão das diferenças: {desvio_diff:.4f}
-- N: {n}
-- Intervalo {confidence:.1f}%: [{intervalo[0]:.4f}, {intervalo[1]:.4f}]
-- Estatística t: {t_stat:.4f}
-- p-valor: {p_valor:.4f}
-- Anderson-Darling: estatística={ad_stat:.4f}, normalidade={'Aprovada' if ad_aprovado else 'Reprovada'}
-
-**Conclusão**
-{conclusao}
-"""
-
     return texto.strip(), grafico_base64
+
 
 
 
