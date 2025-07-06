@@ -1546,6 +1546,7 @@ p-valor = {p_valor:.2f}
 def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
     grupos = []
     variancias = {}
+    normalidades = {}
 
     if subgrupo and subgrupo in df.columns and len(lista_y) == 1:
         y_col = lista_y[0]
@@ -1557,6 +1558,21 @@ def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo=None, field
                 return f"❌ O grupo {nome} requer ao menos 5 valores não nulos.", None
             grupos.append(g)
             variancias[str(nome)] = np.var(g, ddof=1)
+            # normalidade
+            ad = stats.anderson(g)
+            sw_stat, sw_p = stats.shapiro(g)
+            dp_stat, dp_p = stats.normaltest(g)
+            ad_crit = ad.critical_values
+            ad_sig = list(ad.significance_level)
+            if 5 in ad_sig:
+                idx = ad_sig.index(5)
+                ad_normal = ad.statistic < ad_crit[idx]
+            else:
+                ad_normal = False
+            sw_normal = sw_p > 0.05
+            dp_normal = dp_p > 0.05
+            algum_normal = ad_normal or sw_normal or dp_normal
+            normalidades[str(nome)] = algum_normal
         labels = list(df_valid[subgrupo].unique())
     else:
         if len(lista_y) < 2:
@@ -1569,9 +1585,30 @@ def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo=None, field
                 return f"❌ O grupo {col} requer ao menos 5 valores não nulos.", None
             grupos.append(dados)
             variancias[col] = np.var(dados, ddof=1)
+            # normalidade
+            ad = stats.anderson(dados)
+            sw_stat, sw_p = stats.shapiro(dados)
+            dp_stat, dp_p = stats.normaltest(dados)
+            ad_crit = ad.critical_values
+            ad_sig = list(ad.significance_level)
+            if 5 in ad_sig:
+                idx = ad_sig.index(5)
+                ad_normal = ad.statistic < ad_crit[idx]
+            else:
+                ad_normal = False
+            sw_normal = sw_p > 0.05
+            dp_normal = dp_p > 0.05
+            algum_normal = ad_normal or sw_normal or dp_normal
+            normalidades[col] = algum_normal
         labels = lista_y
 
     stat, p_valor = stats.levene(*grupos, center='median')
+
+    # recomendação se todos normais
+    if all(normalidades.values()):
+        recomendacao = "⚠️ Todos os grupos parecem ser normais. Recomenda-se utilizar o teste paramétrico equivalente para maior precisão."
+    else:
+        recomendacao = ""
 
     aplicar_estilo_minitab()
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
@@ -1592,18 +1629,30 @@ def analise_brown_forsythe(df: pd.DataFrame, lista_y: list, subgrupo=None, field
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    variancia_texto = "\n".join([f"- Variância {label}: {variancias[label]:.4f}" for label in labels])
-    texto = f"""
-**Brown-Forsythe - Teste de Igualdade de Variâncias**
-{variancia_texto}
-- Estatística Brown-Forsythe: {stat:.4f}
-- p-valor: {p_valor:.4f}
+    variancia_texto = "\n".join([f"{label}: Variância = {variancias[label]:.2f}, Normalidade = {'✅' if normalidades[label] else '❌'}" for label in labels])
 
-**Conclusão**
-{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
+    texto = f"""
+📊 **Análise – Teste Brown-Forsythe para Igualdade de Variâncias**
+
+🔹 **Hipóteses:**
+- H₀: As variâncias dos grupos são iguais
+- H₁: As variâncias dos grupos são diferentes
+
+🔎 **Estatísticas Descritivas e Normalidade:**
+{variancia_texto}
+
+🔎 **Teste Brown-Forsythe:**
+Estatística = {stat:.2f}
+p-valor = {p_valor:.2f}
+
+🔎 **Conclusão:**
+{"Com 95% de confiança, rejeitamos a hipótese conservadora. Logo, há diferença estatisticamente significativa entre as variâncias dos grupos." if p_valor < 0.05 else "Com 95% de confiança, não rejeitamos H0. Não há diferença significativa entre as variâncias dos grupos."}
+
+{recomendacao}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_conf=None):
