@@ -895,7 +895,6 @@ def analise_2_wilcoxon_paired(df: pd.DataFrame, lista_y: list, field_conf=None):
 
 
 
-
 def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
     if not lista_y or len(lista_y) != 1:
         return "❌ A análise Kruskal-Wallis requer exatamente 1 coluna Y.", None
@@ -904,7 +903,7 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
     x = subgrupo if subgrupo and subgrupo in df.columns else None
 
     if coluna_y not in df.columns:
-        return "❌ A coluna Y informada não foi encontrada no DataFrame.", None
+        return f"❌ A coluna {coluna_y} não foi encontrada no DataFrame.", None
 
     if x:
         df_valid = df[[coluna_y, x]].dropna()
@@ -917,9 +916,11 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
         if len(grupos[0]) < 2:
             return "❌ O Kruskal-Wallis requer ao menos uma coluna Y com dados suficientes.", None
 
+    # Calcula o teste Kruskal-Wallis
     h_stat, p_valor = stats.kruskal(*grupos)
 
-    normal_flag = False
+    # Testes de normalidade dos grupos
+    normal_flag = True
     if x:
         for nome, g in df_valid.groupby(x)[coluna_y]:
             dados = g.dropna()
@@ -936,8 +937,7 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
                     ad_normal = False
                 sw_normal = sw_p > 0.05
                 dp_normal = dp_p > 0.05
-                if ad_normal or sw_normal or dp_normal:
-                    normal_flag = True
+                normal_flag = normal_flag and (ad_normal or sw_normal or dp_normal)
     else:
         for g in grupos:
             if len(g) >= 5:
@@ -953,25 +953,25 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
                     ad_normal = False
                 sw_normal = sw_p > 0.05
                 dp_normal = dp_p > 0.05
-                if ad_normal or sw_normal or dp_normal:
-                    normal_flag = True
+                normal_flag = normal_flag and (ad_normal or sw_normal or dp_normal)
 
     recomendacao = ""
     if normal_flag:
-        recomendacao = "⚠ Pelo menos um grupo apresentou indícios de normalidade. Considere realizar o teste One Way ANOVA."
+        recomendacao = "⚠ Observação: Como os três grupos de dados apresentaram indícios de normalidade, recomenda-se considerar o uso do teste paramétrico One Way ANOVA, caso os pressupostos sejam atendidos."
 
+    # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     if x:
         df_valid.boxplot(column=coluna_y, by=x, ax=ax, grid=False)
-        medias = df_valid.groupby(x)[coluna_y].mean()
-        ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+        medianas = df_valid.groupby(x)[coluna_y].median()
+        ax.plot(range(1, len(medianas) + 1), medianas.values, color='blue', marker='o', linestyle='-', label='Medianas')
     else:
         ax.boxplot(grupos, labels=[coluna_y])
-        medias = [np.mean(g) for g in grupos]
-        ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
+        medianas = [np.median(g) for g in grupos]
+        ax.plot(range(1, len(medianas) + 1), medianas, color='blue', marker='o', linestyle='-', label='Medianas')
 
-    ax.set_title("Kruskal-Wallis - Boxplot por Grupo")
+    ax.set_title("Kruskal-Wallis - Boxplot por Grupo", fontsize=10)
     ax.set_xlabel("Grupo")
     ax.set_ylabel("Valor")
     plt.suptitle("")
@@ -983,18 +983,26 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Report no padrão aprovado
     texto = f"""
-**Kruskal-Wallis**
-- Estatística H: {h_stat:.4f}
-- p-valor: {p_valor:.4f}
+📊 Análise – Kruskal-Wallis
+
+🔹 Hipóteses:
+- H₀: As distribuições (medianas) dos grupos são iguais
+- H₁: Pelo menos um grupo possui distribuição (mediana) diferente
+
+🔎 Estatísticas Kruskal-Wallis:
+- Estatística H = {h_stat:.4f}
+- p-valor = {p_valor:.4f}
 
 {recomendacao}
 
-**Conclusão**
-{"✅ Rejeitamos H0: pelo menos um grupo tem distribuição diferente." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as distribuições dos grupos."}
+🔎 Conclusão:
+{"✅ Rejeitamos H0. Há diferenças estatisticamente significativas entre as medianas dos grupos." if p_valor < 0.05 else "⚠ Não rejeitamos H0. Não há evidências de diferenças estatísticas significativas entre as medianas dos grupos."}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
