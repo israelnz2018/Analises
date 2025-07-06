@@ -564,7 +564,6 @@ def analise_1_intervalo_confianca(df: pd.DataFrame, coluna_y, field_conf=None):
 
 
 
-
 def analise_1_wilcoxon(df: pd.DataFrame, coluna_y, field, field_conf=None):
     import numpy as np
     import pandas as pd
@@ -632,10 +631,10 @@ def analise_1_wilcoxon(df: pd.DataFrame, coluna_y, field, field_conf=None):
     fig, ax = plt.subplots(figsize=(6, 4))
     box = ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
 
-    # Linha da mediana amostra apenas dentro do boxplot
-    for line in box['medians']:
-        x, y_med = line.get_xydata()[0]
-        ax.vlines(x, y_med - 0.2, y_med + 0.2, color='blue', linestyle='-', label=f'Mediana amostra: {mediana_amostra:.2f}')
+    # Linha azul apenas dentro do boxplot
+    q1 = np.percentile(y, 25)
+    q3 = np.percentile(y, 75)
+    ax.vlines(mediana_amostra, 0.85, 1.15, color='blue', linestyle='-', label=f'Mediana amostra: {mediana_amostra:.2f}')
 
     # Linha vermelha pontilhada para mediana H0
     ax.axvline(valor_ref, color='red', linestyle='--', label=f'Mediana H0 ({valor_ref})')
@@ -673,6 +672,7 @@ def analise_1_wilcoxon(df: pd.DataFrame, coluna_y, field, field_conf=None):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
