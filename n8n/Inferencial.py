@@ -1843,20 +1843,17 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 
 
 
-    
-def analise_2_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
-    if len(lista_y) != 2:
-        return "❌ O teste 2 Proporções requer exatamente 2 colunas Y.", None
+  def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None, field_conf=None):
+    if not coluna_x:
+        return "❌ O teste 2 Proporções requer pelo menos a coluna X.", None
 
-    col1, col2 = lista_y
-    dados1 = df[col1].dropna()
-    dados2 = df[col2].dropna()
+    if coluna_x not in df.columns:
+        return f"❌ A coluna {coluna_x} não foi encontrada no arquivo.", None
 
-    if len(dados1) < 5 or len(dados2) < 5:
-        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
+    x = df[coluna_x].dropna()
 
     try:
-        nivel_conf = float(field_conf)
+        nivel_conf = float(field_conf) if field_conf else 95.0
         if nivel_conf <= 1:
             nivel_conf *= 100
         if not (50 <= nivel_conf < 100):
@@ -1865,22 +1862,52 @@ def analise_2_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
         return "❌ Valor do nível de confiança inválido. Informe um número como 95 no campo Field.", None
 
     alpha = 1 - (nivel_conf / 100)
+    z = stats.norm.ppf(1 - alpha / 2)
 
-    n1, n2 = len(dados1), len(dados2)
-    sucesso1, sucesso2 = np.sum(dados1), np.sum(dados2)
-    p1, p2 = sucesso1 / n1, sucesso2 / n2
+    if coluna_y and coluna_y in df.columns:
+        # fluxo tabela: coluna_x = grupo, coluna_y = sucesso/fracasso
+        df_valid = df[[coluna_x, coluna_y]].dropna()
+        grupos = df_valid[coluna_x].unique()
+        if len(grupos) != 2:
+            return "❌ O teste 2 Proporções com tabela requer exatamente 2 grupos na coluna X.", None
 
-    p_pool = (sucesso1 + sucesso2) / (n1 + n2)
+        prop = {}
+        n = {}
+        for g in grupos:
+            sub = df_valid[df_valid[coluna_x] == g][coluna_y]
+            n[g] = len(sub)
+            if n[g] < 5:
+                return f"❌ O grupo {g} requer ao menos 5 valores não nulos.", None
+            prop[g] = np.mean(sub == sub.unique()[0])  # considera sucesso como a primeira categoria encontrada
+
+        g1, g2 = grupos
+        p1, p2 = prop[g1], prop[g2]
+        n1, n2 = n[g1], n[g2]
+
+    else:
+        # fluxo sem coluna_y: coluna_x possui duas categorias
+        categorias = x.value_counts()
+        if len(categorias) != 2:
+            return "❌ O teste 2 Proporções requer exatamente 2 categorias na coluna X.", None
+
+        g1, g2 = categorias.index
+        n1, n2 = categorias[g1], categorias[g2]
+        total = n1 + n2
+        p1, p2 = n1 / total, n2 / total
+
+    # cálculo estatístico
+    p_pool = (p1 * n1 + p2 * n2) / (n1 + n2)
     se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
     z_stat = (p1 - p2) / se
     p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
+    # IC da diferença
     se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
-    z = stats.norm.ppf(1 - alpha / 2)
     diff = p1 - p2
     ic_lower = diff - z * se_diff
     ic_upper = diff + z * se_diff
 
+    # gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
@@ -1891,7 +1918,7 @@ def analise_2_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
                        min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2]],
                 fmt='o', color='black', capsize=5)
     ax.set_xticks([0, 1])
-    ax.set_xticklabels([col1, col2])
+    ax.set_xticklabels([g1, g2])
     ax.set_ylim(0, 1)
     ax.set_ylabel("Proporção")
     ax.set_title(f"2 Proporções - IC {nivel_conf:.1f}% e Teste H0: p1 = p2")
@@ -1903,20 +1930,28 @@ def analise_2_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-**2 Proporções**
-- Proporção {col1}: {p1:.4f}
-- Proporção {col2}: {p2:.4f}
-- Diferença: {diff:.4f}
-- Nível de confiança: {nivel_conf:.1f}%
-- Intervalo da diferença: [{ic_lower:.4f}, {ic_upper:.4f}]
-- Estatística Z: {z_stat:.4f}
-- p-valor: {p_valor:.4f}
+📊 **Análise – Teste de 2 Proporções**
 
-**Conclusão**
-{"✅ Rejeitamos H0: as proporções são diferentes." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre as proporções."}
+🔹 **Hipóteses:**
+- H₀: As proporções de {g1} e {g2} são iguais
+- H₁: As proporções de {g1} e {g2} são diferentes
+
+🔎 **Estatísticas Descritivas:**
+- {g1}: proporção = {p1:.2f}, N = {n1}
+- {g2}: proporção = {p2:.2f}, N = {n2}
+
+🔎 **Teste de 2 Proporções:**
+- Diferença = {diff:.2f}
+- Intervalo {nivel_conf:.1f}% = [{ic_lower:.2f}, {ic_upper:.2f}]
+- Estatística Z = {z_stat:.2f}
+- p-valor = {p_valor:.2f}
+
+🔎 **Conclusão:**
+{"✅ Com {nivel_conf:.1f}% de confiança, rejeitamos H0. As proporções são estatisticamente diferentes." if p_valor < alpha else f"⚠️ Com {nivel_conf:.1f}% de confiança, não rejeitamos H0. Não há diferença significativa entre as proporções."}
 """
 
     return texto.strip(), grafico_base64
+
 
 def analise_k_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
     if len(lista_y) < 2:
