@@ -1142,12 +1142,6 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
 
 
 
-
-
-
-
-
-
 def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=None):
     if not coluna_y:
         return "❌ O intervalo interquartílico requer exatamente 1 coluna Y.", None
@@ -1168,6 +1162,7 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     maximo = np.max(y)
     n = len(y)
 
+    # Testes de normalidade
     ad = stats.anderson(y)
     sw_stat, sw_p = stats.shapiro(y)
     dp_stat, dp_p = stats.normaltest(y)
@@ -1182,14 +1177,19 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     sw_normal = sw_p > 0.05
     dp_normal = dp_p > 0.05
 
+    normalidade_final = "✅ Os dados podem ser considerados normais" if (ad_normal or sw_normal or dp_normal) else "⚠ Os dados podem não ser normais"
+
     recomendacao = ""
     if ad_normal or sw_normal or dp_normal:
-        recomendacao = "⚠ Os dados podem ser normais. Considere também o cálculo do intervalo de confiança da média."
+        recomendacao = "Como os dados podem ser considerados normais, recomenda-se também calcular o intervalo de confiança da média para inferências adicionais."
+    else:
+        recomendacao = "Como os dados podem não ser normais, utilize o IQR como medida robusta de dispersão e considere análises não paramétricas se necessário."
 
+    # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 2))
     ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
-    ax.set_title("1 Intervalo Interquartílico - Boxplot")
+    ax.set_title("Intervalo Interquartílico - Boxplot", fontsize=10)
     ax.set_xlabel(coluna_y)
     plt.tight_layout()
 
@@ -1198,25 +1198,27 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Texto final
     texto = f"""
-**1 Intervalo Interquartílico**
-- Mediana: {mediana:.4f}
-- Q1 (25%): {q1:.4f}
-- Q3 (75%): {q3:.4f}
-- IQR (Q3 - Q1): {iqr:.4f}
-- Mínimo: {minimo:.4f}
-- Máximo: {maximo:.4f}
-- N: {n}
+📊 **Análise – Intervalo Interquartílico**
 
-**Normalidade dos dados**
-- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+🔎 **Descrição dos Dados:**
+- **N:** {n}
+- **Mediana:** {mediana:.2f}
+- **1º Quartil (Q1, 25%):** {q1:.2f}
+- **3º Quartil (Q3, 75%):** {q3:.2f}
+- **Intervalo Interquartílico (IQR):** {iqr:.2f}
+- **Mínimo:** {minimo:.2f}
+- **Máximo:** {maximo:.2f}
 
+🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
+- {normalidade_final}
+
+🔎 **Conclusão:**
 {recomendacao}
 """
-
     return texto.strip(), grafico_base64
+
 
 
 def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
