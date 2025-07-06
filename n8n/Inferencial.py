@@ -748,8 +748,8 @@ def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
 📊 **Análise – Teste Mann-Whitney (Wilcoxon Rank-Sum)**
 
 🔹 **Hipóteses:**
-- H₀: As variâncias dos dois grupos são iguais
-- H₁: As variâncias dos dois grupos são diferentes
+- H₀: As medianas dos dois grupos são iguais
+- H₁: As medianas dos dois grupos são diferentes
 
 🔎 **Estatísticas Descritivas:**
 
@@ -773,7 +773,7 @@ def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
 {recomendacao}
 
 🔎 **Conclusão:**
-{"✅ Rejeitamos H0: há diferença estatisticamente significativa entre as variâncias dos grupos." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença estatisticamente significativa entre as variâncias dos grupos."}
+{"✅ Rejeitamos H0: há diferença estatisticamente significativa entre as medianas dos grupos." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença estatisticamente significativa entre as medianas dos grupos."}
 """
 
     return texto.strip(), grafico_base64
