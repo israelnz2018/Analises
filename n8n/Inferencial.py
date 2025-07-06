@@ -1745,48 +1745,80 @@ O intervalo de confiança da variância foi calculado assumindo normalidade dos 
     return texto.strip(), grafico_base64
 
 
-def analise_1_proporcao(df: pd.DataFrame, coluna_y, field_conf=None):
-    if not coluna_y:
-        return "❌ O teste 1 Proporção requer exatamente 1 coluna Y.", None
+def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
+    if not coluna_x:
+        return "❌ O teste 1 Proporção requer exatamente 1 coluna X.", None
 
-    if coluna_y not in df.columns:
-        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
+    if coluna_x not in df.columns:
+        return f"❌ A coluna {coluna_x} não foi encontrada no arquivo.", None
 
-    y = df[coluna_y].dropna()
+    x = df[coluna_x].dropna()
 
-    if len(y) < 5:
+    if len(x) < 5:
         return "❌ O teste requer ao menos 5 valores não nulos.", None
 
     try:
-        p0 = float(field_conf)
+        p0 = float(field_conf) if field_conf else 0.5
         if not (0 < p0 < 1):
             return "❌ A proporção de referência deve estar entre 0 e 1 (ex.: 0.5).", None
     except:
         return "❌ Valor de referência inválido. Informe um número como 0.5 no campo Field.", None
 
-    n = len(y)
-    sucesso = np.sum(y)
-    p_hat = sucesso / n
-
+    n = len(x)
     nivel_conf = 95.0
     alpha = 1 - (nivel_conf / 100)
 
-    z = stats.norm.ppf(1 - alpha / 2)
+    categorias = x.value_counts()
+    resultados = []
+
+    for categoria, sucesso in categorias.items():
+        p_hat = sucesso / n
+
+        # intervalo de confiança
+        z = stats.norm.ppf(1 - alpha / 2)
+        se = np.sqrt(p_hat * (1 - p_hat) / n)
+        ic_lower = max(0, p_hat - z * se)
+        ic_upper = min(1, p_hat + z * se)
+
+        # teste de proporção
+        se_h0 = np.sqrt(p0 * (1 - p0) / n)
+        z_stat = (p_hat - p0) / se_h0
+        p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+
+        conclusao = (
+            f"✅ Rejeitamos H0: proporção diferente da referência."
+            if p_valor < alpha
+            else "⚠️ Não rejeitamos H0: proporção não difere significativamente da referência."
+        )
+
+        resultados.append(f"""
+🔹 **Categoria: {categoria}**
+- N = {n}
+- Sucessos = {sucesso}
+- Proporção amostral = {p_hat:.2f}
+- Intervalo {nivel_conf:.1f}% = [{ic_lower:.2f}, {ic_upper:.2f}]
+- Estatística Z = {z_stat:.2f}
+- p-valor = {p_valor:.2f}
+
+🔎 **Conclusão:**
+{conclusao}
+""")
+
+    # gera gráfico apenas para a primeira categoria como exemplo
+    primeira_categoria = categorias.index[0]
+    sucesso = categorias.iloc[0]
+    p_hat = sucesso / n
     se = np.sqrt(p_hat * (1 - p_hat) / n)
     ic_lower = max(0, p_hat - z * se)
     ic_upper = min(1, p_hat + z * se)
 
-    se_h0 = np.sqrt(p0 * (1 - p0) / n)
-    z_stat = (p_hat - p0) / se_h0
-    p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
-
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar([0], [p_hat], color='skyblue', width=0.4, label='Proporção amostra')
+    ax.bar([0], [p_hat], color='skyblue', width=0.4, label=f'Proporção {primeira_categoria}')
     ax.errorbar([0], [p_hat], yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
-    ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0:.4f}')
+    ax.axhline(p0, color='red', linestyle='--', label=f'Proporção referência: {p0:.2f}')
     ax.set_xticks([0])
-    ax.set_xticklabels(['Amostra'])
+    ax.set_xticklabels([primeira_categoria])
     ax.set_ylim(0, max(ic_upper * 1.2, p_hat * 1.2, p0 * 1.2))
     ax.set_ylabel('Proporção')
     ax.legend()
@@ -1799,21 +1831,13 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_y, field_conf=None):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-**1 Proporção**
-- N: {n}
-- Sucessos: {sucesso}
-- Proporção amostra: {p_hat:.4f}
-- Proporção referência (H0): {p0:.4f}
-- Nível de confiança: {nivel_conf:.1f}%
-- Intervalo: [{ic_lower:.4f}, {ic_upper:.4f}]
-- Estatística Z: {z_stat:.4f}
-- p-valor: {p_valor:.4f}
+📊 **Análise – Teste de 1 Proporção**
 
-**Conclusão**
-{"✅ Rejeitamos H0: proporção diferente da referência." if p_valor < alpha else "⚠ Não rejeitamos H0: proporção não difere significativamente da referência."}
+{"".join(resultados)}
 """
 
     return texto.strip(), grafico_base64
+
 
     
 def analise_2_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
