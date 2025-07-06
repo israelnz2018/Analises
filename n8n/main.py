@@ -101,7 +101,7 @@ CONFIG_ANALISES = {
     "Brown-Forsythe": ["df", "lista_y", "subgrupo", "field_conf"],
     "1 Intervalo de Confianca Variancia": ["df", "coluna_y", "field_conf"],
     "1 Proporcao": ["df", "coluna_x", "field_conf"],
-    "2 Proporcoes": ["df", "coluna_x", "coluna_y"],
+    "2 Proporções": ["df", "coluna_x", "coluna_y"],
     "K Proporcoes": ["df", "coluna_x", "coluna_y"],
     "Qui-quadrado": ["df", "coluna_y", "lista_x", "subgrupo"],
     "Tipo de modelo de regressão": ["df", "coluna_y"],
