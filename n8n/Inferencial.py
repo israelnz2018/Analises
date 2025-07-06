@@ -696,7 +696,7 @@ def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
 
     alpha = 1 - (confidence / 100)
 
-    # Teste de normalidade dos dois grupos
+    # Testes de normalidade
     ad1 = stats.anderson(dados1)
     ad2 = stats.anderson(dados2)
     ad1_stat = ad1.statistic
@@ -721,9 +721,10 @@ def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
     dp1_normal = dp1_p > 0.05
     dp2_normal = dp2_p > 0.05
 
+    # ✅ Observação apenas se ambos forem normais
     recomendacao = ""
-    if ad1_normal or sw1_normal or dp1_normal or ad2_normal or sw2_normal or dp2_normal:
-        recomendacao = "⚠ Pelo menos um grupo apresentou indícios de normalidade. Considere realizar o teste 2 Sample T."
+    if (ad1_normal or sw1_normal or dp1_normal) and (ad2_normal or sw2_normal or dp2_normal):
+        recomendacao = "⚠ Observação: Os dois grupos apresentaram indícios de normalidade. Logo, o teste paramétrico 2 Sample T seria mais apropriado."
 
     u_stat, p_valor = stats.mannwhitneyu(dados1, dados2, alternative='two-sided')
 
@@ -734,7 +735,7 @@ def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.boxplot([dados1, dados2], labels=[col1, col2], patch_artist=True,
                boxprops=dict(facecolor='lightblue'))
-    ax.set_title(f"2 Mann-Whitney - Boxplot por Grupo (IC {confidence:.1f}%)")
+    ax.set_title(f"2 Mann-Whitney - Boxplot por Grupo (IC {confidence:.1f}%)", fontsize=10)
     ax.set_ylabel("Valores")
     plt.tight_layout()
 
@@ -744,31 +745,39 @@ def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-**2 Mann-Whitney - Wilcoxon Rank-Sum**
-- Mediana {col1}: {mediana1:.4f}
-- Mediana {col2}: {mediana2:.4f}
-- Estatística U: {u_stat:.4f}
-- p-valor: {p_valor:.4f}
-- Nível de confiança: {confidence:.1f}%
+📊 **Análise – Teste Mann-Whitney (Wilcoxon Rank-Sum)**
 
-**Normalidade dos dados**
-{col1}:
-- Anderson-Darling: estatística={ad1_stat:.4f}, normalidade={'Aprovada' if ad1_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor={sw1_p:.4f}, normalidade={'Aprovada' if sw1_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor={dp1_p:.4f}, normalidade={'Aprovada' if dp1_normal else 'Reprovada'}
+🔹 **Hipóteses:**
+- H₀: As variâncias dos dois grupos são iguais
+- H₁: As variâncias dos dois grupos são diferentes
 
-{col2}:
-- Anderson-Darling: estatística={ad2_stat:.4f}, normalidade={'Aprovada' if ad2_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor={sw2_p:.4f}, normalidade={'Aprovada' if sw2_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor={dp2_p:.4f}, normalidade={'Aprovada' if dp2_normal else 'Reprovada'}
+🔎 **Estatísticas Descritivas:**
+
+**{col1}:**
+- Mediana = {mediana1:.2f}
+
+**{col2}:**
+- Mediana = {mediana2:.2f}
+
+🔎 **Resultados do Teste Mann-Whitney:**
+- Estatística U = {u_stat:.4f}
+- p-valor = {p_valor:.4f}
+- Nível de confiança = {confidence:.1f}%
+
+🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
+
+**{col1}:** {'✅ Os dados podem ser considerados normais' if (ad1_normal or sw1_normal or dp1_normal) else '⚠ Os dados podem não ser normais'}
+
+**{col2}:** {'✅ Os dados podem ser considerados normais' if (ad2_normal or sw2_normal or dp2_normal) else '⚠ Os dados podem não ser normais'}
 
 {recomendacao}
 
-**Conclusão**
-{"✅ Rejeitamos H0: as distribuições são diferentes." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre as distribuições."}
+🔎 **Conclusão:**
+{"✅ Rejeitamos H0: há diferença estatisticamente significativa entre as variâncias dos grupos." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença estatisticamente significativa entre as variâncias dos grupos."}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
