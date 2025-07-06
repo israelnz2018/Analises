@@ -1010,8 +1010,15 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
 
 
 
-
 def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+    from scipy import stats
+    from suporte import aplicar_estilo_minitab
+
     ys = [c for c in lista_y if c != ""]
     x = subgrupo if subgrupo and subgrupo in df.columns else None
 
@@ -1036,15 +1043,18 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
             return "❌ O Friedman requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
 
         grupos = [pivot[col].values for col in pivot.columns]
+        labels = list(pivot.columns)
     else:
         df_valid = df[ys].dropna()
         if df_valid.shape[1] < 2:
             return "❌ O Friedman requer pelo menos 2 colunas Y com dados.", None
 
         grupos = [df_valid[col].values for col in df_valid.columns]
+        labels = ys
 
     stat, p_valor = stats.friedmanchisquare(*grupos)
 
+    # Normalidade dos resíduos
     residuos = np.array(grupos).T - np.mean(grupos, axis=0)
     residuos_flat = residuos.flatten()
     ad = stats.anderson(residuos_flat)
@@ -1060,22 +1070,25 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
     sw_normal = sw_p > 0.05
     dp_normal = dp_p > 0.05
 
+    normal_text = "✅ Os resíduos podem ser considerados normais." if (ad_normal or sw_normal or dp_normal) else "⚠ Os resíduos não seguem distribuição normal."
+
     recomendacao = ""
     if ad_normal or sw_normal or dp_normal:
-        recomendacao = "⚠ Pelo menos um teste indicou normalidade dos resíduos. Considere realizar um ANOVA Repeated Measures."
+        recomendacao = "⚠ Observação: Os resíduos apresentaram indícios de normalidade. Caso os pressupostos sejam atendidos, considere usar ANOVA Repeated Measures."
 
+    # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     if x:
         df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
-        medias = df_valid.groupby(x)[y_col].mean()
-        ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+        medianas = df_valid.groupby(x)[y_col].median()
+        ax.plot(range(1, len(medianas) + 1), medianas.values, color='blue', marker='o', linestyle='-', label='Medianas')
     else:
-        ax.boxplot(grupos, labels=ys)
-        medias = [np.mean(g) for g in grupos]
-        ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
+        ax.boxplot(grupos, labels=labels)
+        medianas = [np.median(g) for g in grupos]
+        ax.plot(range(1, len(medianas) + 1), medianas, color='blue', marker='o', linestyle='-', label='Medianas')
 
-    ax.set_title(f"Friedman Pareado - Boxplot por Grupo (IC {confidence:.1f}%)")
+    ax.set_title(f"Friedman Pareado - Boxplot por Grupo")
     ax.set_xlabel("Grupo")
     ax.set_ylabel("Valor")
     plt.suptitle("")
@@ -1087,23 +1100,30 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Reporte no padrão ANOVA
     texto = f"""
-**Friedman Pareado**
-- Estatística: {stat:.4f}
-- p-valor: {p_valor:.4f}
-- Nível de confiança: {confidence:.1f}%
+📊 **Análise – Friedman Pareado**
 
-- Anderson-Darling (resíduos): estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
-- Shapiro-Wilk (resíduos): p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
-- D’Agostino-Pearson (resíduos): p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+🔹 **Hipóteses:**
+- H₀: As distribuições dos grupos são iguais
+- H₁: Pelo menos um grupo tem distribuição diferente
+
+🔎 **Estatísticas do Teste:**
+- Estatística = {stat:.4f}
+- p-valor = {p_valor:.4f}
+- Nível de confiança = {confidence:.1f}%
+
+🔎 **Normalidade dos Resíduos (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
+- {normal_text}
 
 {recomendacao}
 
-**Conclusão**
-{"✅ Rejeitamos H0: pelo menos um grupo tem distribuição diferente." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre os grupos."}
+🔎 **Conclusão:**
+{"Com {confidence:.1f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferenças estatisticamente significativas entre os grupos." if p_valor < alpha else f"Com {confidence:.1f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferenças estatisticamente significativas entre os grupos."}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
