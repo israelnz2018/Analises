@@ -1033,6 +1033,7 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
 
     alpha = 1 - (confidence / 100)
 
+    # Preparar dados
     if x:
         y_col = ys[0]
         df_valid = df[[y_col, x]].dropna()
@@ -1051,15 +1052,22 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
         grupos = [df_valid[col].values for col in df_valid.columns]
         labels = ys
 
-    # Verificar se realmente é pareado (mesmo número de observações em todos os grupos)
-    if not all(len(g) == len(grupos[0]) for g in grupos):
-        return "❌ O teste Friedman Pareado requer que todos os grupos tenham o mesmo número de observações (dados pareados).", None
+    # Garantir pareamento
+    min_len = min(len(g) for g in grupos)
+    grupos = [g[:min_len] for g in grupos]
 
-    # Teste Friedman
-    stat, p_valor = stats.friedmanchisquare(*grupos)
+    # Verifica se há dados suficientes
+    if min_len < 2:
+        return "❌ O teste Friedman Pareado requer pelo menos 2 observações por grupo.", None
 
-    # Normalidade dos resíduos (como no Kruskal-Wallis)
-    dados_matrix = np.array(grupos).T  # shape (n_obs, n_grupos)
+    # Executa teste
+    try:
+        stat, p_valor = stats.friedmanchisquare(*grupos)
+    except Exception as e:
+        return f"❌ Erro ao executar o teste Friedman: {str(e)}", None
+
+    # Normalidade dos resíduos
+    dados_matrix = np.array(grupos).T
     residuos = dados_matrix - np.mean(dados_matrix, axis=1, keepdims=True)
     residuos_flat = residuos.flatten()
 
@@ -1125,6 +1133,7 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
