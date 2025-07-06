@@ -91,7 +91,7 @@ CONFIG_ANALISES = {
     "1 Wilcoxon": ["df", "coluna_y", "field", "field_conf"],
     "2 Mann-Whitney": ["df", "lista_y", "field_conf"],
     "2 Wilcoxon Paired": ["df", "lista_y", "field_conf"],
-    "Kruskal-Wallis": ["df", "coluna_y", "subgrupo", "field_conf"],
+    "Kruskal-Wallis": ["df", "lista_y", "subgrupo", "field_conf"],
     "Friedman Pareado": ["df", "lista_y", "subgrupo", "field_conf"],
     "1 Intervalo de Confianca": ["df", "coluna_y", "field_conf"],
     "1 Intervalo Interquartilico": ["df", "coluna_y", "field_conf"],
