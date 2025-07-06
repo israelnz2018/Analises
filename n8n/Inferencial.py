@@ -1134,8 +1134,9 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
 {recomendacao}
 
 🔎 **Conclusão:**
-{"✅ Com {confidence:.1f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferenças estatisticamente significativas entre as medianas dos grupos." if p_valor < alpha else f"⚠ Com {confidence:.1f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferenças estatisticamente significativas entre as medianas dos grupos."}
+{"✅ Com {:.1f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferenças estatisticamente significativas entre as medianas dos grupos.".format(confidence) if p_valor < alpha else "⚠ Com {:.1f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferenças estatisticamente significativas entre as medianas dos grupos.".format(confidence)}
 """
+
 
     return texto.strip(), grafico_base64
 
