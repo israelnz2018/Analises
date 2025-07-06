@@ -1037,10 +1037,16 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
     if x:
         y_col = ys[0]
         df_valid = df[[y_col, x]].dropna()
-        pivot = df_valid.pivot(columns=x, values=y_col)
+
+        if df_valid[x].nunique() < 2:
+            return "❌ O Friedman requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
+
+        # Pivotar em formato wide, apenas IDs completos
+        df_valid['ID_temp'] = df_valid.groupby(x).cumcount()
+        pivot = df_valid.pivot(index='ID_temp', columns=x, values=y_col).dropna()
 
         if pivot.shape[1] < 2:
-            return "❌ O Friedman requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
+            return "❌ O Friedman requer pelo menos 2 grupos completos para análise pareada.", None
 
         grupos = [pivot[col].values for col in pivot.columns]
         labels = pivot.columns.tolist()
@@ -1056,9 +1062,8 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
     min_len = min(len(g) for g in grupos)
     grupos = [g[:min_len] for g in grupos]
 
-    # Verifica se há dados suficientes
     if min_len < 2:
-        return "❌ O teste Friedman Pareado requer pelo menos 2 observações por grupo.", None
+        return "❌ O teste Friedman Pareado requer pelo menos 2 observações pareadas.", None
 
     # Executa teste
     try:
@@ -1133,6 +1138,7 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
