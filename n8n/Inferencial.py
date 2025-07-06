@@ -470,6 +470,97 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_
 
 
 
+def analise_1_intervalo_confianca(df: pd.DataFrame, coluna_y, field_conf=None):
+    if not coluna_y:
+        return "❌ O intervalo de confiança requer exatamente 1 coluna Y.", None
+
+    if coluna_y not in df.columns:
+        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
+
+    y = df[coluna_y].dropna()
+
+    if len(y) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos.", None
+
+    # Nível de confiança informado
+    try:
+        nivel_conf = float(field_conf) if field_conf else 95.0
+        if nivel_conf <= 1:  # Permite entrada como 0.95
+            nivel_conf *= 100
+        if not (50 <= nivel_conf < 100):
+            return "❌ O nível de confiança deve ser entre 50 e 99.9.", None
+    except:
+        return "❌ Valor do nível de confiança inválido. Informe um número (ex.: 95).", None
+
+    alpha = 1 - (nivel_conf / 100)
+
+    media = np.mean(y)
+    desvio = np.std(y, ddof=1)
+    n = len(y)
+    se = desvio / np.sqrt(n)
+    intervalo = stats.t.interval(1 - alpha, n-1, loc=media, scale=se)
+
+    # Normalidade dos dados
+    ad = stats.anderson(y)
+    sw_stat, sw_p = stats.shapiro(y)
+    dp_stat, dp_p = stats.normaltest(y)
+
+    ad_crit = ad.critical_values
+    ad_sig = list(ad.significance_level)
+    if 5 in ad_sig:
+        idx = ad_sig.index(5)
+        ad_normal = ad.statistic < ad_crit[idx]
+    else:
+        ad_normal = False
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
+
+    # Conclusão baseada em normalidade
+    if ad_normal or sw_normal or dp_normal:
+        normalidade_texto = "✅ Os dados podem ser considerados normais."
+        conclusao = f"Com {nivel_conf:.1f}% de confiança, estima-se que a média populacional esteja entre {intervalo[0]:.2f} e {intervalo[1]:.2f}. Como os dados podem ser considerados normais, este intervalo é confiável para inferências estatísticas."
+    else:
+        normalidade_texto = "⚠ Os dados podem não ser normais."
+        conclusao = f"Com {nivel_conf:.1f}% de confiança, estima-se que a média populacional esteja entre {intervalo[0]:.2f} e {intervalo[1]:.2f}. Contudo, como os dados não seguem distribuição normal, a estimativa do intervalo de confiança pode não ser confiável.\n\nRecomenda-se coletar mais dados para avaliar novamente a distribuição, verificar a estabilidade do processo ou utilizar métodos não paramétricos (ex: análise de medianas)."
+
+    # Gráfico
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6, 2))
+    ax.errorbar(media, 0, xerr=[[media - intervalo[0]], [intervalo[1] - media]], fmt='o', color='blue', ecolor='black', capsize=5)
+    ax.axvline(media, color='blue', linestyle='-', label=f'Média: {media:.2f}')
+    ax.set_yticks([])
+    ax.set_title(f"Intervalo de Confiança {nivel_conf:.1f}%")
+    ax.set_xlabel(coluna_y)
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+📊 **Análise – Intervalo de Confiança**
+
+🔹 **Hipóteses (usadas de forma geral):**
+- **H₀:** A média populacional é igual à média amostral
+- **H₁:** A média populacional é diferente da média amostral
+
+🔎 **Estatísticas Descritivas:**
+- **N:** {n}
+- **Média:** {media:.2f}
+- **Desvio Padrão:** {desvio:.2f}
+- **Nível de Confiança:** {nivel_conf:.1f}%
+- **Intervalo de Confiança:** [{intervalo[0]:.2f} ; {intervalo[1]:.2f}]
+
+🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
+{normalidade_texto}
+
+🔎 **Conclusão:**
+{conclusao}
+"""
+
+    return texto.strip(), grafico_base64
 
 
 
@@ -858,86 +949,7 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
     return texto.strip(), grafico_base64
 
 
-def analise_1_intervalo_confianca(df: pd.DataFrame, coluna_y, field_conf=None):
-    if not coluna_y:
-        return "❌ O intervalo de confiança requer exatamente 1 coluna Y.", None
 
-    if coluna_y not in df.columns:
-        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
-
-    y = df[coluna_y].dropna()
-
-    if len(y) < 5:
-        return "❌ O teste requer ao menos 5 valores não nulos.", None
-
-    # Nível de confiança informado
-    try:
-        nivel_conf = float(field_conf) if field_conf else 95.0
-        if nivel_conf <= 1:  # Permite entrada como 0.95
-            nivel_conf *= 100
-        if not (50 <= nivel_conf < 100):
-            return "❌ O nível de confiança deve ser entre 50 e 99.9.", None
-    except:
-        return "❌ Valor do nível de confiança inválido. Informe um número (ex.: 95).", None
-
-    alpha = 1 - (nivel_conf / 100)
-
-    media = np.mean(y)
-    desvio = np.std(y, ddof=1)
-    n = len(y)
-    se = desvio / np.sqrt(n)
-    intervalo = stats.t.interval(1 - alpha, n-1, loc=media, scale=se)
-
-    ad = stats.anderson(y)
-    sw_stat, sw_p = stats.shapiro(y)
-    dp_stat, dp_p = stats.normaltest(y)
-
-    ad_crit = ad.critical_values
-    ad_sig = list(ad.significance_level)
-    if 5 in ad_sig:
-        idx = ad_sig.index(5)
-        ad_normal = ad.statistic < ad_crit[idx]
-    else:
-        ad_normal = False
-    sw_normal = sw_p > 0.05
-    dp_normal = dp_p > 0.05
-
-    recomendacao = ""
-    if not (ad_normal or sw_normal or dp_normal):
-        recomendacao = "⚠ Os dados podem não ser normais. Considere também a mediana e intervalo interquartílico."
-
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 2))
-    ax.errorbar(media, 0, xerr=[[media - intervalo[0]], [intervalo[1] - media]], fmt='o', color='blue', ecolor='black', capsize=5)
-    ax.axvline(media, color='blue', linestyle='-', label=f'Média: {media:.2f}')
-    ax.set_yticks([])
-    ax.set_title(f"Intervalo de Confiança {nivel_conf:.1f}%")
-    ax.set_xlabel(coluna_y)
-    ax.legend()
-    plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-    texto = f"""
-**1 Intervalo de Confiança**
-- Média: {media:.4f}
-- Desvio padrão: {desvio:.4f}
-- N: {n}
-- Nível de confiança: {nivel_conf:.1f}%
-- Intervalo: [{intervalo[0]:.4f}, {intervalo[1]:.4f}]
-
-**Normalidade dos dados**
-- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
-
-{recomendacao}
-"""
-
-    return texto.strip(), grafico_base64
 
 
 def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=None):
