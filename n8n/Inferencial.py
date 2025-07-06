@@ -1290,13 +1290,13 @@ def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
         recomendacao = "⚠️ Como pelo menos um dos conjuntos de dados não é normal, recomenda-se utilizar o teste de Levene ou Brown-Forsythe para confirmação."
 
     texto = f"""
-📊 Análise – Teste F para Igualdade de Variâncias
+📊 **Análise** – Teste F para Igualdade de Variâncias
 
 🔹 Hipóteses:
 - H₀: As variâncias de {col1} e {col2} são iguais
 - H₁: As variâncias de {col1} e {col2} são diferentes
 
-🔎 Estatísticas Descritivas:
+🔎 **Estatísticas Descritivas**:
 
 {col1}:
 Variância = {var1:.2f}
@@ -1304,15 +1304,15 @@ Variância = {var1:.2f}
 {col2}:
 Variância = {var2:.2f}
 
-🔎 Teste F para Igualdade de Variâncias:
+🔎 **Teste F para Igualdade de Variâncias**:
 Estatística F = {f_stat:.2f}
 p-valor = {p_valor:.2f}
 
-🔎 Testes de Normalidade:
+🔎 **Testes de Normalidade**:
 {col1}: {"✅ Os dados parecem ser normais." if normal1 else "❌ Os dados não são normais."}
 {col2}: {"✅ Os dados parecem ser normais." if normal2 else "❌ Os dados não são normais."}
 
-🔎 Conclusão:
+🔎 **Conclusão**:
 {"Com " + str(int(confidence)) + "% de confiança, rejeitamos a hipótese conservadora. Logo, há diferença estatisticamente significativa entre as variâncias." if p_valor < alpha else "Com " + str(int(confidence)) + "% de confiança, não rejeitamos H0. Não há diferença significativa entre as variâncias."}
 
 {recomendacao}
@@ -1322,8 +1322,7 @@ p-valor = {p_valor:.2f}
 
 
 
-
-def analise_2_variancas_brown_forsythe(df: pd.DataFrame, lista_y, field_conf=None): 
+def analise_2_variancas_brown_forsythe(df: pd.DataFrame, lista_y, field_conf=None):
     if len(lista_y) != 2:
         return "❌ O teste 2 Variâncias Brown-Forsythe requer exatamente 2 colunas Y.", None
 
@@ -1348,6 +1347,30 @@ def analise_2_variancas_brown_forsythe(df: pd.DataFrame, lista_y, field_conf=Non
 
     stat, p_valor = stats.levene(dados1, dados2, center='median')
 
+    def normalidade(dados):
+        ad = stats.anderson(dados)
+        sw_stat, sw_p = stats.shapiro(dados)
+        dp_stat, dp_p = stats.normaltest(dados)
+        ad_crit = ad.critical_values
+        ad_sig = list(ad.significance_level)
+        if 5 in ad_sig:
+            idx = ad_sig.index(5)
+            ad_normal = ad.statistic < ad_crit[idx]
+        else:
+            ad_normal = False
+        sw_normal = sw_p > 0.05
+        dp_normal = dp_p > 0.05
+        algum_normal = ad_normal or sw_normal or dp_normal
+        return algum_normal
+
+    normal1 = normalidade(dados1)
+    normal2 = normalidade(dados2)
+
+    recomendacao = ""
+    if normal1 and normal2:
+        recomendacao = "Os dados são normais. Recomenda-se utilizar o teste paramétrico equivalente para maior precisão."
+
+    # mantém o gráfico exatamente como estava
     aplicar_estilo_minitab()
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
@@ -1368,18 +1391,36 @@ def analise_2_variancas_brown_forsythe(df: pd.DataFrame, lista_y, field_conf=Non
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-**2 Variâncias Brown-Forsythe**
-- Variância {col1}: {var1:.4f}
-- Variância {col2}: {var2:.4f}
-- Estatística Brown-Forsythe: {stat:.4f}
-- p-valor: {p_valor:.4f}
-- Nível de confiança: {confidence:.1f}%
+📊 **Análise – Teste Brown-Forsythe para Igualdade de Variâncias**
 
-**Conclusão**
-{"✅ Rejeitamos H0: as variâncias são diferentes." if p_valor < alpha else "⚠ Não rejeitamos H0: não há diferença significativa entre as variâncias."}
+🔹 **Hipóteses:**
+- H₀: As variâncias de {col1} e {col2} são iguais
+- H₁: As variâncias de {col1} e {col2} são diferentes
+
+🔎 **Estatísticas Descritivas:**
+
+{col1}:
+Variância = {var1:.2f}
+
+{col2}:
+Variância = {var2:.2f}
+
+🔎 **Testes de Normalidade:**
+{col1}: {"✅ Os dados parecem ser normais." if normal1 else "❌ Os dados não são normais."}
+{col2}: {"✅ Os dados parecem ser normais." if normal2 else "❌ Os dados não são normais."}
+
+🔎 **Teste Brown-Forsythe:**
+Estatística = {stat:.2f}
+p-valor = {p_valor:.2f}
+
+🔎 **Conclusão:**
+{"Com " + str(int(confidence)) + "% de confiança, rejeitamos a hipótese conservadora. Logo, há diferença estatisticamente significativa entre as variâncias." if p_valor < alpha else "Com " + str(int(confidence)) + "% de confiança, não rejeitamos H0. Não há diferença significativa entre as variâncias."}
+
+{f"⚠️ {recomendacao}" if recomendacao else ""}
 """
 
     return texto.strip(), grafico_base64
+
 
 def analise_bartlett(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=None):
     grupos = []
