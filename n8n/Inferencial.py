@@ -962,17 +962,17 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
     if normal_flag:
         recomendacao = "⚠ Observação: Como todos os grupos apresentaram indícios de normalidade, recomenda-se considerar o uso do teste paramétrico One Way ANOVA, caso os pressupostos sejam atendidos."
 
-    # Gráfico
+        # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     if len(lista_y) > 1:
         ax.boxplot(grupos, labels=nomes_grupos)
-        medias = [np.mean(g) for g in grupos]
-        ax.plot(range(1, len(medias)+1), medias, color='blue', marker='o', linestyle='-', label='Médias')
+        medianas = [np.median(g) for g in grupos]
+        ax.plot(range(1, len(medianas)+1), medianas, color='blue', marker='o', linestyle='-', label='Medianas')
     else:
         df_valid.boxplot(column=y_col, by=subgrupo, ax=ax, grid=False)
-        medias = df_valid.groupby(subgrupo)[y_col].mean()
-        ax.plot(range(1, len(medias)+1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
+        medianas = df_valid.groupby(subgrupo)[y_col].median()
+        ax.plot(range(1, len(medianas)+1), medianas.values, color='blue', marker='o', linestyle='-', label='Medianas')
 
     ax.set_title("Kruskal-Wallis - Boxplot por Grupo")
     ax.set_xlabel("Grupo")
@@ -980,6 +980,7 @@ def analise_kruskal_wallis(df: pd.DataFrame, lista_y: list, subgrupo=None, field
     plt.suptitle("")
     ax.legend()
     plt.tight_layout()
+
 
     buf = BytesIO()
     plt.savefig(buf, format='png')
