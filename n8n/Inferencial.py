@@ -95,7 +95,7 @@ def analise_1_sample_t(df, coluna_y, field, field_conf=None):
     plt.savefig(buf, format="png")
     plt.close(fig)
     buf.seek(0)
-    return resultado, imagem_base64
+    return texto.strip(), grafico_base64
 
 
 
