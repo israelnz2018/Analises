@@ -1941,22 +1941,32 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y):
     sucessos = []
     totais = []
     proporcoes = {}
+
     for col in lista_y:
         if col not in df.columns:
             return f"❌ A coluna {col} não foi encontrada no arquivo.", None
         dados = df[col].dropna()
         if len(dados) < 5:
             return f"❌ O grupo {col} requer ao menos 5 valores não nulos.", None
-        sucesso = np.sum(dados)
+
+        # Conversão: detecta automaticamente a primeira categoria como sucesso
+        unique_vals = dados.unique()
+        if len(unique_vals) != 2:
+            return f"❌ A coluna {col} precisa conter exatamente 2 categorias distintas (binárias).", None
+
+        sucesso_val = unique_vals[0]
+        sucesso = np.sum(dados == sucesso_val)
         total = len(dados)
+
         sucessos.append(sucesso)
         totais.append(total)
         proporcoes[col] = sucesso / total
 
+    # Montagem da tabela de contingência
     table = np.array([sucessos, [t - s for s, t in zip(sucessos, totais)]])
     stat, p_valor, dof, expected = stats.chi2_contingency(table.T)
 
-    # gráfico
+    # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.bar(range(len(lista_y)), [proporcoes[c] for c in lista_y], color='skyblue')
@@ -1972,7 +1982,7 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # report padronizado
+    # Report padronizado
     proporcao_texto = "\n".join([f"- {col}: proporção = {proporcoes[col]:.2f}, N = {totais[i]}" for i, col in enumerate(lista_y)])
 
     texto = f"""
@@ -1995,6 +2005,7 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_associacao(df: pd.DataFrame, coluna_y, lista_x, subgrupo):
