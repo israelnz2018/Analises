@@ -1841,9 +1841,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 
 
 
-
-
- def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
+def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
     if not coluna_x:
         return "❌ O teste 2 Proporções requer pelo menos a coluna X.", None
 
@@ -1857,7 +1855,6 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
     z = stats.norm.ppf(1 - alpha / 2)
 
     if coluna_y and coluna_y in df.columns:
-        # fluxo tabela: coluna_x = grupo, coluna_y = sucesso/fracasso
         df_valid = df[[coluna_x, coluna_y]].dropna()
         grupos = df_valid[coluna_x].unique()
         if len(grupos) != 2:
@@ -1870,14 +1867,13 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
             n[g] = len(sub)
             if n[g] < 5:
                 return f"❌ O grupo {g} requer ao menos 5 valores não nulos.", None
-            prop[g] = np.mean(sub == sub.unique()[0])  # considera sucesso como a primeira categoria encontrada
+            prop[g] = np.mean(sub == sub.unique()[0])
 
         g1, g2 = grupos
         p1, p2 = prop[g1], prop[g2]
         n1, n2 = n[g1], n[g2]
 
     else:
-        # fluxo sem coluna_y: coluna_x possui duas categorias
         categorias = x.value_counts()
         if len(categorias) != 2:
             return "❌ O teste 2 Proporções requer exatamente 2 categorias na coluna X.", None
@@ -1887,19 +1883,16 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
         total = n1 + n2
         p1, p2 = n1 / total, n2 / total
 
-    # cálculo estatístico
     p_pool = (p1 * n1 + p2 * n2) / (n1 + n2)
     se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
     z_stat = (p1 - p2) / se
     p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
-    # IC da diferença
     se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
     diff = p1 - p2
     ic_lower = diff - z * se_diff
     ic_upper = diff + z * se_diff
 
-    # gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
@@ -1943,6 +1936,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
