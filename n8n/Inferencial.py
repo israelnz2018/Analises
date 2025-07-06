@@ -1934,7 +1934,7 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
 
 
 
-def analise_k_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
+def analise_k_proporcoes(df: pd.DataFrame, lista_y):
     if len(lista_y) < 2:
         return "❌ O teste K Proporções requer pelo menos 2 colunas Y (grupos).", None
 
@@ -1956,8 +1956,9 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
     table = np.array([sucessos, [t - s for s, t in zip(sucessos, totais)]])
     stat, p_valor, dof, expected = stats.chi2_contingency(table.T)
 
+    # gráfico
     aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=(8, 4))
     ax.bar(range(len(lista_y)), [proporcoes[c] for c in lista_y], color='skyblue')
     ax.set_xticks(range(len(lista_y)))
     ax.set_xticklabels(lista_y)
@@ -1971,20 +1972,30 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    proporcao_texto = "\n".join([f"- {col}: {proporcoes[col]:.4f}" for col in lista_y])
+    # report padronizado
+    proporcao_texto = "\n".join([f"- {col}: proporção = {proporcoes[col]:.2f}, N = {totais[i]}" for i, col in enumerate(lista_y)])
 
     texto = f"""
-**K Proporções - Teste de Homogeneidade**
-{proporcao_texto}
-- Estatística Qui-quadrado: {stat:.4f}
-- p-valor: {p_valor:.4f}
-- Graus de liberdade: {dof}
+📊 **Análise – Teste de K Proporções**
 
-**Conclusão**
-{"✅ Rejeitamos H0: as proporções não são todas iguais." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há diferença significativa entre as proporções dos grupos."}
+🔹 **Hipóteses:**
+- H₀: As proporções dos grupos são todas iguais
+- H₁: Ao menos uma proporção é diferente
+
+🔎 **Estatísticas Descritivas:**
+{proporcao_texto}
+
+🔎 **Teste Qui-Quadrado:**
+- Estatística χ² = {stat:.2f}
+- p-valor = {p_valor:.2f}
+- Graus de liberdade = {dof}
+
+🔎 **Conclusão:**
+{"✅ Com 95% de confiança, rejeitamos H0. Há diferença significativa entre as proporções dos grupos." if p_valor < 0.05 else "⚠️ Com 95% de confiança, não rejeitamos H0. Não há diferença significativa entre as proporções dos grupos."}
 """
 
     return texto.strip(), grafico_base64
+
 
 def analise_associacao(df: pd.DataFrame, coluna_y, lista_x, subgrupo):
     if not coluna_y or not lista_x or len(lista_x) != 1:
