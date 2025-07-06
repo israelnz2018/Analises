@@ -779,21 +779,24 @@ def analise_2_mann_whitney(df: pd.DataFrame, lista_y: list, field_conf=None):
     return texto.strip(), grafico_base64
 
 def analise_2_wilcoxon_paired(df: pd.DataFrame, lista_y: list, field_conf=None):
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from scipy import stats
+    from suporte import aplicar_estilo_minitab
+
     if len(lista_y) != 2:
-        return "❌ O teste 2 Wilcoxon Paired requer exatamente 2 colunas Y.", None
+        return "❌ O teste 2 Wilcoxon Pareado requer exatamente 2 colunas Y.", None
 
     col1, col2 = lista_y
-    dados1 = df[col1].dropna()
-    dados2 = df[col2].dropna()
+    dados1 = pd.to_numeric(df[col1], errors="coerce").dropna()
+    dados2 = pd.to_numeric(df[col2], errors="coerce").dropna()
 
-    if len(dados1) != len(dados2):
-        min_len = min(len(dados1), len(dados2))
-        dados1 = dados1.iloc[:min_len]
-        dados2 = dados2.iloc[:min_len]
+    if len(dados1) < 5 or len(dados2) < 5:
+        return "❌ O teste requer ao menos 5 valores não nulos em cada grupo.", None
 
-    diferencas = dados1 - dados2
-
-    # Nível de confiança
     try:
         confidence = float(field_conf) if field_conf else 95.0
         if confidence <= 1:
@@ -803,7 +806,16 @@ def analise_2_wilcoxon_paired(df: pd.DataFrame, lista_y: list, field_conf=None):
 
     alpha = 1 - (confidence / 100)
 
-    # Testes de normalidade (3 testes padrão Minitab)
+    # Garantir mesmo tamanho para pareamento
+    n = min(len(dados1), len(dados2))
+    dados1 = dados1.iloc[:n]
+    dados2 = dados2.iloc[:n]
+
+    # Diferenças
+    diferencas = dados1 - dados2
+    mediana_diff = np.median(diferencas)
+
+    # Testes de normalidade
     ad = stats.anderson(diferencas)
     sw_stat, sw_p = stats.shapiro(diferencas)
     dp_stat, dp_p = stats.normaltest(diferencas)
@@ -819,6 +831,7 @@ def analise_2_wilcoxon_paired(df: pd.DataFrame, lista_y: list, field_conf=None):
     sw_normal = sw_p > 0.05
     dp_normal = dp_p > 0.05
 
+    # Resultado consolidado dos testes
     if ad_normal or sw_normal or dp_normal:
         normalidade = "✅ A diferença dos dados pode ser considerada normal."
     else:
@@ -826,27 +839,30 @@ def analise_2_wilcoxon_paired(df: pd.DataFrame, lista_y: list, field_conf=None):
 
     # Teste Wilcoxon pareado
     w_stat, p_valor = stats.wilcoxon(diferencas)
-    mediana_diff = np.median(diferencas)
 
-    # Conclusão detalhada
+    # Conclusão
     if p_valor < alpha:
-        conclusao = f"Com {confidence:.1f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferença estatisticamente significativa entre as medianas de {col1} e {col2}."
+        conclusao = f"Com {confidence:.1f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferença estatisticamente significativa entre as medianas dos pares avaliados."
     else:
-        conclusao = f"Com {confidence:.1f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferença estatisticamente significativa entre as medianas de {col1} e {col2}."
+        conclusao = f"Com {confidence:.1f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferença estatisticamente significativa entre as medianas dos pares avaliados."
 
     # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.boxplot(diferencas, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
-    ax.axvline(0, color='red', linestyle='--', label='H0 (0)')
 
-    # Linha vertical da mediana dentro do boxplot
+    # Linha vertical da mediana (dentro do boxplot)
     q1 = np.percentile(diferencas, 25)
     q3 = np.percentile(diferencas, 75)
-    ax.vlines(mediana_diff, 0.85, 1.15, color='blue', lw=2, label=f'Mediana: {mediana_diff:.2f}')
+    ax.vlines(mediana_diff, 0.85, 1.15, color='blue', linestyle='-', label=f'Mediana: {mediana_diff:.2f}')
 
-    ax.set_title(f"2 Wilcoxon Paired - Diferenças Pareadas", fontsize=10)
+    # Linha H0 no zero
+    ax.axvline(0, color='red', linestyle='--', label='H0 (0)')
+
+    ax.set_title(f"2 Wilcoxon Paired – Diferenças Pareadas", fontsize=10)
     ax.set_xlabel(f"Diferença ({col1} - {col2})")
+    ax.set_yticks([])
+
     ax.legend()
     plt.tight_layout()
 
@@ -855,21 +871,15 @@ def analise_2_wilcoxon_paired(df: pd.DataFrame, lista_y: list, field_conf=None):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Reporte final
     texto = f"""
 📊 **Análise – 2 Wilcoxon Paired**
 
-🔹 **Hipóteses:**
-- H₀: A mediana das diferenças é igual a zero
-- H₁: A mediana das diferenças é diferente de zero
-
-🔎 **Estatísticas Descritivas das Diferenças:**
-- N = {len(diferencas)}
+🔹 **Estatísticas Descritivas das Diferenças:**
+- N = {n}
 - Mediana = {mediana_diff:.2f}
 
 🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
-- Anderson-Darling: estatística = {ad.statistic:.4f}, normalidade = {'Aprovada' if ad_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor = {sw_p:.4f}, normalidade = {'Aprovada' if sw_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor = {dp_p:.4f}, normalidade = {'Aprovada' if dp_normal else 'Reprovada'}
 - {normalidade}
 
 🔎 **Teste Wilcoxon Pareado:**
@@ -881,6 +891,7 @@ def analise_2_wilcoxon_paired(df: pd.DataFrame, lista_y: list, field_conf=None):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
