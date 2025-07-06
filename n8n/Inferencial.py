@@ -1141,7 +1141,6 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
     return texto.strip(), grafico_base64
 
 
-
 def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=None):
     if not coluna_y:
         return "❌ O intervalo interquartílico requer exatamente 1 coluna Y.", None
@@ -1154,7 +1153,7 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     if len(y) < 5:
         return "❌ O teste requer ao menos 5 valores não nulos.", None
 
-    # Estatísticas descritivas
+    # Estatísticas
     mediana = np.median(y)
     q1 = np.percentile(y, 25)
     q3 = np.percentile(y, 75)
@@ -1163,23 +1162,7 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     maximo = np.max(y)
     n = len(y)
 
-    # Nível de confiança (default 95%)
-    try:
-        confidence = float(field_conf) if field_conf else 95.0
-        if confidence <= 1:
-            confidence *= 100
-    except (ValueError, TypeError):
-        confidence = 95.0
-
-    alpha = 1 - (confidence / 100)
-
-    # Intervalo de confiança da média
-    media = np.mean(y)
-    desvio = np.std(y, ddof=1)
-    se = desvio / np.sqrt(n)
-    intervalo = stats.t.interval(1 - alpha, n-1, loc=media, scale=se)
-
-    # Testes de normalidade
+    # Normalidade
     ad = stats.anderson(y)
     sw_stat, sw_p = stats.shapiro(y)
     dp_stat, dp_p = stats.normaltest(y)
@@ -1194,21 +1177,15 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     sw_normal = sw_p > 0.05
     dp_normal = dp_p > 0.05
 
-    normalidade_final = "✅ Os dados podem ser considerados normais" if (ad_normal or sw_normal or dp_normal) else "⚠ Os dados podem não ser normais"
+    normalidade_texto = "✅ Os dados podem ser considerados normais." if (ad_normal or sw_normal or dp_normal) else "⚠ Os dados não seguem distribuição normal."
 
-    recomendacao = ""
-    if ad_normal or sw_normal or dp_normal:
-        recomendacao = f"Como os dados podem ser considerados normais, recomenda-se utilizar o intervalo de confiança da média ({intervalo[0]:.2f} ; {intervalo[1]:.2f}) para inferências paramétricas."
-    else:
-        recomendacao = "Como os dados podem não ser normais, utilize o IQR como medida robusta de dispersão e considere análises não paramétricas se necessário."
-
-    # Gráfico no estilo de intervalo de confiança
+    # Gráfico estilo IC mediana
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 2))
-    ax.errorbar(media, 0, xerr=[[media - intervalo[0]], [intervalo[1] - media]], fmt='o', color='blue', ecolor='black', capsize=5)
-    ax.axvline(media, color='blue', linestyle='-', label=f'Média: {media:.2f}')
-    ax.set_yticks([])
-    ax.set_title(f"Intervalo de Confiança {confidence:.1f}% e IQR", fontsize=10)
+    ax.boxplot(y, vert=False, patch_artist=True, boxprops=dict(facecolor='lightblue'))
+    ax.axvline(mediana, color='blue', linestyle='-', label=f'Mediana: {mediana:.2f}')
+    ax.hlines(-0.5, q1, q3, color='black', lw=4, label=f'IQR: {iqr:.2f}')
+    ax.set_title(f"1 Intervalo Interquartílico - Boxplot")
     ax.set_xlabel(coluna_y)
     ax.legend()
     plt.tight_layout()
@@ -1218,30 +1195,28 @@ def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=N
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Report final
+    # Texto do relatório
     texto = f"""
 📊 **Análise – Intervalo Interquartílico**
 
-🔎 **Descrição dos Dados:**
-- **N:** {n}
-- **Média:** {media:.2f}
-- **Mediana:** {mediana:.2f}
-- **1º Quartil (Q1, 25%):** {q1:.2f}
-- **3º Quartil (Q3, 75%):** {q3:.2f}
-- **Intervalo Interquartílico (IQR):** {iqr:.2f}
-- **Mínimo:** {minimo:.2f}
-- **Máximo:** {maximo:.2f}
-
-🔎 **Intervalo de Confiança da Média ({confidence:.1f}%):**
-- [{intervalo[0]:.2f} ; {intervalo[1]:.2f}]
+🔹 **Estatísticas:**
+- Mediana = {mediana:.2f}
+- Q1 (25%) = {q1:.2f}
+- Q3 (75%) = {q3:.2f}
+- IQR (Q3 - Q1) = {iqr:.2f}
+- Mínimo = {minimo:.2f}
+- Máximo = {maximo:.2f}
+- N = {n}
 
 🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
-- {normalidade_final}
+- {normalidade_texto}
 
 🔎 **Conclusão:**
-{recomendacao}
+O intervalo interquartílico (IQR) indica que o valor central (mediana) é {mediana:.2f}, com dispersão entre {q1:.2f} e {q3:.2f}. {normalidade_texto}
 """
+
     return texto.strip(), grafico_base64
+
 
 
 
