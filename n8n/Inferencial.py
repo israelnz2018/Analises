@@ -1843,7 +1843,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 
 
 
-  def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None, field_conf=None):
+ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y=None):
     if not coluna_x:
         return "❌ O teste 2 Proporções requer pelo menos a coluna X.", None
 
@@ -1852,15 +1852,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 
     x = df[coluna_x].dropna()
 
-    try:
-        nivel_conf = float(field_conf) if field_conf else 95.0
-        if nivel_conf <= 1:
-            nivel_conf *= 100
-        if not (50 <= nivel_conf < 100):
-            return "❌ O nível de confiança deve ser entre 50 e 99.9.", None
-    except:
-        return "❌ Valor do nível de confiança inválido. Informe um número como 95 no campo Field.", None
-
+    nivel_conf = 95.0
     alpha = 1 - (nivel_conf / 100)
     z = stats.norm.ppf(1 - alpha / 2)
 
@@ -1951,6 +1943,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_k_proporcoes(df: pd.DataFrame, lista_y, field_conf=None):
