@@ -2067,7 +2067,7 @@ ANALISES = {
     "Brown-Forsythe": analise_brown_forsythe,
     "1 Intervalo de Confianca Variancia": analise_1_intervalo_confianca_variancia,
     "1 Proporcao": analise_1_proporcao,
-    "2 Proporcoes": analise_2_proporcoes,
+    "2 Proporções": analise_2_proporcoes,
     "K Proporcoes": analise_k_proporcoes,
     "Qui-quadrado": analise_associacao
   
