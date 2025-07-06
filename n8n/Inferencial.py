@@ -1776,11 +1776,12 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
     sucesso_top = categorias.max()
     p_hat_top = sucesso_top / n
 
+    z = stats.norm.ppf(1 - alpha / 2)  # define z fora do loop para consistência
+
     for categoria, sucesso in categorias.items():
         p_hat = sucesso / n
 
         # intervalo de confiança
-        z = stats.norm.ppf(1 - alpha / 2)
         se = np.sqrt(p_hat * (1 - p_hat) / n)
         ic_lower = max(0, p_hat - z * se)
         ic_upper = min(1, p_hat + z * se)
@@ -1791,11 +1792,22 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
         p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
         if p_valor < alpha:
-            conclusao = f"✅ {categoria}: proporção {p_hat:.2f} é estatisticamente diferente da referência {p0:.2f}."
+            conclusao = f"✅ Com {nivel_conf:.1f}% de confiança, rejeitamos H0. Proporção observada ({p_hat:.2f}) é estatisticamente diferente da referência ({p0:.2f})."
         else:
-            conclusao = f"⚠️ {categoria}: proporção {p_hat:.2f} não difere significativamente da referência {p0:.2f}."
+            conclusao = f"⚠️ Com {nivel_conf:.1f}% de confiança, não rejeitamos H0. Proporção observada ({p_hat:.2f}) não difere significativamente da referência ({p0:.2f})."
 
-        resultados.append(conclusao)
+        resultados.append(f"""
+🔹 **Categoria: {categoria}**
+- N = {n}
+- Sucessos = {sucesso}
+- Proporção amostral = {p_hat:.2f}
+- Intervalo {nivel_conf:.1f}% = [{ic_lower:.2f}, {ic_upper:.2f}]
+- Estatística Z = {z_stat:.2f}
+- p-valor = {p_valor:.2f}
+
+🔎 **Conclusão:**
+{conclusao}
+""")
 
     # gera gráfico apenas para a categoria com maior proporção
     se_top = np.sqrt(p_hat_top * (1 - p_hat_top) / n)
@@ -1822,10 +1834,11 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 
     texto = f"""
 📊 **Análise – Teste de 1 Proporção**
-{' '.join(resultados)}
+{''.join(resultados)}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
