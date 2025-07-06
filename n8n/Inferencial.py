@@ -145,20 +145,16 @@ def analise_2_sample_t(df, lista_y, field_conf=None):
 
     # Função para normalidade consolidada
     def normalidade_consolidada(serie):
-        # Anderson-Darling
         ad = anderson(serie)
         normal_ad = ad.statistic < ad.critical_values[2]
 
-        # Ryan-Joiner (Shapiro)
         stat_shapiro, p_shapiro = shapiro(serie)
         normal_shapiro = p_shapiro > 0.05
 
-        # Kolmogorov-Smirnov
         stat_ks, p_ks = kstest(serie, 'norm', args=(serie.mean(), serie.std(ddof=1)))
         normal_ks = p_ks > 0.05
 
-        normal = normal_ad or normal_shapiro or normal_ks
-        return normal
+        return normal_ad or normal_shapiro or normal_ks
 
     normal1 = normalidade_consolidada(serie1)
     normal2 = normalidade_consolidada(serie2)
@@ -177,6 +173,10 @@ def analise_2_sample_t(df, lista_y, field_conf=None):
         return str(round(value, 2)).replace('.', ',')
 
     texto = f"""📊 **Análise – Teste T para 2 Amostras Independentes**
+
+🔹 **Hipóteses:**
+- **H₀:** As médias de {col1} e {col2} são iguais
+- **H₁:** As médias de {col1} e {col2} são diferentes
 
 🔎 **Estatísticas Descritivas:**
 
@@ -240,6 +240,7 @@ Com {confidence:.0f}% de confiança, {"podemos rejeitar a hipótese conservadora
         imagem_base64 = None
 
     return texto, imagem_base64
+
 
 
 
