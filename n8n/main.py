@@ -112,7 +112,7 @@ CONFIG_ANALISES = {
     "Regressão Linear Múltipla": ["df", "coluna_y", "lista_x"],
     "Regressão Binária": ["df", "coluna_y", "lista_x"],
     "Regressão Ordinal": ["df", "coluna_y", "lista_x"],
-    "Regressão Oominal": ["df", "coluna_y", "lista_x"],
+    "Regressão Nominal": ["df", "coluna_y", "lista_x"],
     "Árvore de Decisão": ["df", "coluna_y", "lista_x"],
     "Random Forest": ["df", "coluna_y", "lista_x"],
     "ARIMA": ["df", "coluna_y", "field"],
