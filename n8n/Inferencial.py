@@ -2070,6 +2070,79 @@ def analise_associacao(df: pd.DataFrame, coluna_y, coluna_x):
 
     return texto.strip(), grafico_base64
 
+def analise_quiquadrado_ajuste(df: pd.DataFrame, coluna_y, coluna_x):
+    # Validação inicial
+    if not coluna_y or not coluna_x:
+        return "❌ O teste Qui-Quadrado de Ajuste requer exatamente 1 coluna Y (contagem) e 1 coluna X (categorias).", None
+
+    if coluna_y not in df.columns or coluna_x not in df.columns:
+        return "❌ As colunas informadas não foram encontradas no arquivo.", None
+
+    # Filtra dados válidos
+    df_valid = df[[coluna_x, coluna_y]].dropna()
+    if df_valid.empty:
+        return "❌ Não há dados suficientes após remoção de valores nulos.", None
+
+    # Validação de tipos
+    if not np.issubdtype(df_valid[coluna_y].dtype, np.number):
+        return "❌ A coluna Y deve conter valores numéricos (contagens observadas).", None
+
+    categorias = df_valid[coluna_x].astype(str).tolist()
+    observados = df_valid[coluna_y].to_numpy()
+
+    if len(categorias) < 2:
+        return "❌ É necessário pelo menos 2 categorias para o teste.", None
+
+    # Calcula esperado uniforme
+    total = np.sum(observados)
+    esperado = np.full_like(observados, total / len(observados))
+
+    # Teste Qui-Quadrado de Ajuste
+    stat, p_valor = stats.chisquare(f_obs=observados, f_exp=esperado)
+
+    # Gráfico - barras Observado vs Esperado
+    aplicar_estilo_minitab()
+    x = np.arange(len(categorias))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(8,4))
+    ax.bar(x - width/2, observados, width, label='Observado', color='skyblue')
+    ax.bar(x + width/2, esperado, width, label='Esperado', color='lightgreen')
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(categorias, rotation=45)
+    ax.set_ylabel("Contagem")
+    ax.set_title("Qui-Quadrado de Ajuste: Observado vs Esperado")
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    # Report padronizado
+    texto = f"""
+📊 **Análise – Qui-Quadrado de Ajuste**
+
+🔹 **Hipóteses:**
+- H₀: A distribuição observada é igual à distribuição esperada (uniforme)
+- H₁: A distribuição observada é diferente da esperada
+
+🔎 **Resumo:**
+- Categorias: {', '.join(categorias)}
+- Total observado: {total}
+- Esperado por categoria (uniforme): {total / len(observados):.2f}
+
+🔎 **Teste Qui-Quadrado de Ajuste:**
+- Estatística χ² = {stat:.2f}
+- p-valor = {p_valor:.4f}
+
+🔎 **Conclusão:**
+{"✅ Com 95% de confiança, rejeitamos H0. A distribuição observada é significativamente diferente da uniforme." if p_valor < 0.05 else "⚠️ Com 95% de confiança, não rejeitamos H0. Não há evidência significativa de diferença entre a distribuição observada e a uniforme."}
+"""
+
+    return texto.strip(), grafico_base64
 
 
 ANALISES = {
@@ -2092,7 +2165,8 @@ ANALISES = {
     "1 Proporcao": analise_1_proporcao,
     "2 Proporções": analise_2_proporcoes,
     "K Proporcoes": analise_k_proporcoes,
-    "Qui-quadrado de Associação": analise_associacao
+    "Qui-quadrado de Associação": analise_associacao,
+    "Qui-quadrado de Ajuste": analise_quiquadrado_ajuste,
   
 
 }
