@@ -116,7 +116,6 @@ CONFIG_ANALISES = {
     "Árvore de Decisão - CART": ["df", "coluna_y", "lista_x"],
     "Random Forest": ["df", "coluna_y", "lista_x"],
     "Série Temporal - ARIMA": ["df", "coluna_y", "Data", "field"],
-    "Holt-Winters": ["df", "coluna_y", "field"],
     "Carta I-MR": ["df", "coluna_y"],
     "Carta X-BarraR": ["df", "coluna_y", "subgrupo"],
     "Carta X-BarraS": ["df", "coluna_y", "subgrupo"], 
