@@ -1285,20 +1285,28 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
 
 import pandas as pd
 
-def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
+def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     if not coluna_y or coluna_y not in df.columns:
-        return "O ARIMA requer 1 coluna Y (série temporal).", None
+        return "❌ O ARIMA requer 1 coluna Y (série temporal).", None
 
-    df_valid = df[[coluna_y]].dropna()
+    # Se Data existir e estiver no df, usar como índice
+    if Data and Data in df.columns:
+        df_valid = df[[Data, coluna_y]].dropna()
+        df_valid = df_valid.sort_values(by=Data)
+        index = df_valid[Data].values
+    else:
+        df_valid = df[[coluna_y]].dropna()
+        index = range(len(df_valid))
+
     if len(df_valid) < 10:
-        return "A série temporal requer pelo menos 10 observações.", None
+        return "❌ A série temporal requer pelo menos 10 observações.", None
 
     Y = df_valid[coluna_y].values
 
     try:
         import pmdarima as pm
     except ImportError:
-        return "O pacote pmdarima não está disponível neste ambiente.", None
+        return "❌ O pacote pmdarima não está disponível neste ambiente.", None
 
     modelo = pm.auto_arima(Y, seasonal=False, stepwise=True, suppress_warnings=True)
     ordem = modelo.order
@@ -1313,7 +1321,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
     import base64
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(range(len(Y)), Y, label='Série Original', color='black')
+    ax.plot(index, Y, label='Série Original', color='black')
     ax.plot(range(len(Y), len(Y) + horizonte), previsao, label='Previsão', color='blue')
     ax.set_title(f'Modelo ARIMA{ordem} - Previsão de {horizonte} períodos')
     ax.legend()
@@ -1326,19 +1334,34 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
 
     previsao_texto = ", ".join([f"{p:.2f}" for p in previsao])
 
+    # Conclusão
+    conclusao_status = "✅ **Modelo ajustado com sucesso.**"
+
+    # Recomendação
+    recomendacao = (
+        "\n🔎 **Observação / Recomendação**\n➡️ Considere:\n"
+        "- Verificar se há tendência ou sazonalidade não capturada.\n"
+        "- Experimentar modelos sazonais ou ajustar p,d,q manualmente se necessário.\n"
+        "- Garantir dados ordenados corretamente para previsões confiáveis."
+    )
+
+    # Reporte final
     texto = (
-        f"Modelo ARIMA\n\n"
-        f"Configuração do modelo: ARIMA{ordem}\n"
-        f"Qualidade do ajuste:\n"
+        f"📊 **Análise – Série Temporal (ARIMA)**\n\n"
+        f"🔹 **Configuração do modelo**\n"
+        f"- Modelo ARIMA{ordem}\n\n"
+        f"🔎 **Conclusão**\n"
+        f"{conclusao_status}\n\n"
+        f"🔹 **Qualidade do ajuste:**\n"
         f"- AIC: {aic:.2f}\n"
         f"- BIC: {bic:.2f}\n\n"
-        f"Previsão para os próximos {horizonte} períodos:\n"
-        f"{previsao_texto}\n\n"
-        f"O modelo foi ajustado automaticamente. "
-        f"Use o gráfico para avaliar a tendência e decidir se precisa refinar manualmente."
+        f"🔹 **Previsão para os próximos {horizonte} períodos:**\n"
+        f"{previsao_texto}\n"
+        f"{recomendacao}"
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
