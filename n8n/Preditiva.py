@@ -1,93 +1,103 @@
 from suporte import *
 
-def analise_tipo_modelo_regressao(df: pd.DataFrame, coluna_y):
-    if not coluna_y:
-        return "❌ O Tipo de modelo de regressão requer 1 coluna Y.", None
+def analise_melhor_modelo(df: pd.DataFrame, coluna_y, coluna_x):
+    import statsmodels.api as sm
+    from sklearn.metrics import r2_score
 
-    if coluna_y not in df.columns:
-        return f"❌ Coluna {coluna_y} não encontrada no arquivo.", None
+    if not coluna_y or not coluna_x:
+        return "❌ O teste requer exatamente 1 coluna Y e 1 coluna X.", None
 
-    colunas_x = [col for col in df.columns if col != coluna_y and pd.api.types.is_numeric_dtype(df[col])]
-    if not colunas_x:
-        return "❌ Nenhuma coluna X numérica encontrada automaticamente no arquivo.", None
+    if coluna_y not in df.columns or coluna_x not in df.columns:
+        return "❌ As colunas informadas não foram encontradas no arquivo.", None
 
-    coluna_x = colunas_x[0]
     df_valid = df[[coluna_x, coluna_y]].dropna()
-    if len(df_valid) < 5:
-        return "❌ São necessários pelo menos 5 pares válidos para análise.", None
+    if df_valid.empty:
+        return "❌ Não há dados suficientes após remoção de valores nulos.", None
 
-    X_raw = df_valid[coluna_x].values
-    Y = df_valid[coluna_y].values
+    x = df_valid[coluna_x].to_numpy()
+    y = df_valid[coluna_y].to_numpy()
 
-    modelos = {
-        "Linear": np.polyfit(X_raw, Y, 1),
-        "Quadrático": np.polyfit(X_raw, Y, 2),
-        "Cúbico": np.polyfit(X_raw, Y, 3)
-    }
+    resultados = []
 
-    X_log = X_raw[X_raw > 0]
-    Y_log = Y[X_raw > 0]
-    if len(X_log) >= 5:
-        modelos["Logarítmico"] = np.polyfit(np.log(X_log), Y_log, 1)
+    # 1. Modelo Linear
+    X_lin = sm.add_constant(x)
+    modelo_lin = sm.OLS(y, X_lin).fit()
+    r2_lin = modelo_lin.rsquared
+    resultados.append(("Linear", r2_lin, modelo_lin))
 
-    Y_exp = Y[Y > 0]
-    X_exp = X_raw[Y > 0]
-    if len(Y_exp) >= 5:
-        modelos["Exponencial"] = np.polyfit(X_exp, np.log(Y_exp), 1)
+    # 2. Modelo Log-linear
+    if all(y > 0):
+        modelo_loglin = sm.OLS(np.log(y), X_lin).fit()
+        y_pred_loglin = np.exp(modelo_loglin.predict(X_lin))
+        r2_loglin = r2_score(y, y_pred_loglin)
+        resultados.append(("Log-linear", r2_loglin, modelo_loglin))
+    
+    # 3. Modelo Exponencial
+    if all(y > 0):
+        X_exp = sm.add_constant(x)
+        modelo_exp = sm.OLS(np.log(y), X_exp).fit()
+        y_pred_exp = np.exp(modelo_exp.predict(X_exp))
+        r2_exp = r2_score(y, y_pred_exp)
+        resultados.append(("Exponencial", r2_exp, modelo_exp))
 
-    resultados = {}
-    for nome, coef in modelos.items():
-        if nome == "Logarítmico":
-            y_pred = np.polyval(coef, np.log(X_raw[X_raw > 0]))
-            y_pred_full = np.full_like(Y, np.nan)
-            y_pred_full[X_raw > 0] = y_pred
-            y_pred = y_pred_full
-        elif nome == "Exponencial":
-            y_pred = np.exp(np.polyval(coef, X_raw))
-        else:
-            y_pred = np.polyval(coef, X_raw)
+    # 4. Modelo Potência
+    if all(x > 0) and all(y > 0):
+        X_pot = sm.add_constant(np.log(x))
+        modelo_pot = sm.OLS(np.log(y), X_pot).fit()
+        y_pred_pot = np.exp(modelo_pot.predict(X_pot))
+        r2_pot = r2_score(y, y_pred_pot)
+        resultados.append(("Potência", r2_pot, modelo_pot))
 
-        ss_res = np.nansum((Y - y_pred) ** 2)
-        ss_tot = np.nansum((Y - np.nanmean(Y)) ** 2)
-        r2 = 1 - ss_res / ss_tot
-        adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - len(coef) - 1)
+    # 5. Modelo Polinomial grau 2
+    X_poly = np.column_stack((x, x**2))
+    X_poly = sm.add_constant(X_poly)
+    modelo_poly = sm.OLS(y, X_poly).fit()
+    r2_poly = modelo_poly.rsquared
+    resultados.append(("Polinomial", r2_poly, modelo_poly))
 
-        resultados[nome] = {
-            "coef": coef,
-            "r2": r2,
-            "r2_adj": adj
-        }
+    # Ordena por R² decrescente
+    resultados.sort(key=lambda x: x[1], reverse=True)
 
-    resultados_validos = {k: v for k, v in resultados.items() if v["r2_adj"] >= 0}
+    # Critério de desempate
+    melhor = resultados[0]
+    for modelo in resultados[1:]:
+        if abs(melhor[1] - modelo[1]) < 0.05:
+            # Se diferença <5%, escolhe modelo mais simples (pela ordem original)
+            ordem_simples = ["Linear", "Log-linear", "Exponencial", "Potência", "Polinomial"]
+            if ordem_simples.index(modelo[0]) < ordem_simples.index(melhor[0]):
+                melhor = modelo
 
-    if not resultados_validos:
-        return "❌ Nenhum modelo apresentou R² ajustado positivo. Regressão não recomendada.", None
+    tipo_modelo, r2_melhor, modelo_melhor = melhor
 
-    melhor = max(resultados_validos.items(), key=lambda x: x[1]["r2_adj"])
-    nome_vencedor, res_vencedor = melhor
-
-    aviso = ""
-    if all(r["r2_adj"] < 0.3 for r in resultados_validos.values()):
-        aviso = "⚠ Todos os modelos apresentaram baixo poder de explicação (R² ajustado < 0.3). Use com cautela.\n"
-
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.scatter(X_raw, Y, color='black', label='Dados')
-
-    if nome_vencedor == "Logarítmico":
-        X_plot = X_raw[X_raw > 0]
-        y_fit = np.polyval(res_vencedor["coef"], np.log(X_plot))
-        ax.plot(X_plot, y_fit, color='blue', label=f'Modelo: {nome_vencedor}')
-    elif nome_vencedor == "Exponencial":
-        y_fit = np.exp(np.polyval(res_vencedor["coef"], X_raw))
-        ax.plot(X_raw, y_fit, color='blue', label=f'Modelo: {nome_vencedor}')
+    # Gera equação
+    params = modelo_melhor.params
+    if tipo_modelo == "Linear":
+        eq = f"Y = {params[0]:.3f} + {params[1]:.3f}X"
+        y_pred = modelo_melhor.predict(sm.add_constant(x))
+    elif tipo_modelo == "Log-linear":
+        eq = f"ln(Y) = {params[0]:.3f} + {params[1]:.3f}X"
+        y_pred = np.exp(modelo_melhor.predict(sm.add_constant(x)))
+    elif tipo_modelo == "Exponencial":
+        eq = f"Y = exp({params[0]:.3f} + {params[1]:.3f}X)"
+        y_pred = np.exp(modelo_melhor.predict(sm.add_constant(x)))
+    elif tipo_modelo == "Potência":
+        eq = f"Y = exp({params[0]:.3f}) * X^{params[1]:.3f}"
+        y_pred = np.exp(modelo_melhor.predict(sm.add_constant(np.log(x))))
+    elif tipo_modelo == "Polinomial":
+        eq = f"Y = {params[0]:.3f} + {params[1]:.3f}X + {params[2]:.3f}X²"
+        y_pred = modelo_melhor.predict(X_poly)
     else:
-        y_fit = np.polyval(res_vencedor["coef"], X_raw)
-        ax.plot(X_raw, y_fit, color='blue', label=f'Modelo: {nome_vencedor}')
+        eq = "Modelo não reconhecido"
+        y_pred = np.zeros_like(y)
 
+    # Gráfico com equação no topo
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(8,4))
+    ax.scatter(x, y, label="Observado", color="#0072B2")
+    ax.plot(x, y_pred, label="Modelo Ajustado", color="#E69F00")
+    ax.set_title(eq)
     ax.set_xlabel(coluna_x)
     ax.set_ylabel(coluna_y)
-    ax.set_title("Tipo de Modelo de Regressão")
     ax.legend()
     plt.tight_layout()
 
@@ -96,20 +106,20 @@ def analise_tipo_modelo_regressao(df: pd.DataFrame, coluna_y):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-    linhas = []
-    for nome, r in resultados.items():
-        coef_txt = " + ".join([f"{c:.4f}*X^{i}" for i, c in enumerate(r["coef"][::-1])])
-        linhas.append(f"- {nome}: R²={r['r2']:.4f}, R² ajustado={r['r2_adj']:.4f}\n  Equação: {coef_txt}")
-
+    # Report padronizado
     texto = f"""
-**Tipo de Modelo de Regressão**
-{chr(10).join(linhas)}
+📊 **Análise – Melhor Modelo de Regressão**
 
-**Conclusão**
-{aviso}Modelo recomendado: {nome_vencedor} (R² ajustado = {res_vencedor['r2_adj']:.4f})
+🔎 **Modelo selecionado:** {tipo_modelo}
+- Equação: {eq}
+- R² = {r2_melhor:.3f}
+
+🔎 **Conclusão:**
+✅ O modelo {tipo_modelo} apresentou o melhor ajuste para os dados de {coluna_y} em função de {coluna_x}.
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
@@ -918,7 +928,7 @@ def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
 
 # Dicionário de análises
 ANALISES = {
-    "Tipo de modelo de regressão": analise_tipo_modelo_regressao,
+    "Tipo de modelo de regressão": analise_melhor_modelo,
     "Regressão linear simples": analise_regressao_linear_simples,
     "Regressão linear múltipla": analise_regressao_linear_multipla,
     "Regressão logística binária": analise_regressao_logistica_binaria,
