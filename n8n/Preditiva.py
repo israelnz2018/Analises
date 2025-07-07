@@ -764,31 +764,52 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
     linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
-    conclusao = []
-    if r2_mcf > 0.2:
-        conclusao.append("✅ Modelo apresenta bom ajuste (R² de McFadden adequado).")
-    else:
-        conclusao.append("⚠ R² de McFadden baixo, modelo pode não ter bom ajuste.")
+    # Novo modelo de reporte bonito e completo
+    validado = (r2_mcf > 0.2) and (auc > 0.7) and all(v < 10 for v in vif) and any(p < 0.05 for p in model.pvalues[1:])
 
-    if auc > 0.7:
-        conclusao.append("✅ Capacidade discriminativa aceitável (AUC > 0.7).")
-    else:
-        conclusao.append("⚠ Capacidade discriminativa baixa (AUC <= 0.7).")
+    conclusao_status = "✅ Modelo validado." if validado else "❌ Modelo não validado."
 
-    if all(v < 10 for v in vif):
-        conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
-    else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
+    criterios = []
+    criterios.append(f"- R² de McFadden = {r2_mcf:.4f} {'✅ adequado (>0.2)' if r2_mcf > 0.2 else '❌ baixo (<=0.2)'}")
+    criterios.append(f"- AUC = {auc:.4f} {'✅ adequado (>0.7)' if auc > 0.7 else '❌ baixo (<=0.7)'}")
+    criterios.append(f"- Percentual de acerto = {acerto*100:.2f}%")
+    for name, pval in zip(x_cols_final, model.pvalues[1:]):
+        criterios.append(f"- p-valor {name} = {pval:.4f} {'✅ significativo (<0.05)' if pval < 0.05 else '❌ não significativo (>=0.05)'}")
+    criterios.append("- VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
+
+    recomendacao = ""
+    if not validado:
+        recomendacao = """
+🔎 Observação / Recomendação
+➡️ O modelo não foi validado. Considere:
+- Remover preditoras não significativas (p >= 0.05).
+- Transformar variáveis ou criar categorias.
+- Aumentar o tamanho amostral para maior poder estatístico.
+""".strip()
 
     texto = f"""
-**Regressão Logística Binária**
+📊 Análise – Regressão Logística Binária
+
+🔹 Hipóteses do modelo
+- H₀: Nenhuma variável está associada à probabilidade do evento
+- H₁: Pelo menos uma variável está associada à probabilidade do evento
+
+🔎 Resumo do modelo
+- Variável dependente (Y): {coluna_y}
+- Variáveis independentes (Xs): {', '.join(x_cols_final)}
 {chr(10).join(linhas)}
 
-**Conclusão**
-{chr(10).join(conclusao)}
-"""
+🔎 Conclusão
+{conclusao_status}
 
-    return texto.strip(), grafico_base64
+🔹 Critérios avaliados:
+{chr(10).join(criterios)}
+
+{recomendacao}
+""".strip()
+
+    return texto, grafico_base64
+
 
 
 import pandas as pd
