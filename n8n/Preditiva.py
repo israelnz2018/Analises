@@ -18,27 +18,30 @@ def analise_melhor_modelo(df: pd.DataFrame, coluna_y, coluna_x):
     y = df_valid[coluna_y].to_numpy()
 
     resultados = []
+    detalhes_modelos = ""
 
     # 1. Modelo Linear
     X_lin = sm.add_constant(x)
     modelo_lin = sm.OLS(y, X_lin).fit()
     r2_lin = modelo_lin.rsquared
-    resultados.append(("Linear", r2_lin, modelo_lin))
+    eq_lin = f"Y = {modelo_lin.params[0]:.3f} + {modelo_lin.params[1]:.3f}X"
+    resultados.append(("Linear", r2_lin, modelo_lin, eq_lin))
 
     # 2. Modelo Log-linear
     if all(y > 0):
         modelo_loglin = sm.OLS(np.log(y), X_lin).fit()
         y_pred_loglin = np.exp(modelo_loglin.predict(X_lin))
         r2_loglin = r2_score(y, y_pred_loglin)
-        resultados.append(("Log-linear", r2_loglin, modelo_loglin))
+        eq_loglin = f"ln(Y) = {modelo_loglin.params[0]:.3f} + {modelo_loglin.params[1]:.3f}X"
+        resultados.append(("Log-linear", r2_loglin, modelo_loglin, eq_loglin))
     
     # 3. Modelo Exponencial
     if all(y > 0):
-        X_exp = sm.add_constant(x)
-        modelo_exp = sm.OLS(np.log(y), X_exp).fit()
-        y_pred_exp = np.exp(modelo_exp.predict(X_exp))
+        modelo_exp = sm.OLS(np.log(y), X_lin).fit()
+        y_pred_exp = np.exp(modelo_exp.predict(X_lin))
         r2_exp = r2_score(y, y_pred_exp)
-        resultados.append(("Exponencial", r2_exp, modelo_exp))
+        eq_exp = f"Y = exp({modelo_exp.params[0]:.3f} + {modelo_exp.params[1]:.3f}X)"
+        resultados.append(("Exponencial", r2_exp, modelo_exp, eq_exp))
 
     # 4. Modelo Potência
     if all(x > 0) and all(y > 0):
@@ -46,14 +49,20 @@ def analise_melhor_modelo(df: pd.DataFrame, coluna_y, coluna_x):
         modelo_pot = sm.OLS(np.log(y), X_pot).fit()
         y_pred_pot = np.exp(modelo_pot.predict(X_pot))
         r2_pot = r2_score(y, y_pred_pot)
-        resultados.append(("Potência", r2_pot, modelo_pot))
+        eq_pot = f"Y = exp({modelo_pot.params[0]:.3f}) * X^{modelo_pot.params[1]:.3f}"
+        resultados.append(("Potência", r2_pot, modelo_pot, eq_pot))
 
     # 5. Modelo Polinomial grau 2
     X_poly = np.column_stack((x, x**2))
     X_poly = sm.add_constant(X_poly)
     modelo_poly = sm.OLS(y, X_poly).fit()
     r2_poly = modelo_poly.rsquared
-    resultados.append(("Polinomial", r2_poly, modelo_poly))
+    eq_poly = f"Y = {modelo_poly.params[0]:.3f} + {modelo_poly.params[1]:.3f}X + {modelo_poly.params[2]:.3f}X²"
+    resultados.append(("Polinomial", r2_poly, modelo_poly, eq_poly))
+
+    # Monta texto com todos os modelos
+    for nome, r2, _, eq in resultados:
+        detalhes_modelos += f"🔹 {nome}\n- Equação: {eq}\n- R² = {r2:.3f}\n\n"
 
     # Ordena por R² decrescente
     resultados.sort(key=lambda x: x[1], reverse=True)
@@ -67,35 +76,28 @@ def analise_melhor_modelo(df: pd.DataFrame, coluna_y, coluna_x):
             if ordem_simples.index(modelo[0]) < ordem_simples.index(melhor[0]):
                 melhor = modelo
 
-    tipo_modelo, r2_melhor, modelo_melhor = melhor
+    tipo_modelo, r2_melhor, modelo_melhor, eq_melhor = melhor
 
-    # Gera equação
-    params = modelo_melhor.params
+    # Calcula y_pred para o modelo vencedor
     if tipo_modelo == "Linear":
-        eq = f"Y = {params[0]:.3f} + {params[1]:.3f}X"
         y_pred = modelo_melhor.predict(sm.add_constant(x))
     elif tipo_modelo == "Log-linear":
-        eq = f"ln(Y) = {params[0]:.3f} + {params[1]:.3f}X"
         y_pred = np.exp(modelo_melhor.predict(sm.add_constant(x)))
     elif tipo_modelo == "Exponencial":
-        eq = f"Y = exp({params[0]:.3f} + {params[1]:.3f}X)"
         y_pred = np.exp(modelo_melhor.predict(sm.add_constant(x)))
     elif tipo_modelo == "Potência":
-        eq = f"Y = exp({params[0]:.3f}) * X^{params[1]:.3f}"
         y_pred = np.exp(modelo_melhor.predict(sm.add_constant(np.log(x))))
     elif tipo_modelo == "Polinomial":
-        eq = f"Y = {params[0]:.3f} + {params[1]:.3f}X + {params[2]:.3f}X²"
         y_pred = modelo_melhor.predict(X_poly)
     else:
-        eq = "Modelo não reconhecido"
         y_pred = np.zeros_like(y)
 
-    # Gráfico com equação no topo
+    # Gráfico do modelo vencedor
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(8,4))
     ax.scatter(x, y, label="Observado", color="#0072B2")
     ax.plot(x, y_pred, label="Modelo Ajustado", color="#E69F00")
-    ax.set_title(eq)
+    ax.set_title(eq_melhor)
     ax.set_xlabel(coluna_x)
     ax.set_ylabel(coluna_y)
     ax.legend()
@@ -106,19 +108,31 @@ def analise_melhor_modelo(df: pd.DataFrame, coluna_y, coluna_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
+    # Alerta se R² < 50%
+    alerta = ""
+    if r2_melhor < 0.50:
+        alerta = "⚠️ **Atenção:** O modelo possui baixo poder explicativo (R² < 50%). Recomenda-se adicionar mais fatores (variáveis X) para melhorar o ajuste.\n"
+
     # Report padronizado
     texto = f"""
 📊 **Análise – Melhor Modelo de Regressão**
 
-🔎 **Modelo selecionado:** {tipo_modelo}
-- Equação: {eq}
+🔎 **Resultados de todos os modelos:**
+{detalhes_modelos}
+
+🔎 **Modelo escolhido:**
+- Tipo: {tipo_modelo}
+- Equação: {eq_melhor}
 - R² = {r2_melhor:.3f}
 
-🔎 **Conclusão:**
-✅ O modelo {tipo_modelo} apresentou o melhor ajuste para os dados de {coluna_y} em função de {coluna_x}.
+🔎 **Justificativa:**
+O modelo {tipo_modelo} foi selecionado por apresentar o maior R² considerando simplicidade como critério secundário.
+
+{alerta}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
