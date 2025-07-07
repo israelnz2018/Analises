@@ -1411,6 +1411,6 @@ ANALISES = {
     "Regressão Nominal": analise_regressao_logistica_nominal,
     "Árvore de Decisão - CART": analise_arvore_decisao,
     "Random Forest": analise_random_forest,
-    "ARIMA": analise_arima,
+    "Série Temporal - ARIMA": analise_arima,
     "Holt-Winters": analise_holt_winters
 }
