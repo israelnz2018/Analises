@@ -962,10 +962,9 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     Y_codes.name = "target"
     Y_labels = dict(enumerate(Y.cat.categories))
 
-    # Prepara X com nomes seguros (strings) e únicos
+    # Prepara X com nomes seguros
     X_final = df_valid[lista_x].copy()
     X_final.columns = [str(i) for i in range(X_final.shape[1])]
-    X_final.columns = [str(col) for col in X_final.columns]
     nomes_originais = dict(zip(X_final.columns, lista_x))
 
     # Ajusta modelo MNLogit
@@ -975,6 +974,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
 
+    # R² de McFadden
     try:
         ll_null = sm.MNLogit(Y_codes, np.ones((len(Y_codes), 1))).fit(disp=0).llf
         ll_model = res.llf
@@ -994,7 +994,9 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     # Previsões e matriz de confusão
     Y_pred = res.predict().argmax(axis=1)
     cm = confusion_matrix(Y_codes, Y_pred)
+    acerto = (cm.diagonal().sum()) / cm.sum()
 
+    # Gráfico matriz de confusão
     fig, ax = plt.subplots(figsize=(6, 4))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(Y_labels.values()))
     disp.plot(ax=ax, cmap="Blues", colorbar=False)
@@ -1012,8 +1014,8 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     menor_pval = 1.0
 
     for (cat, coef, pval) in zip(res.params.index, res.params.values, res.pvalues.values):
-        coef_str = ", ".join([f"{c:.4f}" for c in coef])
-        pval_str = ", ".join([f"{p:.4f}" for p in pval])
+        coef_str = ", ".join([f"{c:.2f}".replace('.', ',') for c in coef])
+        pval_str = ", ".join([f"{p:.3f}".replace('.', ',') for p in pval])
         linhas.append(f"- {cat}: coef=[{coef_str}], p-valor=[{pval_str}]")
 
         for nome_coluna, p in zip(X_final.columns, pval):
@@ -1021,40 +1023,58 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
                 menor_pval = p
                 melhor_var = nomes_originais[nome_coluna]
 
+    # Critérios avaliados
+    criterios = []
     if r2_mcf is not None:
-        linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
-    acerto = (cm.diagonal().sum()) / cm.sum()
-    linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{nomes_originais[c]}={v:.2f}" for c, v in zip(X_final.columns, vif)]))
+        status_r2 = "✅ adequado (>0,2)" if r2_mcf > 0.2 else "❌ baixo (<=0,2)"
+        criterios.append(f"- R² de McFadden = {str(round(r2_mcf,3)).replace('.',',')} {status_r2}")
+    criterios.append(f"- Percentual de acerto = {round(acerto*100,2):.2f}%")
+    for c, v in zip(X_final.columns, vif):
+        status_vif = "✅ adequado (<10)" if v < 10 else "❌ alto (>=10)"
+        criterios.append(f"- VIF {nomes_originais[c]} = {str(round(v,2)).replace('.',',')} {status_vif}")
 
-    # Sugestões e conclusão
-    sugestao = ""
-    if melhor_var:
-        sugestao = f"\n📌 A variável **{melhor_var}** teve o menor p-valor ({menor_pval:.4f}) e pode ser a explicação mais relevante isoladamente."
-    if len(lista_x) > 1 and any(v >= 10 for v in vif):
-        sugestao += "\n⚠ Considere remover variáveis com VIF alto ou p-valor elevado para melhorar o modelo."
+    # Conclusão
+    validado = (r2_mcf is not None and r2_mcf > 0.2 and all(v < 10 for v in vif))
+    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
 
-    conclusao = []
-    if r2_mcf is not None:
-        if r2_mcf > 0.2:
-            conclusao.append("✅ Modelo apresenta bom ajuste (R² de McFadden adequado).")
-        else:
-            conclusao.append("⚠ R² de McFadden baixo, modelo pode não ter bom ajuste.")
-    if all(v < 10 for v in vif):
-        conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
-    else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
+    # Recomendação
+    recomendacao = ""
+    if not validado:
+        recomendacao = """
+🔎 **Observação / Recomendação**
+➡️ O modelo não foi validado. Considere:
+- Remover variáveis não significativas.
+- Adicionar variáveis ou categorias relevantes.
+- Aumentar o tamanho amostral para maior poder estatístico.
+""".strip()
 
+    # Reporte final
     texto = f"""
-**Regressão Logística Nominal**
+📊 **Análise – Regressão Logística Nominal**
+
+🔹 **Hipóteses do modelo**
+- H₀: Nenhuma variável está associada às categorias da variável dependente
+- H₁: Pelo menos uma variável está associada às categorias
+
+🔎 **Resumo do modelo**
+- Variável dependente (Y): {coluna_y}
+- Variáveis independentes (Xs): {', '.join([nomes_originais[c] for c in X_final.columns])}
 {chr(10).join(linhas)}
-{sugestao}
 
-**Conclusão**
-{chr(10).join(conclusao)}
-"""
+🔎 **Conclusão**
+{conclusao_status}
 
-    return texto.strip(), grafico_base64
+🔹 **Critérios avaliados:**
+{chr(10).join(criterios)}
+
+🔎 **Variável mais relevante**
+- {melhor_var} (p = {str(round(menor_pval,3)).replace('.',',')})
+
+{recomendacao}
+""".strip()
+
+    return texto, grafico_base64
+
 
 
 
