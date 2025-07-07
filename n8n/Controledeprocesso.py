@@ -33,7 +33,7 @@ def analise_carta_imr(df, coluna_y):
     UCL_MR = mr_mean * 3.267
 
     # Gráfico estilo Minitab
-    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=False)
 
     # Carta Individual (I)
     y = dados[nome_coluna_y].values
@@ -43,11 +43,12 @@ def analise_carta_imr(df, coluna_y):
     axs[0].axhline(media, color="green", linestyle="-")
     axs[0].axhline(UCL_I, color="red", linestyle="-")
     axs[0].axhline(LCL_I, color="red", linestyle="-")
-    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18)
-    axs[0].set_ylabel("Valor Individual", fontsize=16)
-    axs[0].set_xlabel(nome_coluna_y, fontsize=16)  # alteração aqui
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18, fontweight='bold')
+    axs[0].set_ylabel("Valor Individual", fontsize=16, fontweight='bold')
+    axs[0].set_xlabel(nome_coluna_y, fontsize=16, fontweight='bold')
 
-    axs[0].set_xticks(x)  # mostrar todos os números no eixo X
+    # Intervalos regulares automáticos no eixo X (Carta I)
+    axs[0].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     xlim = axs[0].get_xlim()
     axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=12, color="green")
@@ -67,11 +68,12 @@ def analise_carta_imr(df, coluna_y):
     axs[1].scatter(x_mr, y_mr, color="black")
     axs[1].axhline(mr_mean, color="green", linestyle="-")
     axs[1].axhline(UCL_MR, color="red", linestyle="-")
-    axs[1].set_title("Carta MR", fontsize=18)
-    axs[1].set_ylabel("Amplitude Móvel", fontsize=16)
-    axs[1].set_xlabel(nome_coluna_y, fontsize=16)  # alteração aqui
+    axs[1].set_title("Carta MR", fontsize=18, fontweight='bold')
+    axs[1].set_ylabel("Amplitude Móvel", fontsize=16, fontweight='bold')
+    axs[1].set_xlabel(nome_coluna_y, fontsize=16, fontweight='bold')
 
-    axs[1].set_xticks(x_mr)  # mostrar todos os números no eixo X
+    # Intervalos regulares automáticos no eixo X (Carta MR)
+    axs[1].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     xlim_mr = axs[1].get_xlim()
     axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=12, color="green")
@@ -87,18 +89,18 @@ def analise_carta_imr(df, coluna_y):
     plt.tight_layout()
 
     # Critérios 2 e 3 (sequências)
-    def check_crit2(y):
+    def check_crit2(y, ref_media):
         count = 1
         lados = []
         for i in range(1, len(y)):
-            if (y[i] > media and y[i-1] > media) or (y[i] < media and y[i-1] < media):
+            if (y[i] > ref_media and y[i-1] > ref_media) or (y[i] < ref_media and y[i-1] < ref_media):
                 count += 1
                 lados.append(i+1)
                 if count >= 9:
                     return True, lados[-9:]
             else:
                 count = 1
-                lados = [i+1] if (y[i] > media or y[i] < media) else []
+                lados = [i+1] if (y[i] > ref_media or y[i] < ref_media) else []
         return False, []
 
     def check_crit3(y):
@@ -128,14 +130,14 @@ def analise_carta_imr(df, coluna_y):
                 seq_down = [i+1]
         return False, []
 
-    crit2_I, linhas_crit2_I = check_crit2(y)
+    crit2_I, linhas_crit2_I = check_crit2(y, media)
     crit3_I, linhas_crit3_I = check_crit3(y)
-    crit2_MR, linhas_crit2_MR = check_crit2(y_mr)
+    crit2_MR, linhas_crit2_MR = check_crit2(y_mr, mr_mean)  # corrigido para usar mr_mean
     crit3_MR, linhas_crit3_MR = check_crit3(y_mr)
 
     # 🔷 REPORT – Individual
     texto_I = f"📊 **Carta I ({nome_coluna_y})**\n"
-    texto_I += "🔎 Critérios avaliados:\n"
+    texto_I += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_I:
         pontos = ", ".join([f"Linha {linha}: {valor:.2f}" for linha, valor in crit1_flag_I])
         texto_I += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
@@ -155,14 +157,14 @@ def analise_carta_imr(df, coluna_y):
         texto_I += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
 
     if crit1_flag_I or crit2_I or crit3_I:
-        texto_I += "🔎 Conclusão: Causa especial detectada. O processo não está sob controle estatístico.\n"
-        texto_I += "🔎 Recomendação: Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+        texto_I += "🔎 **Conclusão:** Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto_I += "🔎 **Recomendação:** Investigue o processo para entender e se possível remover a causa especial identificada.\n"
     else:
-        texto_I += "🔎 Conclusão: Processo está estável.\n"
+        texto_I += "🔎 **Conclusão:** Processo está estável.\n"
 
     # 🔷 REPORT – MR
     texto_MR = f"📊 **Carta MR**\n"
-    texto_MR += "🔎 Critérios avaliados:\n"
+    texto_MR += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_MR:
         pontos = ", ".join([f"Linha {linha}: {valor:.2f}" for linha, valor in crit1_flag_MR])
         texto_MR += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
@@ -182,10 +184,10 @@ def analise_carta_imr(df, coluna_y):
         texto_MR += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
 
     if crit1_flag_MR or crit2_MR or crit3_MR:
-        texto_MR += "🔎 Conclusão: Causa especial detectada. O processo não está sob controle estatístico.\n"
-        texto_MR += "🔎 Recomendação: Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+        texto_MR += "🔎 **Conclusão:** Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto_MR += "🔎 **Recomendação:** Investigue o processo para entender e se possível remover a causa especial identificada.\n"
     else:
-        texto_MR += "🔎 Conclusão: Processo está estável.\n"
+        texto_MR += "🔎 **Conclusão:** Processo está estável.\n"
 
     # Salva gráfico
     buffer = BytesIO()
@@ -196,7 +198,6 @@ def analise_carta_imr(df, coluna_y):
 
     # Retorna os dois relatórios juntos + imagem
     return (texto_I + "\n" + texto_MR), img_base64
-
 
 
 
