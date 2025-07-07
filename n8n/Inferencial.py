@@ -2106,8 +2106,8 @@ def analise_quiquadrado_ajuste(df: pd.DataFrame, coluna_y, coluna_x):
     width = 0.35
 
     fig, ax = plt.subplots(figsize=(8,4))
-    ax.bar(x - width/2, observados, width, label='Observado', color='skyblue')
-    ax.bar(x + width/2, esperado, width, label='Esperado', color='lightgreen')
+    ax.bar(x - width/2, observados, width, label='Observado', color='#0072B2')
+    ax.bar(x + width/2, esperado, width, label='Esperado', color='#E69F00')
 
     ax.set_xticks(x)
     ax.set_xticklabels(categorias, rotation=45)
