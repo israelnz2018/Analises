@@ -1091,15 +1091,14 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 
 
 import pandas as pd
-
 def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
-        return "A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
+        return "❌ A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
 
     cols = [coluna_y] + lista_x
     df_valid = df[cols].dropna()
     if len(df_valid) < len(lista_x) + 5:
-        return "O modelo requer mais dados válidos.", None
+        return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
     X = df_valid[lista_x]
@@ -1110,27 +1109,34 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     import base64
     import matplotlib.pyplot as plt
 
+    tipo_modelo = "classificação"
     if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
         model = DecisionTreeRegressor(max_depth=4, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
         score = r2_score(Y, Y_pred)
-        score_txt = f"R²: {score:.4f}"
+        score_txt = f"R²: {score:.2f}".replace('.', ',')
+        criterio_status = "✅ adequado (>0,6)" if score >= 0.6 else "❌ baixo (<=0,6)"
+        desempenho = score
+        tipo_modelo = "regressão"
     else:
         model = DecisionTreeClassifier(max_depth=4, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
-        score_txt = f"Percentual de acerto: {acc * 100:.2f}%"
+        score_txt = f"Percentual de acerto: {acc * 100:.2f}%".replace('.', ',')
+        criterio_status = "✅ adequado (>70%)" if acc >= 0.7 else "❌ baixo (<=70%)"
+        desempenho = acc
 
-    importancias = ", ".join([f"{c} = {v * 100:.2f}%" for c, v in zip(lista_x, model.feature_importances_)])
+    importancias = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, model.feature_importances_)])
     regras = export_text(model, feature_names=lista_x)
 
+    # Gráfico árvore
     fig, ax = plt.subplots(figsize=(10, 6))
     plot_tree(
         model,
         feature_names=lista_x,
-        class_names=[str(c) for c in Y.unique()] if not pd.api.types.is_numeric_dtype(Y) else None,
+        class_names=[str(c) for c in Y.unique()] if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
         fontsize=8,
@@ -1142,33 +1148,56 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Conclusão
+    validado = (tipo_modelo == "regressão" and desempenho >= 0.6) or (tipo_modelo == "classificação" and desempenho >= 0.7)
+    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
 
+    # Recomendação
+    recomendacao = ""
+    if not validado:
+        recomendacao = (
+            "\n🔎 **Observação / Recomendação**\n➡️ O modelo não foi validado. Considere:\n"
+            "- Ajustar parâmetros do modelo (ex: max_depth).\n"
+            "- Adicionar variáveis relevantes.\n"
+            "- Aumentar o tamanho amostral para maior poder preditivo."
+        )
 
+    # Reporte final
     texto = (
-        f"📊 **Análise com Árvore de Decisão**\n\n"
-        f"🔹 **Desempenho do modelo**:\n{score_txt}\n\n"
-        f"🔹 **Estrutura da árvore**:\n"
+        f"📊 **Análise – Árvore de Decisão**\n\n"
+        f"🔹 **Hipóteses do modelo**\n"
+        f"- O modelo consegue explicar ou classificar a variável Y com base em Xs.\n\n"
+        f"🔎 **Resumo do modelo**\n"
+        f"- Tipo: {tipo_modelo.capitalize()}\n"
+        f"- Variável dependente (Y): {coluna_y}\n"
+        f"- Variáveis independentes (Xs): {', '.join(lista_x)}\n\n"
+        f"🔎 **Conclusão**\n"
+        f"{conclusao_status}\n\n"
+        f"🔹 **Critérios avaliados:**\n"
+        f"- {score_txt} {criterio_status}\n"
         f"- Número de decisões finais (folhas): {model.get_n_leaves()}\n"
         f"- Profundidade da árvore: {model.get_depth()} níveis\n\n"
-        f"🔹 **Importância das variáveis utilizadas**:\n"
+        f"🔹 **Importância das variáveis:**\n"
         f"{importancias}\n\n"
-        f"📘 **Regras aprendidas pelo modelo**\n"
-        f"{regras}"
+        f"📘 **Regras aprendidas pelo modelo:**\n"
+        f"{regras}\n"
+        f"{recomendacao}"
     )
 
     return texto.strip(), grafico_base64
+
 
 
 import pandas as pd
 
 def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
-        return "O Random Forest requer 1 coluna Y e pelo menos 1 X.", None
+        return "❌ O Random Forest requer 1 coluna Y e pelo menos 1 X.", None
 
     cols = [coluna_y] + lista_x
     df_valid = df[cols].dropna()
     if len(df_valid) < len(lista_x) + 5:
-        return "O modelo requer mais dados válidos.", None
+        return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
     X = df_valid[lista_x]
@@ -1179,22 +1208,29 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     import base64
     import matplotlib.pyplot as plt
 
+    tipo_modelo = "classificação"
     if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
         model = RandomForestRegressor(n_estimators=100, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
         score = r2_score(Y, Y_pred)
-        score_txt = f"R²: {score:.4f}"
+        score_txt = f"R²: {score:.2f}".replace('.', ',')
+        criterio_status = "✅ adequado (>0,6)" if score >= 0.6 else "❌ baixo (<=0,6)"
+        desempenho = score
+        tipo_modelo = "regressão"
     else:
         model = RandomForestClassifier(n_estimators=100, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
-        score_txt = f"Percentual de acerto: {acc * 100:.2f}%"
+        score_txt = f"Percentual de acerto: {acc * 100:.2f}%".replace('.', ',')
+        criterio_status = "✅ adequado (>70%)" if acc >= 0.7 else "❌ baixo (<=70%)"
+        desempenho = acc
 
     importancias = model.feature_importances_
-    importancia_str = ", ".join([f"{c} = {v * 100:.2f}%" for c, v in zip(lista_x, importancias)])
+    importancia_str = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, importancias)])
 
+    # Gráfico de importância das variáveis
     fig, ax = plt.subplots(figsize=(8, 5))
     sorted_idx = importancias.argsort()
     ax.barh([lista_x[i] for i in sorted_idx], importancias[sorted_idx])
@@ -1207,15 +1243,41 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Conclusão
+    validado = (tipo_modelo == "regressão" and desempenho >= 0.6) or (tipo_modelo == "classificação" and desempenho >= 0.7)
+    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
+
+    # Recomendação
+    recomendacao = ""
+    if not validado:
+        recomendacao = (
+            "\n🔎 **Observação / Recomendação**\n➡️ O modelo não foi validado. Considere:\n"
+            "- Ajustar parâmetros do modelo (ex: n_estimators, max_depth).\n"
+            "- Adicionar variáveis relevantes.\n"
+            "- Aumentar o tamanho amostral para maior poder preditivo."
+        )
+
+    # Reporte final
     texto = (
-        "Random Forest - Resultado\n\n"
-        f"Desempenho do modelo:\n{score_txt}\n\n"
-        "Número de árvores usadas: 100\n\n"
-        "Importância das variáveis:\n"
-        f"{importancia_str}"
+        f"📊 **Análise – Random Forest**\n\n"
+        f"🔹 **Hipóteses do modelo**\n"
+        f"- O modelo consegue explicar ou classificar a variável Y com base em Xs.\n\n"
+        f"🔎 **Resumo do modelo**\n"
+        f"- Tipo: {tipo_modelo.capitalize()}\n"
+        f"- Variável dependente (Y): {coluna_y}\n"
+        f"- Variáveis independentes (Xs): {', '.join(lista_x)}\n"
+        f"- Número de árvores usadas: 100\n\n"
+        f"🔎 **Conclusão**\n"
+        f"{conclusao_status}\n\n"
+        f"🔹 **Critérios avaliados:**\n"
+        f"- {score_txt} {criterio_status}\n\n"
+        f"🔹 **Importância das variáveis:**\n"
+        f"{importancia_str}\n"
+        f"{recomendacao}"
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
