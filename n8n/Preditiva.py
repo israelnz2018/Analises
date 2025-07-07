@@ -144,7 +144,6 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
         return f"❌ Coluna {coluna_y} ou {coluna_x} não encontrada no arquivo.", None
 
     df_valid = df[[coluna_x, coluna_y]].dropna()
-
     if len(df_valid) < 5:
         return "❌ O modelo requer ao menos 5 observações válidas.", None
 
@@ -158,20 +157,13 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     ss_res = np.sum((Y - y_pred) ** 2)
     ss_tot = np.sum((Y - np.mean(Y)) ** 2)
     r2 = 1 - ss_res / ss_tot
-    r2_adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - 2)
-
-    # p-valor do coeficiente angular
-    X_mat = np.vstack([np.ones_like(X), X]).T
-    beta, residuals, rank, s = np.linalg.lstsq(X_mat, Y, rcond=None)
-    mse = ss_res / (len(Y) - 2)
-    var_beta = mse * np.linalg.inv(X_mat.T @ X_mat)
-    se_beta1 = np.sqrt(var_beta[1,1])
-    t_stat = beta[1] / se_beta1
-    p_valor_beta1 = 2 * (1 - stats.t.cdf(abs(t_stat), df=len(Y)-2))
+    n = len(Y)
+    p = 2
+    r2_adj = 1 - (1 - r2) * (n - 1) / (n - p)
 
     # R² preditivo (Leave-One-Out)
     erros = []
-    for i in range(len(Y)):
+    for i in range(n):
         X_train = np.delete(X, i)
         Y_train = np.delete(Y, i)
         coef_lo = np.polyfit(X_train, Y_train, 1)
@@ -180,29 +172,55 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     ss_pred = np.sum(erros)
     r2_pred = 1 - ss_pred / ss_tot
 
+    # p-valor do coeficiente angular
+    X_mat = np.vstack([np.ones_like(X), X]).T
+    beta, residuals, rank, s = np.linalg.lstsq(X_mat, Y, rcond=None)
+    mse = ss_res / (n - p)
+    var_beta = mse * np.linalg.inv(X_mat.T @ X_mat)
+    se_beta1 = np.sqrt(var_beta[1,1])
+    t_stat = beta[1] / se_beta1
+    p_valor_beta1 = 2 * (1 - stats.t.cdf(abs(t_stat), df=n-p))
+
     # Testes de normalidade dos resíduos
     residuos = Y - y_pred
-
     ad = stats.anderson(residuos)
     sw_stat, sw_p = stats.shapiro(residuos)
     dp_stat, dp_p = stats.normaltest(residuos)
 
-    # Melhor teste (com maior p-valor)
     testes_normalidade = {
-        "Anderson-Darling": (ad.statistic, ad.statistic < ad.critical_values[2], 0.05),  # índice 2 ≈ 5%
+        "Anderson-Darling": (ad.statistic, ad.statistic < ad.critical_values[2], 0.05),
         "Shapiro-Wilk": (sw_p, sw_p > 0.05, sw_p),
         "D’Agostino-Pearson": (dp_p, dp_p > 0.05, dp_p)
     }
-
-    melhor_teste = max(testes_normalidade.items(), key=lambda x: x[1][2])  # maior p-valor
+    melhor_teste = max(testes_normalidade.items(), key=lambda x: x[1][2])
     nome_teste, (stat, aprovado, p_valor) = melhor_teste
-
     normalidade_residuos = aprovado
 
-    # Conclusão
-    conclusao = []
-    conclusao.append(f"✅ Os resíduos podem ser considerados normais (p = {p_valor:.4f}, {nome_teste})." if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste}). Recomenda-se verificar a estabilidade do processo ou coletar mais dados.")
-    conclusao.append(f"✅ Coeficiente angular significativo (p = {p_valor_beta1:.4f})." if p_valor_beta1 < 0.05 else f"❌ Coeficiente angular não significativo (p = {p_valor_beta1:.4f}).")
+    # Conclusão baseada em critérios
+    motivos = []
+    if not normalidade_residuos:
+        motivos.append("os resíduos não são normais")
+    if p_valor_beta1 >= 0.05:
+        motivos.append("o coeficiente angular não é significativo (p-valor >= 0.05)")
+    if r2 < 0.5:
+        motivos.append("o R² é inferior a 50%")
+
+    if not motivos:
+        validacao = "✅ Modelo validado. O modelo linear é adequado para os dados."
+    else:
+        motivos_txt = "; ".join(motivos)
+        validacao = f"⚠️ Modelo não validado porque {motivos_txt}."
+
+    # Recomendação prática
+    recomendacoes = []
+    if r2 < 0.5:
+        recomendacoes.append("➔ O R² está abaixo de 50%. Considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo.")
+    if not normalidade_residuos:
+        recomendacoes.append("➔ Os resíduos não são normais. Verifique a estabilidade do processo ou colete mais dados.")
+    if p_valor_beta1 >= 0.05:
+        recomendacoes.append("➔ O coeficiente angular não é significativo. Avalie a relação entre as variáveis ou considere outro modelo.")
+
+    recomendacao_final = "\n".join(recomendacoes)
 
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6,4))
@@ -231,19 +249,20 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
 - R²: {r2:.4f}
 - R² ajustado: {r2_adj:.4f}
 - R² preditivo: {r2_pred:.4f}
-- Coeficiente angular: p-valor = {p_valor_beta1:.4f}
+- p-valor do coeficiente angular: {p_valor_beta1:.4f}
 
 🔎 **Normalidade dos resíduos**
-{conclusao[0]}
+{"✅ Os resíduos podem ser considerados normais" if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste})."}
 
 🔎 **Conclusão**
-{conclusao[1]}
+{validacao}
 
 🔧 **Recomendação**
-➔ Considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva.
+{recomendacao_final}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
@@ -260,7 +279,7 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
     X = df_valid[coluna_x].values
     Y = df_valid[coluna_y].values
 
-    # Ajuste quadrático (2º grau)
+    # Ajuste quadrático
     coef = np.polyfit(X, Y, 2)
     y_pred = np.polyval(coef, X)
     a, b, c = coef[0], coef[1], coef[2]
@@ -269,7 +288,7 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
     ss_tot = np.sum((Y - np.mean(Y)) ** 2)
     r2 = 1 - ss_res / ss_tot
     n = len(Y)
-    p = 3  # parâmetros a, b, c
+    p = 3
     r2_adj = 1 - (1 - r2) * (n - 1) / (n - p)
 
     # R² preditivo (Leave-One-Out)
@@ -291,12 +310,10 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
 
     # Testes de normalidade dos resíduos
     residuos = Y - y_pred
-
     ad = stats.anderson(residuos)
     sw_stat, sw_p = stats.shapiro(residuos)
     dp_stat, dp_p = stats.normaltest(residuos)
 
-    # Melhor teste (maior p-valor)
     testes_normalidade = {
         "Anderson-Darling": (ad.statistic, ad.statistic < ad.critical_values[2], 0.05),
         "Shapiro-Wilk": (sw_p, sw_p > 0.05, sw_p),
@@ -304,12 +321,33 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
     }
     melhor_teste = max(testes_normalidade.items(), key=lambda x: x[1][2])
     nome_teste, (stat, aprovado, p_valor) = melhor_teste
-
     normalidade_residuos = aprovado
 
-    # Conclusão
-    conclusao = []
-    conclusao.append(f"✅ Os resíduos podem ser considerados normais (p = {p_valor:.4f}, {nome_teste})." if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste}). Recomenda-se verificar a estabilidade do processo ou coletar mais dados.")
+    # Conclusão baseada em critérios
+    motivos = []
+    if not normalidade_residuos:
+        motivos.append("os resíduos não são normais")
+    if p_valor_modelo >= 0.05:
+        motivos.append("o modelo não é estatisticamente significativo (p-valor >= 0.05)")
+    if r2 < 0.5:
+        motivos.append("o R² é inferior a 50%")
+
+    if not motivos:
+        validacao = "✅ Modelo validado. O modelo quadrático é adequado para os dados."
+    else:
+        motivos_txt = "; ".join(motivos)
+        validacao = f"⚠️ Modelo não validado porque {motivos_txt}."
+
+    # Recomendação prática (independente do R²)
+    recomendacoes = []
+    if r2 < 0.5:
+        recomendacoes.append("➔ O R² está abaixo de 50%. Considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva.")
+    if not normalidade_residuos:
+        recomendacoes.append("➔ Os resíduos não são normais. Recomenda-se verificar a estabilidade do processo ou coletar mais dados.")
+    if p_valor_modelo >= 0.05:
+        recomendacoes.append("➔ O modelo não é estatisticamente significativo. Avalie se há relação entre as variáveis ou considere outro tipo de modelo.")
+
+    recomendacao_final = "\n".join(recomendacoes)
 
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6,4))
@@ -346,13 +384,17 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
 - p-valor do modelo quadrático: {p_valor_modelo:.4f}
 
 🔎 **Normalidade dos resíduos**
-{conclusao[0]}
+{"✅ Os resíduos podem ser considerados normais" if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste})."}
+
+🔎 **Conclusão**
+{validacao}
 
 🔧 **Recomendação**
-➔ Se o R² < 50%, considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva.
+{recomendacao_final}
 """
 
     return texto.strip(), grafico_base64
+
 
 def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
     if not coluna_y or not coluna_x:
@@ -432,6 +474,11 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
 
     conclusao_normalidade = f"✅ Os resíduos podem ser considerados normais (p = {p_valor:.4f}, {nome_teste})." if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste}). Recomenda-se verificar a estabilidade do processo ou coletar mais dados."
 
+    # Recomendação apenas se R² < 50%
+    recomendacao = ""
+    if r2 < 0.5:
+        recomendacao = "🔧 **Recomendação**\n➔ O R² está abaixo de 50%. Considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva."
+
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6,4))
     ax.scatter(X, Y, color='black', label='Dados')
@@ -472,11 +519,11 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
 🔎 **Conclusão**
 {validacao}
 
-🔧 **Recomendação**
-➔ Se o R² < 50%, considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva.
+{recomendacao}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
