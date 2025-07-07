@@ -594,26 +594,22 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
             "Y_pred": Y_pred
         }
 
-    resultados = []
-    if len(x_cols_final) > 5:
-        x_cols_final = x_cols_final[:5]
+    # ➔ Modelo completo com TODAS as preditoras
+    modelo_completo = calcular_modelo(X_values, x_cols_final)
 
-    for k in range(1, len(x_cols_final) + 1):
+    # ➔ Seleção de subset para sugerir possíveis reduções
+    resultados = []
+    for k in range(1, len(x_cols_final)):
         for subset in combinations(range(len(x_cols_final)), k):
             cols_sub = [x_cols_final[i] for i in subset]
             X_sub = X_final[cols_sub].values
             resultados.append(calcular_modelo(X_sub, cols_sub))
 
-    melhor = max(resultados, key=lambda r: r["r2_pred"])
-    simples = sorted(resultados, key=lambda r: len(r["cols"]))
-    modelo_recomendado = melhor
-    for m in simples:
-        if (melhor["r2_pred"] - m["r2_pred"]) < 0.05:
-            modelo_recomendado = m
-            break
+    # ➔ Melhor modelo alternativo
+    melhor_alternativo = max(resultados, key=lambda r: r["r2_pred"]) if resultados else None
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.scatter(modelo_recomendado["Y_pred"], Y - modelo_recomendado["Y_pred"], color='black')
+    ax.scatter(modelo_completo["Y_pred"], Y - modelo_completo["Y_pred"], color='black')
     ax.axhline(0, color='red', linestyle='--')
     ax.set_xlabel("Valores preditos")
     ax.set_ylabel("Resíduos")
@@ -626,71 +622,59 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     # Equação
-    coef_str = " + ".join([f"{coef:.3f}·{col}" for coef, col in zip(modelo_recomendado["model"].coef_, modelo_recomendado["cols"])])
-    equacao = f"Y = {modelo_recomendado['model'].intercept_:.3f} + {coef_str}"
+    coef_str = " + ".join([f"{coef:.2f}·{col}" for coef, col in zip(modelo_completo["model"].coef_, modelo_completo["cols"])])
+    equacao = f"Y = {modelo_completo['model'].intercept_:.2f} + {coef_str}"
 
     # Diagnóstico
     conclusao = []
-    validado = True
-
-    if modelo_recomendado['r2_pred'] > 0.5:
-        conclusao.append("✅ R² preditivo adequado (>50%).")
+    if modelo_completo['r2_pred'] > 0.5:
+        conclusao.append("✅ Modelo validado (R² preditivo adequado).")
     else:
-        conclusao.append("❌ R² preditivo baixo (<50%).")
-        validado = False
+        conclusao.append("⚠ Modelo não validado (R² preditivo baixo).")
 
-    if all(v < 10 for v in modelo_recomendado['vif']):
+    if all(v < 10 for v in modelo_completo['vif']):
         conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
     else:
-        conclusao.append("❌ Multicolinearidade identificada (VIF ≥ 10).")
-        validado = False
+        conclusao.append("⚠ Multicolinearidade identificada (VIF ≥ 10).")
 
-    cp_ideal = len(modelo_recomendado["cols"]) + 1
-    if abs(modelo_recomendado["cp"] - cp_ideal) < 2:
-        conclusao.append(f"✅ Cp dentro do esperado (~{cp_ideal}).")
+    if abs(modelo_completo["cp"] - (len(modelo_completo["cols"]) + 1)) < 2:
+        conclusao.append("✅ Cp dentro do esperado (sem evidência de superajuste).")
     else:
-        conclusao.append(f"❌ Cp fora do ideal (esperado ~{cp_ideal}).")
-        validado = False
+        conclusao.append("⚠ Cp elevado, modelo pode estar superajustado.")
 
-    if 1.5 < modelo_recomendado["dw"] < 2.5:
-        conclusao.append("✅ Sem autocorrelação nos resíduos (DW entre 1,5 e 2,5).")
+    if 1.5 < modelo_completo["dw"] < 2.5:
+        conclusao.append("✅ Sem autocorrelação nos resíduos (Durbin-Watson adequado).")
     else:
-        conclusao.append("❌ Autocorrelação identificada nos resíduos (DW fora de 1,5–2,5).")
-        validado = False
+        conclusao.append("⚠ Autocorrelação identificada nos resíduos (Durbin-Watson fora do ideal).")
 
-    # Recomendação
-    recomendacao = ""
-    if not validado:
-        recomendacao = "\n🔧 **Recomendação**\n➔ Considere remover variáveis não significativas, adicionar novos fatores ou testar outro tipo de modelo para melhorar o ajuste."
+    # ➔ Sugerir remoção de variáveis se modelo menor for similar
+    if melhor_alternativo and (modelo_completo["r2_pred"] - melhor_alternativo["r2_pred"]) < 0.05:
+        conclusao.append(f"💡 Sugestão: Considere remover variáveis para simplificar o modelo sem perder capacidade preditiva. Exemplo: modelo apenas com {', '.join(melhor_alternativo['cols'])}.")
 
     texto = f"""
 📊 **Análise – Regressão Linear Múltipla**
 
 🔹 **Hipóteses do modelo**
-- **H₀:** Não há relação linear entre {', '.join(modelo_recomendado['cols'])} e {coluna_y}
-- **H₁:** Existe relação linear entre {', '.join(modelo_recomendado['cols'])} e {coluna_y}
+- **H₀:** Não há relação linear entre {', '.join(lista_x)} e {coluna_y}
+- **H₁:** Existe relação linear entre {', '.join(lista_x)} e {coluna_y}
 
 🔎 **Resumo do modelo**
-- 📌 Modelo recomendado: {', '.join(modelo_recomendado['cols'])}
+- Y: {coluna_y}
+- Xs: {', '.join(modelo_completo['cols'])}
 - Equação: {equacao}
-- R²: {modelo_recomendado['r2']:.3f}
-- R² ajustado: {modelo_recomendado['r2_adj']:.3f}
-- R² preditivo: {modelo_recomendado['r2_pred']:.3f}
-- Mallows Cp: {modelo_recomendado['cp']:.3f}
-- Durbin-Watson: {modelo_recomendado['dw']:.3f}
-- VIFs: {', '.join([f"{c}={v:.2f}" for c, v in zip(modelo_recomendado['cols'], modelo_recomendado['vif'])])}
-
-🔎 **Critérios**
-- **VIF < 10:** Sem multicolinearidade severa.
-- **Cp ≈ p + 1:** Modelo parcimonioso (bom ajuste sem overfitting).
-- **DW ≈ 2:** Resíduos independentes (sem autocorrelação).
+- R²: {modelo_completo['r2']:.3f}
+- R² ajustado: {modelo_completo['r2_adj']:.3f}
+- R² preditivo: {modelo_completo['r2_pred']:.3f}
+- Mallows Cp: {modelo_completo['cp']:.3f}
+- Durbin-Watson: {modelo_completo['dw']:.3f}
+- VIFs: {', '.join([f"{c}={v:.2f}" for c, v in zip(modelo_completo['cols'], modelo_completo['vif'])])}
 
 🔎 **Conclusão**
 {chr(10).join(conclusao)}
-{recomendacao}
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
