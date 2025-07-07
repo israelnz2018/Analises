@@ -740,11 +740,11 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
         ax.legend()
     else:
         fpr, tpr, _ = roc_curve(Y, Y_pred_prob)
-        ax.plot(fpr, tpr, color='blue', label=f'ROC AUC = {auc:.2f}')
+        ax.plot(fpr, tpr, color='blue', label=f'AUC = {auc:.2f}')
         ax.plot([0, 1], [0, 1], color='grey', linestyle='--')
-        ax.set_xlabel('FPR')
-        ax.set_ylabel('TPR')
-        ax.set_title('Curva ROC')
+        ax.set_xlabel('TFP (Taxa de Falso Positivo)')
+        ax.set_ylabel('TAP (Taxa de Acerto Positivo)')
+        ax.set_title('Curva ROC\nTAP = Sensibilidade | TFP = 1 - Especificidade')
         ax.legend()
 
     plt.tight_layout()
@@ -761,7 +761,7 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     linhas.append(f"- Percentual de acerto: {acerto*100:.2f}%")
     linhas.append("- VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
-    # Novo modelo de reporte bonito e completo
+    # Modelo de reporte completo com conclusão antes da recomendação
     validado = (r2_mcf > 0.2) and (auc > 0.7) and all(v < 10 for v in vif) and any(p < 0.05 for p in model.pvalues[1:])
 
     conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
@@ -807,6 +807,7 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
