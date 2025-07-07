@@ -1366,62 +1366,6 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
 
 
 
-import pandas as pd
-
-def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
-    if not coluna_y or len(coluna_y) != 1:
-        return "O Holt-Winters requer exatamente 1 coluna Y (série temporal).", None
-
-    y_col = coluna_y[0]
-    if y_col not in df.columns:
-        return f"Coluna {y_col} não encontrada no arquivo.", None
-
-    df_valid = df[[y_col]].dropna()
-    if len(df_valid) < 10:
-        return "A série temporal requer pelo menos 10 observações.", None
-
-    Y = df_valid[y_col].values
-
-    try:
-        from statsmodels.tsa.holtwinters import ExponentialSmoothing
-    except ImportError:
-        return "O pacote statsmodels não está disponível neste ambiente.", None
-
-    horizonte = int(field) if field and str(field).isdigit() else 5
-    modelo = ExponentialSmoothing(Y, trend="add", seasonal=None, damped_trend=True).fit()
-    previsao = modelo.forecast(horizonte)
-
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(range(len(Y)), Y, label="Série Original", color="black")
-    ax.plot(range(len(Y), len(Y) + horizonte), previsao, label="Previsão", color="blue")
-    ax.set_title(f"Holt-Winters - Previsão de {horizonte} períodos")
-    ax.legend()
-    plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-
-    previsao_texto = ", ".join([f"{p:.2f}" for p in previsao])
-
-    texto = (
-        "Holt-Winters (Suavização Exponencial)\n\n"
-        "Tendência: aditiva (com amortecimento)\n"
-        "Sazonalidade: não aplicada\n\n"
-        f"Previsão para os próximos {horizonte} períodos:\n{previsao_texto}\n\n"
-        "Conclusão:\n"
-        "Modelo ajustado automaticamente. Simples e robusto para séries com tendência.\n"
-        "Use o gráfico para avaliar se ajustes adicionais são necessários (ex: sazonalidade)."
-    )
-
-    return texto.strip(), grafico_base64
-
-
 # Dicionário de análises
 ANALISES = {
     "Tipo de modelo de regressão": analise_melhor_modelo,
@@ -1434,6 +1378,6 @@ ANALISES = {
     "Regressão Nominal": analise_regressao_logistica_nominal,
     "Árvore de Decisão - CART": analise_arvore_decisao,
     "Random Forest": analise_random_forest,
-    "Série Temporal - ARIMA": analise_arima,
-    "Holt-Winters": analise_holt_winters
+    "Série Temporal - ARIMA": analise_arima
+   
 }
