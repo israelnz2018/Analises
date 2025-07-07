@@ -136,7 +136,6 @@ O modelo {tipo_modelo} foi selecionado por apresentar o maior R² considerando s
 
 
 
-
 def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     if not coluna_y or not coluna_x:
         return "❌ A regressão linear simples requer 1 coluna Y e 1 coluna X.", None
@@ -188,28 +187,22 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     sw_stat, sw_p = stats.shapiro(residuos)
     dp_stat, dp_p = stats.normaltest(residuos)
 
-    ad_crit = ad.critical_values
-    ad_sig = list(ad.significance_level)
-    if 5 in ad_sig:
-        idx = ad_sig.index(5)
-        ad_normal = ad.statistic < ad_crit[idx]
-    else:
-        ad_normal = False
-    sw_normal = sw_p > 0.05
-    dp_normal = dp_p > 0.05
+    # Melhor teste (com maior p-valor)
+    testes_normalidade = {
+        "Anderson-Darling": (ad.statistic, ad.statistic < ad.critical_values[2], 0.05),  # índice 2 ≈ 5%
+        "Shapiro-Wilk": (sw_p, sw_p > 0.05, sw_p),
+        "D’Agostino-Pearson": (dp_p, dp_p > 0.05, dp_p)
+    }
 
-    # Resultado final de normalidade
-    normalidade_residuos = ad_normal or sw_normal or dp_normal
+    melhor_teste = max(testes_normalidade.items(), key=lambda x: x[1][2])  # maior p-valor
+    nome_teste, (stat, aprovado, p_valor) = melhor_teste
+
+    normalidade_residuos = aprovado
 
     # Conclusão
     conclusao = []
-    conclusao.append(f"🔹 **Hipótese:** H₀: não há relação linear entre {coluna_x} e {coluna_y}; H₁: existe relação linear.")
-    conclusao.append(f"✅ Resíduos podem ser considerados normais." if normalidade_residuos else "❌ Resíduos não são normais. Recomenda-se verificar a estabilidade do processo ou coletar mais dados.")
-    conclusao.append(f"✅ Coeficiente angular significativo (p = {p_valor_beta1:.4f})." if p_valor_beta1 < 0.05 else f"⚠️ Coeficiente angular não significativo (p = {p_valor_beta1:.4f}).")
-    if normalidade_residuos and p_valor_beta1 < 0.05 and r2_pred > 0.5:
-        conclusao.append("✅ Modelo validado.")
-    else:
-        conclusao.append("⚠️ Modelo pode não ser adequado. Verifique os indicadores acima.")
+    conclusao.append(f"✅ Os resíduos podem ser considerados normais (p = {p_valor:.4f}, {nome_teste})." if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste}). Recomenda-se verificar a estabilidade do processo ou coletar mais dados.")
+    conclusao.append(f"✅ Coeficiente angular significativo (p = {p_valor_beta1:.4f})." if p_valor_beta1 < 0.05 else f"❌ Coeficiente angular não significativo (p = {p_valor_beta1:.4f}).")
 
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6,4))
@@ -229,23 +222,37 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     texto = f"""
 📊 **Análise – Regressão Linear Simples**
 
+🔹 **Hipóteses do modelo**
+- **H₀:** Não há relação linear entre {coluna_x} e {coluna_y}
+- **H₁:** Existe relação linear entre {coluna_x} e {coluna_y}
+
+---
+
 🔎 **Resumo do modelo**
 - Equação: Y = {intercepto:.4f} + {angular:.4f} * X
 - R²: {r2:.4f}
 - R² ajustado: {r2_adj:.4f}
 - R² preditivo: {r2_pred:.4f}
-- p-valor do coeficiente angular: {p_valor_beta1:.4f}
+- Coeficiente angular: p-valor = {p_valor_beta1:.4f}
 
-🔎 **Análise dos resíduos (normalidade)**
-- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
-- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
-- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+---
+
+🔎 **Normalidade dos resíduos**
+{conclusao[0]}
+
+---
 
 🔎 **Conclusão**
-{chr(10).join(conclusao)}
+{conclusao[1]}
+
+---
+
+🔧 **Recomendação**
+➔ Considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva.
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
