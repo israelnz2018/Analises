@@ -524,11 +524,6 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
 
     return texto.strip(), grafico_base64
 
-
-
-
-
-
 def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão linear múltipla requer 1 Y e pelo menos 1 X.", None
@@ -613,7 +608,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     simples = sorted(resultados, key=lambda r: len(r["cols"]))
     modelo_recomendado = melhor
     for m in simples:
-        if (melhor["r2_pred"] - m["r2_pred"]) < 0.01:
+        if (melhor["r2_pred"] - m["r2_pred"]) < 0.05:
             modelo_recomendado = m
             break
 
@@ -631,45 +626,72 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     # Equação
-    coef_str = " + ".join([f"{coef:.2f}·{col}" for coef, col in zip(modelo_recomendado["model"].coef_, modelo_recomendado["cols"])])
-    equacao = f"Y = {modelo_recomendado['model'].intercept_:.2f} + {coef_str}"
+    coef_str = " + ".join([f"{coef:.3f}·{col}" for coef, col in zip(modelo_recomendado["model"].coef_, modelo_recomendado["cols"])])
+    equacao = f"Y = {modelo_recomendado['model'].intercept_:.3f} + {coef_str}"
 
     # Diagnóstico
     conclusao = []
+    validado = True
+
     if modelo_recomendado['r2_pred'] > 0.5:
-        conclusao.append("✅ R² preditivo adequado.")
+        conclusao.append("✅ R² preditivo adequado (>50%).")
     else:
-        conclusao.append("⚠ R² preditivo baixo.")
+        conclusao.append("❌ R² preditivo baixo (<50%).")
+        validado = False
+
     if all(v < 10 for v in modelo_recomendado['vif']):
         conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
     else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF ≥ 10).")
-    if abs(modelo_recomendado["cp"] - (len(modelo_recomendado["cols"]) + 1)) < 2:
-        conclusao.append("✅ Cp dentro do esperado.")
+        conclusao.append("❌ Multicolinearidade identificada (VIF ≥ 10).")
+        validado = False
+
+    cp_ideal = len(modelo_recomendado["cols"]) + 1
+    if abs(modelo_recomendado["cp"] - cp_ideal) < 2:
+        conclusao.append(f"✅ Cp dentro do esperado (~{cp_ideal}).")
     else:
-        conclusao.append("⚠ Cp elevado, modelo pode estar superajustado.")
+        conclusao.append(f"❌ Cp fora do ideal (esperado ~{cp_ideal}).")
+        validado = False
+
     if 1.5 < modelo_recomendado["dw"] < 2.5:
-        conclusao.append("✅ Sem autocorrelação nos resíduos (DW adequado).")
+        conclusao.append("✅ Sem autocorrelação nos resíduos (DW entre 1,5 e 2,5).")
     else:
-        conclusao.append("⚠ Autocorrelação identificada nos resíduos (DW fora do ideal).")
+        conclusao.append("❌ Autocorrelação identificada nos resíduos (DW fora de 1,5–2,5).")
+        validado = False
+
+    # Recomendação
+    recomendacao = ""
+    if not validado:
+        recomendacao = "\n🔧 **Recomendação**\n➔ Considere remover variáveis não significativas, adicionar novos fatores ou testar outro tipo de modelo para melhorar o ajuste."
 
     texto = f"""
-**Regressão Linear Múltipla**
+📊 **Análise – Regressão Linear Múltipla**
 
-📌 Modelo recomendado: {', '.join(modelo_recomendado['cols'])}  
-📈 Equação: {equacao}  
-R²: {modelo_recomendado['r2']:.4f}  
-R² ajustado: {modelo_recomendado['r2_adj']:.4f}  
-R² preditivo: {modelo_recomendado['r2_pred']:.4f}  
-Mallows Cp: {modelo_recomendado['cp']:.4f}  
-Durbin-Watson: {modelo_recomendado['dw']:.4f}  
-VIFs: {', '.join([f"{c}={v:.2f}" for c, v in zip(modelo_recomendado['cols'], modelo_recomendado['vif'])])}
+🔹 **Hipóteses do modelo**
+- **H₀:** Não há relação linear entre {', '.join(modelo_recomendado['cols'])} e {coluna_y}
+- **H₁:** Existe relação linear entre {', '.join(modelo_recomendado['cols'])} e {coluna_y}
 
-**Conclusão**  
+🔎 **Resumo do modelo**
+- 📌 Modelo recomendado: {', '.join(modelo_recomendado['cols'])}
+- Equação: {equacao}
+- R²: {modelo_recomendado['r2']:.3f}
+- R² ajustado: {modelo_recomendado['r2_adj']:.3f}
+- R² preditivo: {modelo_recomendado['r2_pred']:.3f}
+- Mallows Cp: {modelo_recomendado['cp']:.3f}
+- Durbin-Watson: {modelo_recomendado['dw']:.3f}
+- VIFs: {', '.join([f"{c}={v:.2f}" for c, v in zip(modelo_recomendado['cols'], modelo_recomendado['vif'])])}
+
+🔎 **Critérios**
+- **VIF < 10:** Sem multicolinearidade severa.
+- **Cp ≈ p + 1:** Modelo parcimonioso (bom ajuste sem overfitting).
+- **DW ≈ 2:** Resíduos independentes (sem autocorrelação).
+
+🔎 **Conclusão**
 {chr(10).join(conclusao)}
+{recomendacao}
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
