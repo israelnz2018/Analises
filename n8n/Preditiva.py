@@ -1409,7 +1409,7 @@ ANALISES = {
     "Regressão Binária": analise_regressao_logistica_binaria,
     "Regressão Ordinal": analise_regressao_logistica_ordinal,
     "Regressão Nominal": analise_regressao_logistica_nominal,
-    "Árvore de Decisão": analise_arvore_decisao,
+    "Árvore de Decisão - CART": analise_arvore_decisao,
     "Random Forest": analise_random_forest,
     "ARIMA": analise_arima,
     "Holt-Winters": analise_holt_winters
