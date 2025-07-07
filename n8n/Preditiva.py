@@ -551,6 +551,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     from io import BytesIO
     import base64
     import numpy as np
+    from scipy import stats
 
     def calcular_modelo(X_sub, cols_sub):
         model = LinearRegression().fit(X_sub, Y)
@@ -558,6 +559,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         r2 = r2_score(Y, Y_pred)
         r2_adj = 1 - (1 - r2) * (n - 1) / (n - X_sub.shape[1] - 1)
 
+        # R² preditivo (Leave-One-Out)
         erros = []
         for i in range(n):
             Xi = np.delete(X_sub, i, axis=0)
@@ -569,6 +571,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         ss_tot = np.sum((Y - np.mean(Y)) ** 2)
         r2_pred = 1 - ss_res_pred / ss_tot
 
+        # VIF
         vif = []
         if X_sub.shape[1] > 1:
             X_sm = sm.add_constant(X_sub)
@@ -577,10 +580,20 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         else:
             vif.append(1.0)
 
+        # Mallows Cp
         resid = Y - Y_pred
         mse_full = np.sum((Y - LinearRegression().fit(X_values, Y).predict(X_values)) ** 2) / (n - p_full - 1)
         cp = (np.sum(resid ** 2) / mse_full) - (n - 2 * (X_sub.shape[1] + 1))
+
+        # Durbin-Watson
         dw = sm.stats.stattools.durbin_watson(resid)
+
+        # p-valor do modelo (F-test)
+        ss_res = np.sum((Y - Y_pred) ** 2)
+        msr = (ss_tot - ss_res) / X_sub.shape[1]
+        mse = ss_res / (n - X_sub.shape[1] - 1)
+        f_stat = msr / mse
+        p_valor_modelo = 1 - stats.f.cdf(f_stat, X_sub.shape[1], n - X_sub.shape[1] - 1)
 
         return {
             "cols": cols_sub,
@@ -591,22 +604,12 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
             "vif": vif,
             "cp": cp,
             "dw": dw,
+            "p_valor_modelo": p_valor_modelo,
             "Y_pred": Y_pred
         }
 
-    # ➔ Modelo completo com TODAS as preditoras
+    # ➔ Modelo completo com todas as preditoras
     modelo_completo = calcular_modelo(X_values, x_cols_final)
-
-    # ➔ Seleção de subset para sugerir possíveis reduções
-    resultados = []
-    for k in range(1, len(x_cols_final)):
-        for subset in combinations(range(len(x_cols_final)), k):
-            cols_sub = [x_cols_final[i] for i in subset]
-            X_sub = X_final[cols_sub].values
-            resultados.append(calcular_modelo(X_sub, cols_sub))
-
-    # ➔ Melhor modelo alternativo
-    melhor_alternativo = max(resultados, key=lambda r: r["r2_pred"]) if resultados else None
 
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.scatter(modelo_completo["Y_pred"], Y - modelo_completo["Y_pred"], color='black')
@@ -635,21 +638,17 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     if all(v < 10 for v in modelo_completo['vif']):
         conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
     else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF ≥ 10).")
+        conclusao.append("⚠ Multicolinearidade identificada (VIF ≥ 10). VIF acima de 10 indica alta correlação entre preditoras.")
 
     if abs(modelo_completo["cp"] - (len(modelo_completo["cols"]) + 1)) < 2:
-        conclusao.append("✅ Cp dentro do esperado (sem evidência de superajuste).")
+        conclusao.append("✅ Cp dentro do esperado (Cp ≈ p+1 indica modelo sem viés).")
     else:
-        conclusao.append("⚠ Cp elevado, modelo pode estar superajustado.")
+        conclusao.append("⚠ Cp elevado, modelo pode estar superajustado (Cp muito maior que p+1).")
 
     if 1.5 < modelo_completo["dw"] < 2.5:
-        conclusao.append("✅ Sem autocorrelação nos resíduos (Durbin-Watson adequado).")
+        conclusao.append("✅ Sem autocorrelação nos resíduos (Durbin-Watson entre 1.5 e 2.5).")
     else:
-        conclusao.append("⚠ Autocorrelação identificada nos resíduos (Durbin-Watson fora do ideal).")
-
-    # ➔ Sugerir remoção de variáveis se modelo menor for similar
-    if melhor_alternativo and (modelo_completo["r2_pred"] - melhor_alternativo["r2_pred"]) < 0.05:
-        conclusao.append(f"💡 Sugestão: Considere remover variáveis para simplificar o modelo sem perder capacidade preditiva. Exemplo: modelo apenas com {', '.join(melhor_alternativo['cols'])}.")
+        conclusao.append("⚠ Autocorrelação identificada nos resíduos (DW fora do ideal). DW <1.5 indica autocorrelação positiva; >2.5 negativa.")
 
     texto = f"""
 📊 **Análise – Regressão Linear Múltipla**
@@ -665,6 +664,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
 - R²: {modelo_completo['r2']:.3f}
 - R² ajustado: {modelo_completo['r2_adj']:.3f}
 - R² preditivo: {modelo_completo['r2_pred']:.3f}
+- p-valor do modelo: {modelo_completo['p_valor_modelo']:.4f}
 - Mallows Cp: {modelo_completo['cp']:.3f}
 - Durbin-Watson: {modelo_completo['dw']:.3f}
 - VIFs: {', '.join([f"{c}={v:.2f}" for c, v in zip(modelo_completo['cols'], modelo_completo['vif'])])}
@@ -674,6 +674,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
