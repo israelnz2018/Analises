@@ -268,11 +268,13 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
     ss_res = np.sum((Y - y_pred) ** 2)
     ss_tot = np.sum((Y - np.mean(Y)) ** 2)
     r2 = 1 - ss_res / ss_tot
-    r2_adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - 3)  # 3 parâmetros: a, b, c
+    n = len(Y)
+    p = 3  # parâmetros a, b, c
+    r2_adj = 1 - (1 - r2) * (n - 1) / (n - p)
 
     # R² preditivo (Leave-One-Out)
     erros = []
-    for i in range(len(Y)):
+    for i in range(n):
         X_train = np.delete(X, i)
         Y_train = np.delete(Y, i)
         coef_lo = np.polyfit(X_train, Y_train, 2)
@@ -280,6 +282,12 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
         erros.append((Y[i] - y_pred_lo) ** 2)
     ss_pred = np.sum(erros)
     r2_pred = 1 - ss_pred / ss_tot
+
+    # p-valor do modelo (F-test)
+    msr = (ss_tot - ss_res) / (p - 1)
+    mse = ss_res / (n - p)
+    f_stat = msr / mse
+    p_valor_modelo = 1 - stats.f.cdf(f_stat, p - 1, n - p)
 
     # Testes de normalidade dos resíduos
     residuos = Y - y_pred
@@ -330,12 +338,12 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
 - **H₀:** Não há relação quadrática entre {coluna_x} e {coluna_y}
 - **H₁:** Existe relação quadrática entre {coluna_x} e {coluna_y}
 
-
 🔎 **Resumo do modelo**
 - Equação: Y = {a:.4f}X² + {b:.4f}X + {c:.4f}
 - R²: {r2:.4f}
 - R² ajustado: {r2_adj:.4f}
 - R² preditivo: {r2_pred:.4f}
+- p-valor do modelo quadrático: {p_valor_modelo:.4f}
 
 🔎 **Normalidade dos resíduos**
 {conclusao[0]}
@@ -345,6 +353,7 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
