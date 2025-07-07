@@ -2008,61 +2008,68 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y):
 
 
 
-def analise_associacao(df: pd.DataFrame, coluna_y, lista_x, subgrupo):
-    if not coluna_y or not lista_x or len(lista_x) != 1:
+def analise_associacao(df: pd.DataFrame, coluna_y, coluna_x):
+    # Validação inicial
+    if not coluna_y or not coluna_x:
         return "❌ A análise de associação requer exatamente 1 coluna Y e 1 coluna X.", None
 
-    y_col = coluna_y
-    x_col = lista_x[0]
-
-    if y_col not in df.columns or x_col not in df.columns:
+    if coluna_y not in df.columns or coluna_x not in df.columns:
         return "❌ As colunas informadas não foram encontradas no arquivo.", None
 
-    df_valid = df[[y_col, x_col]].dropna()
+    # Remoção de nulos
+    df_valid = df[[coluna_y, coluna_x]].dropna()
     if df_valid.empty:
         return "❌ Não há dados suficientes após remoção de valores nulos.", None
 
-    table = pd.crosstab(df_valid[y_col], df_valid[x_col])
-    y_labels = table.index.tolist()
-    x_labels = table.columns.tolist()
-    table_values = table.to_numpy()
+    # Validação de categorias mínimas
+    if df_valid[coluna_y].nunique() < 2 or df_valid[coluna_x].nunique() < 2:
+        return "❌ Cada variável deve conter pelo menos 2 categorias distintas.", None
 
-    stat, p_valor, dof, expected = stats.chi2_contingency(table_values)
+    # Tabela de contingência
+    table = pd.crosstab(df_valid[coluna_x], df_valid[coluna_y])
 
+    # Teste Qui-Quadrado
+    stat, p_valor, dof, expected = stats.chi2_contingency(table.values)
+
+    # Gráfico - barras empilhadas por grupo X
     aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    proporcoes = table_values / table_values.sum()
-    im = ax.imshow(proporcoes, cmap='Blues', aspect='auto')
-
-    ax.set_xticks(range(len(x_labels)))
-    ax.set_xticklabels(x_labels)
-    ax.set_yticks(range(len(y_labels)))
-    ax.set_yticklabels(y_labels)
-    ax.set_title("Mapa de calor das proporções")
-
-    for i in range(proporcoes.shape[0]):
-        for j in range(proporcoes.shape[1]):
-            ax.text(j, i, f"{proporcoes[i, j]:.2f}", ha="center", va="center", color="black")
-
-    fig.colorbar(im, ax=ax)
+    ax = table.plot(kind="bar", stacked=True, figsize=(8,4), colormap="tab20")
+    ax.set_ylabel("Frequência")
+    ax.set_title("Distribuição de categorias Y por grupos X")
+    plt.xticks(rotation=45)
     plt.tight_layout()
 
     buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    plt.savefig(buf, format="png")
+    plt.close()
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+
+    # Report padronizado
+    x_labels = table.index.tolist()
+    y_labels = table.columns.tolist()
 
     texto = f"""
-**Análise de Associação (Qui-quadrado)**
-- Estatística Qui-quadrado: {stat:.4f}
-- p-valor: {p_valor:.4f}
-- Graus de liberdade: {dof}
+📊 **Análise – Associação (Qui-Quadrado)**
 
-**Conclusão**
-{"✅ Rejeitamos H0: existe associação entre as variáveis." if p_valor < 0.05 else "⚠ Não rejeitamos H0: não há evidência de associação entre as variáveis."}
+🔹 **Hipóteses:**
+- H₀: As variáveis {coluna_x} e {coluna_y} são independentes
+- H₁: Existe associação entre as variáveis
+
+🔎 **Resumo da Tabela de Contingência:**
+- Categorias X ({coluna_x}): {', '.join(map(str,x_labels))}
+- Categorias Y ({coluna_y}): {', '.join(map(str,y_labels))}
+
+🔎 **Teste Qui-Quadrado:**
+- Estatística χ² = {stat:.2f}
+- p-valor = {p_valor:.4f}
+- Graus de liberdade = {dof}
+
+🔎 **Conclusão:**
+{"✅ Com 95% de confiança, rejeitamos H0. Existe associação significativa entre as variáveis." if p_valor < 0.05 else "⚠️ Com 95% de confiança, não rejeitamos H0. Não há evidência significativa de associação entre as variáveis."}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 ANALISES = {
@@ -2085,7 +2092,7 @@ ANALISES = {
     "1 Proporcao": analise_1_proporcao,
     "2 Proporções": analise_2_proporcoes,
     "K Proporcoes": analise_k_proporcoes,
-    "Qui-quadrado": analise_associacao
+    "Qui-quadrado de Associação": analise_associacao
   
 
 }
