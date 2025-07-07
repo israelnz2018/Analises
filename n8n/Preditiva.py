@@ -679,9 +679,6 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
 
 
 
-
-
-
 def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística binária requer 1 Y e pelo menos 1 X.", None
@@ -759,15 +756,15 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     linhas = []
     for name, coef, pval in zip(['Const'] + x_cols_final, model.params, model.pvalues):
         linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
-    linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
-    linhas.append(f"AUC: {auc:.4f}")
-    linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
+    linhas.append(f"- R² de McFadden: {r2_mcf:.4f}")
+    linhas.append(f"- AUC: {auc:.4f}")
+    linhas.append(f"- Percentual de acerto: {acerto*100:.2f}%")
+    linhas.append("- VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
     # Novo modelo de reporte bonito e completo
     validado = (r2_mcf > 0.2) and (auc > 0.7) and all(v < 10 for v in vif) and any(p < 0.05 for p in model.pvalues[1:])
 
-    conclusao_status = "✅ Modelo validado." if validado else "❌ Modelo não validado."
+    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
 
     criterios = []
     criterios.append(f"- R² de McFadden = {r2_mcf:.4f} {'✅ adequado (>0.2)' if r2_mcf > 0.2 else '❌ baixo (<=0.2)'}")
@@ -775,40 +772,42 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     criterios.append(f"- Percentual de acerto = {acerto*100:.2f}%")
     for name, pval in zip(x_cols_final, model.pvalues[1:]):
         criterios.append(f"- p-valor {name} = {pval:.4f} {'✅ significativo (<0.05)' if pval < 0.05 else '❌ não significativo (>=0.05)'}")
-    criterios.append("- VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
+    for c, v in zip(x_cols_final, vif):
+        criterios.append(f"- VIF {c} = {v:.2f} {'✅ adequado (<10)' if v < 10 else '❌ alto (>=10)'}")
 
     recomendacao = ""
     if not validado:
         recomendacao = """
-🔎 Observação / Recomendação
+🔎 **Observação / Recomendação**
 ➡️ O modelo não foi validado. Considere:
 - Remover preditoras não significativas (p >= 0.05).
-- Transformar variáveis ou criar categorias.
+- Adicionar variáveis ou categorias.
 - Aumentar o tamanho amostral para maior poder estatístico.
 """.strip()
 
     texto = f"""
-📊 Análise – Regressão Logística Binária
+📊 **Análise – Regressão Logística Binária**
 
-🔹 Hipóteses do modelo
+🔹 **Hipóteses do modelo**
 - H₀: Nenhuma variável está associada à probabilidade do evento
 - H₁: Pelo menos uma variável está associada à probabilidade do evento
 
-🔎 Resumo do modelo
+🔎 **Resumo do modelo**
 - Variável dependente (Y): {coluna_y}
 - Variáveis independentes (Xs): {', '.join(x_cols_final)}
 {chr(10).join(linhas)}
 
-🔎 Conclusão
+🔎 **Conclusão**
 {conclusao_status}
 
-🔹 Critérios avaliados:
+🔹 **Critérios avaliados:**
 {chr(10).join(criterios)}
 
 {recomendacao}
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
