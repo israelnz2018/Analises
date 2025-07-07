@@ -1013,12 +1013,15 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     variaveis_nrelevantes = []
 
     for nome_coluna in X_final.columns:
-        pvals = res.pvalues[nome_coluna]
-        min_pval = pvals.min()
-        if min_pval < 0.05:
-            variaveis_relevantes.append((nomes_originais[nome_coluna], min_pval))
-        else:
-            variaveis_nrelevantes.append((nomes_originais[nome_coluna], min_pval))
+        try:
+            pvals_col = res.pvalues.loc[:, nome_coluna]
+            min_pval = pvals_col.min()
+            if min_pval < 0.05:
+                variaveis_relevantes.append((nomes_originais[nome_coluna], min_pval))
+            else:
+                variaveis_nrelevantes.append((nomes_originais[nome_coluna], min_pval))
+        except:
+            variaveis_nrelevantes.append((nomes_originais[nome_coluna], None))
 
     # Critérios avaliados
     criterios = []
@@ -1037,7 +1040,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     # Recomendação
     recomendacao = "\n🔎 **Observação / Recomendação**\n➡️ O modelo não foi validado. Considere:"
     if variaveis_nrelevantes:
-        recomendacao += "\n- Remover variáveis não significativas: " + ", ".join([f"{v[0]} (p = {str(round(v[1],3)).replace('.',',')})" for v in variaveis_nrelevantes])
+        recomendacao += "\n- Remover variáveis não significativas: " + ", ".join([f"{v[0]} (p = {str(round(v[1],3)).replace('.',',') if v[1] is not None else 'N/A'})" for v in variaveis_nrelevantes])
     else:
         recomendacao += "\n- Nenhuma variável para remoção."
     recomendacao += "\n- Adicionar variáveis ou categorias relevantes.\n- Aumentar o tamanho amostral para maior poder estatístico."
@@ -1067,6 +1070,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
