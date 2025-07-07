@@ -45,17 +45,20 @@ def analise_carta_imr(df, coluna_y):
     axs[0].axhline(LCL_I, color="red", linestyle="-")
     axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18)
     axs[0].set_ylabel("Valor Individual", fontsize=16)
-    axs[0].set_xlabel("Subgrupo", fontsize=16)
+    axs[0].set_xlabel(nome_coluna_y, fontsize=16)  # alteração aqui
+
+    axs[0].set_xticks(x)  # mostrar todos os números no eixo X
 
     xlim = axs[0].get_xlim()
     axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=12, color="green")
     axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=12, color="red")
     axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=12, color="red")
 
-    crit1_flag_I = any((y > UCL_I) | (y < LCL_I))
-    for xi, yi in zip(x, y):
+    crit1_flag_I = []
+    for idx, (xi, yi) in enumerate(zip(x, y)):
         if yi > UCL_I or yi < LCL_I:
             axs[0].scatter(xi, yi, color="red")
+            crit1_flag_I.append((idx+1, yi))  # salva linha e valor
 
     # Carta MR
     x_mr = dados["Subgrupo"].values[1:]
@@ -66,83 +69,123 @@ def analise_carta_imr(df, coluna_y):
     axs[1].axhline(UCL_MR, color="red", linestyle="-")
     axs[1].set_title("Carta MR", fontsize=18)
     axs[1].set_ylabel("Amplitude Móvel", fontsize=16)
-    axs[1].set_xlabel("Subgrupo", fontsize=16)
+    axs[1].set_xlabel(nome_coluna_y, fontsize=16)  # alteração aqui
+
+    axs[1].set_xticks(x_mr)  # mostrar todos os números no eixo X
 
     xlim_mr = axs[1].get_xlim()
     axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=12, color="green")
     axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=12, color="red")
     axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=12, color="red")
 
-    crit1_flag_MR = any(y_mr > UCL_MR)
-    for xi, yi in zip(x_mr, y_mr):
+    crit1_flag_MR = []
+    for idx, (xi, yi) in enumerate(zip(x_mr, y_mr)):
         if yi > UCL_MR:
             axs[1].scatter(xi, yi, color="red")
+            crit1_flag_MR.append((xi, yi))  # salva linha e valor
 
     plt.tight_layout()
 
-    # Critérios 2 e 3 (exemplo simples)
+    # Critérios 2 e 3 (sequências)
     def check_crit2(y):
-        count = 0
-        for val in y:
-            if val > media:
+        count = 1
+        lados = []
+        for i in range(1, len(y)):
+            if (y[i] > media and y[i-1] > media) or (y[i] < media and y[i-1] < media):
                 count += 1
+                lados.append(i+1)
                 if count >= 9:
-                    return True
+                    return True, lados[-9:]
             else:
-                count = 0
-        count = 0
-        for val in y:
-            if val < media:
-                count += 1
-                if count >= 9:
-                    return True
-            else:
-                count = 0
-        return False
+                count = 1
+                lados = [i+1] if (y[i] > media or y[i] < media) else []
+        return False, []
 
     def check_crit3(y):
-        count = 0
+        count_up = 1
+        seq_up = [1]
+        count_down = 1
+        seq_down = [1]
         for i in range(1, len(y)):
             if y[i] > y[i-1]:
-                count += 1
-                if count >= 6:
-                    return True
+                count_up += 1
+                seq_up.append(i+1)
+                count_down = 1
+                seq_down = [i+1]
+                if count_up >= 6:
+                    return True, seq_up[-6:]
+            elif y[i] < y[i-1]:
+                count_down += 1
+                seq_down.append(i+1)
+                count_up = 1
+                seq_up = [i+1]
+                if count_down >= 6:
+                    return True, seq_down[-6:]
             else:
-                count = 0
-        count = 0
-        for i in range(1, len(y)):
-            if y[i] < y[i-1]:
-                count += 1
-                if count >= 6:
-                    return True
-            else:
-                count = 0
-        return False
+                count_up = 1
+                seq_up = [i+1]
+                count_down = 1
+                seq_down = [i+1]
+        return False, []
 
-    crit2_flag_I = check_crit2(y)
-    crit3_flag_I = check_crit3(y)
-    crit2_flag_MR = check_crit2(y_mr)
-    crit3_flag_MR = check_crit3(y_mr)
+    crit2_I, linhas_crit2_I = check_crit2(y)
+    crit3_I, linhas_crit3_I = check_crit3(y)
+    crit2_MR, linhas_crit2_MR = check_crit2(y_mr)
+    crit3_MR, linhas_crit3_MR = check_crit3(y_mr)
 
     # 🔷 REPORT – Individual
-    texto_I = f"📊 Carta I ({nome_coluna_y})\n"
+    texto_I = f"📊 **Carta I ({nome_coluna_y})**\n"
     texto_I += "🔎 Critérios avaliados:\n"
-    texto_I += f"1. Critério 1 – Pontos fora dos limites: {'❌ Detectado' if crit1_flag_I else '✅ OK'}\n"
-    texto_I += f"2. Critério 2 – 9 pontos do mesmo lado da média: {'❌ Detectado' if crit2_flag_I else '✅ OK'}\n"
-    texto_I += f"3. Critério 3 – 6 pontos subindo ou descendo: {'❌ Detectado' if crit3_flag_I else '✅ OK'}\n"
-    texto_I += "🔎 Conclusão: "
-    texto_I += "Causa especial detectada. O processo não está sob controle estatístico.\n" if (crit1_flag_I or crit2_flag_I or crit3_flag_I) else "Processo está estável.\n"
-    texto_I += "🔎 Recomendação: Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    if crit1_flag_I:
+        pontos = ", ".join([f"Linha {linha}: {valor:.2f}" for linha, valor in crit1_flag_I])
+        texto_I += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
+    else:
+        texto_I += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    if crit2_I:
+        linhas = ", ".join([str(l) for l in linhas_crit2_I])
+        texto_I += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Linhas {linhas})\n"
+    else:
+        texto_I += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
+
+    if crit3_I:
+        linhas = ", ".join([str(l) for l in linhas_crit3_I])
+        texto_I += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Linhas {linhas})\n"
+    else:
+        texto_I += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
+
+    if crit1_flag_I or crit2_I or crit3_I:
+        texto_I += "🔎 Conclusão: Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto_I += "🔎 Recomendação: Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    else:
+        texto_I += "🔎 Conclusão: Processo está estável.\n"
 
     # 🔷 REPORT – MR
-    texto_MR = f"📊 Carta MR\n"
+    texto_MR = f"📊 **Carta MR**\n"
     texto_MR += "🔎 Critérios avaliados:\n"
-    texto_MR += f"1. Critério 1 – Pontos fora dos limites: {'❌ Detectado' if crit1_flag_MR else '✅ OK'}\n"
-    texto_MR += f"2. Critério 2 – 9 pontos do mesmo lado da média: {'❌ Detectado' if crit2_flag_MR else '✅ OK'}\n"
-    texto_MR += f"3. Critério 3 – 6 pontos subindo ou descendo: {'❌ Detectado' if crit3_flag_MR else '✅ OK'}\n"
-    texto_MR += "🔎 Conclusão: "
-    texto_MR += "Causa especial detectada. O processo não está sob controle estatístico.\n" if (crit1_flag_MR or crit2_flag_MR or crit3_flag_MR) else "Processo está estável.\n"
-    texto_MR += "🔎 Recomendação: Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    if crit1_flag_MR:
+        pontos = ", ".join([f"Linha {linha}: {valor:.2f}" for linha, valor in crit1_flag_MR])
+        texto_MR += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
+    else:
+        texto_MR += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    if crit2_MR:
+        linhas = ", ".join([str(l) for l in linhas_crit2_MR])
+        texto_MR += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Linhas {linhas})\n"
+    else:
+        texto_MR += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
+
+    if crit3_MR:
+        linhas = ", ".join([str(l) for l in linhas_crit3_MR])
+        texto_MR += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Linhas {linhas})\n"
+    else:
+        texto_MR += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
+
+    if crit1_flag_MR or crit2_MR or crit3_MR:
+        texto_MR += "🔎 Conclusão: Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto_MR += "🔎 Recomendação: Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    else:
+        texto_MR += "🔎 Conclusão: Processo está estável.\n"
 
     # Salva gráfico
     buffer = BytesIO()
@@ -153,6 +196,7 @@ def analise_carta_imr(df, coluna_y):
 
     # Retorna os dois relatórios juntos + imagem
     return (texto_I + "\n" + texto_MR), img_base64
+
 
 
 
