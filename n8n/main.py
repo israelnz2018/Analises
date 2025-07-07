@@ -104,6 +104,7 @@ CONFIG_ANALISES = {
     "2 Proporções": ["df", "coluna_x", "coluna_y"],
     "K Proporcoes": ["df", "lista_y"],
     "Qui-quadrado de Associação": ["df", "coluna_y", "coluna_x"],
+    "Qui-quadrado de Ajuste": ["df", "coluna_y", "coluna_x"],
     "Tipo de modelo de regressão": ["df", "coluna_y"],
     "Regressão linear simples": ["df", "coluna_y", "coluna_x"],
     "Regressão linear múltipla": ["df", "coluna_y", "lista_x"],
