@@ -415,11 +415,20 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
 
     normalidade_residuos = aprovado
 
-    # Conclusão
-    if normalidade_residuos and p_valor_modelo < 0.05 and r2 > 0.5:
+    # Conclusão com justificativas
+    motivos = []
+    if not normalidade_residuos:
+        motivos.append("os resíduos não são normais")
+    if p_valor_modelo >= 0.05:
+        motivos.append("o modelo não é estatisticamente significativo (p-valor >= 0.05)")
+    if r2 < 0.5:
+        motivos.append("o R² é inferior a 50%")
+
+    if not motivos:
         validacao = "✅ Modelo validado. O modelo cúbico é adequado para os dados."
     else:
-        validacao = "⚠️ Modelo não validado. Verifique R², normalidade dos resíduos e significância."
+        motivos_txt = "; ".join(motivos)
+        validacao = f"⚠️ Modelo não validado porque {motivos_txt}."
 
     conclusao_normalidade = f"✅ Os resíduos podem ser considerados normais (p = {p_valor:.4f}, {nome_teste})." if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste}). Recomenda-se verificar a estabilidade do processo ou coletar mais dados."
 
@@ -468,6 +477,7 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
