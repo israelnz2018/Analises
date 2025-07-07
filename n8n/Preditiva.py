@@ -826,6 +826,15 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         return "❌ A regressão logística ordinal requer 1 Y e pelo menos 1 X.", None
 
     try:
+        import pandas as pd
+        import numpy as np
+        from statsmodels.miscmodels.ordinal_model import OrderedModel
+        import statsmodels.api as sm
+        from statsmodels.stats.outliers_influence import variance_inflation_factor
+        import matplotlib.pyplot as plt
+        from io import BytesIO
+        import base64
+
         # Selecionar e limpar dados
         df = df[[coluna_y] + lista_x].copy()
         df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
@@ -849,24 +858,60 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         odds_ratios = np.exp(result.params)
         pvalores = result.pvalues
 
-        texto_resultado = "📊 **Regressão Logística Ordinal**\n\n"
-        texto_resultado += "Categorias (ordem): " + " < ".join(categorias_unicas) + "\n\n"
-        texto_resultado += "📌 **Parâmetros estimados**:\n"
-        for param, val in result.params.items():
-            texto_resultado += f"- {param}: {val:.4f} (p = {pvalores[param]:.4f})\n"
+        # Conclusão e validação
+        validado = all(p < 0.05 for p in pvalores)
 
-        texto_resultado += "\n💡 **Odds Ratios**:\n"
+        conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
+
+        # Reporte
+        texto_resultado = f"""
+📊 **Análise – Regressão Logística Ordinal**
+
+🔹 **Hipóteses do modelo**
+- H₀: Não há relação entre as variáveis independentes e a ordem das categorias
+- H₁: Pelo menos uma variável independente está associada à ordem das categorias
+
+🔎 **Resumo do modelo**
+- Variável dependente (Y): {coluna_y}
+- Variáveis independentes (Xs): {', '.join(lista_x)}
+- Categorias (ordem): {' < '.join(categorias_unicas)}
+
+📌 **Parâmetros estimados:**
+"""
+        for param, val in result.params.items():
+            texto_resultado += f"- {param}: {val:.2f} (p = {pvalores[param]:.3f})\n"
+
+        texto_resultado += "\n💡 **Odds Ratios:**\n"
         for param, val in odds_ratios.items():
-            texto_resultado += f"- {param}: {val:.4f}\n"
+            texto_resultado += f"- {param}: {val:.2f}\n"
 
         # VIF
-        vif_texto = "\n📉 **VIF (Multicolinearidade)**:\n"
+        texto_resultado += "\n📉 **VIF (Multicolinearidade):**\n"
         X_vif = df[lista_x]
         X_vif_const = sm.add_constant(X_vif)
         for i in range(1, X_vif_const.shape[1]):
-            vif = variance_inflation_factor(X_vif_const.values, i)
-            vif_texto += f"- {X_vif_const.columns[i]}: {vif:.2f}\n"
-        texto_resultado += vif_texto
+            vif_val = variance_inflation_factor(X_vif_const.values, i)
+            status_vif = "✅ adequado (<10)" if vif_val < 10 else "❌ alto (>=10)"
+            texto_resultado += f"- {X_vif_const.columns[i]}: {vif_val:.2f} {status_vif}\n"
+
+        # Conclusão
+        texto_resultado += f"\n🔎 **Conclusão**\n{conclusao_status}\n"
+
+        # Critérios avaliados
+        texto_resultado += "\n🔹 **Critérios avaliados:**\n"
+        for param, pval in pvalores.items():
+            status = "✅ significativo (<0,05)" if pval < 0.05 else "❌ não significativo (>=0,05)"
+            texto_resultado += f"- p-valor {param}: {pval:.3f} {status}\n"
+
+        # Recomendação
+        if not validado:
+            texto_resultado += """
+🔎 **Observação / Recomendação**
+➡️ O modelo não foi validado. Considere:
+- Remover variáveis não significativas.
+- Adicionar variáveis ou categorias relevantes.
+- Aumentar o tamanho amostral para maior poder estatístico.
+""".strip()
 
         # Gráfico de boxplot para visualização
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -883,7 +928,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
         plt.close()
 
-        return texto_resultado, imagem_base64
+        return texto_resultado.strip(), imagem_base64
 
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
