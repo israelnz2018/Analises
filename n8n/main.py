@@ -113,7 +113,7 @@ CONFIG_ANALISES = {
     "Regressão Binária": ["df", "coluna_y", "lista_x"],
     "Regressão Ordinal": ["df", "coluna_y", "lista_x"],
     "Regressão Nominal": ["df", "coluna_y", "lista_x"],
-    "Árvore de Decisão": ["df", "coluna_y", "lista_x"],
+    "Árvore de Decisão - CART": ["df", "coluna_y", "lista_x"],
     "Random Forest": ["df", "coluna_y", "lista_x"],
     "ARIMA": ["df", "coluna_y", "field"],
     "Holt-Winters": ["df", "coluna_y", "field"],
