@@ -354,7 +354,6 @@ def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
 
     return texto.strip(), grafico_base64
 
-
 def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
     if not coluna_y or not coluna_x:
         return "❌ A regressão cúbica requer 1 coluna Y e 1 coluna X.", None
@@ -417,8 +416,12 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
     normalidade_residuos = aprovado
 
     # Conclusão
-    conclusao = []
-    conclusao.append(f"✅ Os resíduos podem ser considerados normais (p = {p_valor:.4f}, {nome_teste})." if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste}). Recomenda-se verificar a estabilidade do processo ou coletar mais dados.")
+    if normalidade_residuos and p_valor_modelo < 0.05 and r2 > 0.5:
+        validacao = "✅ Modelo validado. O modelo cúbico é adequado para os dados."
+    else:
+        validacao = "⚠️ Modelo não validado. Verifique R², normalidade dos resíduos e significância."
+
+    conclusao_normalidade = f"✅ Os resíduos podem ser considerados normais (p = {p_valor:.4f}, {nome_teste})." if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste}). Recomenda-se verificar a estabilidade do processo ou coletar mais dados."
 
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6,4))
@@ -447,8 +450,6 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
 - **H₀:** Não há relação cúbica entre {coluna_x} e {coluna_y}
 - **H₁:** Existe relação cúbica entre {coluna_x} e {coluna_y}
 
----
-
 🔎 **Resumo do modelo**
 - Equação: Y = {a:.4f}X³ + {b:.4f}X² + {c:.4f}X + {d:.4f}
 - R²: {r2:.4f}
@@ -456,18 +457,18 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
 - R² preditivo: {r2_pred:.4f}
 - p-valor do modelo cúbico: {p_valor_modelo:.4f}
 
----
-
 🔎 **Normalidade dos resíduos**
-{conclusao[0]}
+{conclusao_normalidade}
 
----
+🔎 **Conclusão**
+{validacao}
 
 🔧 **Recomendação**
 ➔ Se o R² < 50%, considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva.
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
