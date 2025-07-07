@@ -1,100 +1,159 @@
 from suporte import *
 
 def analise_carta_imr(df, coluna_y):
-    if not coluna_y or coluna_y not in df.columns:
-        return "❌ A Carta I-MR requer uma coluna Y válida.", None
-
-    dados = df[coluna_y].dropna()
-    if len(dados) < 5:
-        return "❌ É necessário pelo menos 5 dados para gerar a Carta I-MR.", None
-
-    import numpy as np
     import matplotlib.pyplot as plt
+    import numpy as np
     from io import BytesIO
     import base64
+    import pandas as pd
 
-    media_I = np.mean(dados)
-    mr = np.abs(np.diff(dados))
-    media_MR = np.mean(mr)
+    aplicar_estilo_minitab()
 
-    d2 = 1.128
-    sigma = media_MR / d2 if d2 != 0 else 0
-    LSC_I = media_I + 3 * sigma
-    LIC_I = media_I - 3 * sigma
-    LSC_MR = 3.267 * media_MR
-    LIC_MR = 0
+    nome_coluna_y = coluna_y if isinstance(coluna_y, str) else (coluna_y[0] if coluna_y else None)
+    if not nome_coluna_y or nome_coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    testes = []
+    if not pd.api.types.is_numeric_dtype(df[nome_coluna_y]):
+        return f"❌ A coluna '{nome_coluna_y}' contém dados não numéricos e não pode ser usada na análise.", None
 
-    fora_limite = np.where((dados > LSC_I) | (dados < LIC_I))[0]
-    if len(fora_limite) > 0:
-        testes.append(f"🔴 {len(fora_limite)} ponto(s) fora dos limites de controle.")
+    dados = df[[nome_coluna_y]].dropna().copy()
+    dados["Subgrupo"] = range(1, len(dados) + 1)
 
-    lado = np.where(dados > media_I, 1, -1)
-    conta = 0
-    for i in range(len(lado)):
-        if i == 0 or lado[i] == lado[i-1]:
-            conta += 1
-            if conta >= 9:
-                testes.append("🟠 9 pontos consecutivos do mesmo lado da média.")
-                break
-        else:
-            conta = 1
+    if dados.empty:
+        return "❌ Dados insuficientes para análise.", None
 
-    conta_up = conta_down = 0
-    for i in range(1, len(dados)):
-        if dados[i] > dados[i-1]:
-            conta_up += 1
-            conta_down = 0
-        elif dados[i] < dados[i-1]:
-            conta_down += 1
-            conta_up = 0
-        else:
-            conta_up = conta_down = 0
-        if conta_up >= 6 or conta_down >= 6:
-            testes.append("🟡 6 pontos consecutivos em tendência (subindo ou descendo).")
-            break
+    # Estatísticas
+    media = dados[nome_coluna_y].mean()
+    sigma = dados[nome_coluna_y].std()
+    UCL_I = media + 3 * sigma
+    LCL_I = media - 3 * sigma
 
-    texto = f"""
-**Carta I-MR**
-- Média do processo (Carta I): {media_I:.4f}
-- Desvio padrão estimado: {sigma:.4f}
-- Média MR: {media_MR:.4f}
+    mr = dados[nome_coluna_y].diff().abs()
+    mr_mean = mr[1:].mean()
+    UCL_MR = mr_mean * 3.267
 
-- Limites Carta I: LSC={LSC_I:.4f}, LIC={LIC_I:.4f}
-- Limites Carta MR: LSC MR={LSC_MR:.4f}, LIC MR={LIC_MR:.4f}
+    # Gráfico estilo Minitab
+    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
 
-**Resultados dos testes**
-"""
+    # Carta Individual (I)
+    y = dados[nome_coluna_y].values
+    x = dados["Subgrupo"].values
+    axs[0].plot(x, y, color="black", linestyle="-")
+    axs[0].scatter(x, y, color="black")
+    axs[0].axhline(media, color="green", linestyle="-")
+    axs[0].axhline(UCL_I, color="red", linestyle="-")
+    axs[0].axhline(LCL_I, color="red", linestyle="-")
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18)
+    axs[0].set_ylabel("Valor Individual", fontsize=16)
+    axs[0].set_xlabel("Subgrupo", fontsize=16)
 
-    if testes:
-        texto += "\n".join(testes)
-        texto += "\n⚠ Recomenda-se investigar causas especiais e revisar estabilidade do processo."
-    else:
-        texto += "✅ Processo dentro dos padrões esperados (nenhum alarme nos testes aplicados).\n✅ O processo está estável no momento da análise."
+    xlim = axs[0].get_xlim()
+    axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=12, color="green")
+    axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=12, color="red")
+    axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=12, color="red")
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+    crit1_flag_I = any((y > UCL_I) | (y < LCL_I))
+    for xi, yi in zip(x, y):
+        if yi > UCL_I or yi < LCL_I:
+            axs[0].scatter(xi, yi, color="red")
 
-    ax1.plot(dados, marker='o')
-    ax1.axhline(media_I, color='black', linestyle='-', label='Média')
-    ax1.axhline(LSC_I, color='red', linestyle='--', label='LSC')
-    ax1.axhline(LIC_I, color='red', linestyle='--', label='LIC')
-    ax1.set_title("Carta I")
-    ax1.legend()
+    # Carta MR
+    x_mr = dados["Subgrupo"].values[1:]
+    y_mr = mr[1:].values
+    axs[1].plot(x_mr, y_mr, color="black", linestyle="-")
+    axs[1].scatter(x_mr, y_mr, color="black")
+    axs[1].axhline(mr_mean, color="green", linestyle="-")
+    axs[1].axhline(UCL_MR, color="red", linestyle="-")
+    axs[1].set_title("Carta MR", fontsize=18)
+    axs[1].set_ylabel("Amplitude Móvel", fontsize=16)
+    axs[1].set_xlabel("Subgrupo", fontsize=16)
 
-    ax2.plot(mr, marker='o')
-    ax2.axhline(media_MR, color='black', linestyle='-', label='Média MR')
-    ax2.axhline(LSC_MR, color='red', linestyle='--', label='LSC MR')
-    ax2.set_title("Carta MR")
-    ax2.legend()
+    xlim_mr = axs[1].get_xlim()
+    axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=12, color="green")
+    axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=12, color="red")
+    axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=12, color="red")
+
+    crit1_flag_MR = any(y_mr > UCL_MR)
+    for xi, yi in zip(x_mr, y_mr):
+        if yi > UCL_MR:
+            axs[1].scatter(xi, yi, color="red")
 
     plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    return texto.strip(), grafico_base64
+    # Critérios 2 e 3 (exemplo simples)
+    def check_crit2(y):
+        count = 0
+        for val in y:
+            if val > media:
+                count += 1
+                if count >= 9:
+                    return True
+            else:
+                count = 0
+        count = 0
+        for val in y:
+            if val < media:
+                count += 1
+                if count >= 9:
+                    return True
+            else:
+                count = 0
+        return False
+
+    def check_crit3(y):
+        count = 0
+        for i in range(1, len(y)):
+            if y[i] > y[i-1]:
+                count += 1
+                if count >= 6:
+                    return True
+            else:
+                count = 0
+        count = 0
+        for i in range(1, len(y)):
+            if y[i] < y[i-1]:
+                count += 1
+                if count >= 6:
+                    return True
+            else:
+                count = 0
+        return False
+
+    crit2_flag_I = check_crit2(y)
+    crit3_flag_I = check_crit3(y)
+    crit2_flag_MR = check_crit2(y_mr)
+    crit3_flag_MR = check_crit3(y_mr)
+
+    # 🔷 REPORT – Individual
+    texto_I = f"📊 Carta I ({nome_coluna_y})\n"
+    texto_I += "🔎 Critérios avaliados:\n"
+    texto_I += f"1. Critério 1 – Pontos fora dos limites: {'❌ Detectado' if crit1_flag_I else '✅ OK'}\n"
+    texto_I += f"2. Critério 2 – 9 pontos do mesmo lado da média: {'❌ Detectado' if crit2_flag_I else '✅ OK'}\n"
+    texto_I += f"3. Critério 3 – 6 pontos subindo ou descendo: {'❌ Detectado' if crit3_flag_I else '✅ OK'}\n"
+    texto_I += "🔎 Conclusão: "
+    texto_I += "Causa especial detectada. O processo não está sob controle estatístico.\n" if (crit1_flag_I or crit2_flag_I or crit3_flag_I) else "Processo está estável.\n"
+    texto_I += "🔎 Recomendação: Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+
+    # 🔷 REPORT – MR
+    texto_MR = f"📊 Carta MR\n"
+    texto_MR += "🔎 Critérios avaliados:\n"
+    texto_MR += f"1. Critério 1 – Pontos fora dos limites: {'❌ Detectado' if crit1_flag_MR else '✅ OK'}\n"
+    texto_MR += f"2. Critério 2 – 9 pontos do mesmo lado da média: {'❌ Detectado' if crit2_flag_MR else '✅ OK'}\n"
+    texto_MR += f"3. Critério 3 – 6 pontos subindo ou descendo: {'❌ Detectado' if crit3_flag_MR else '✅ OK'}\n"
+    texto_MR += "🔎 Conclusão: "
+    texto_MR += "Causa especial detectada. O processo não está sob controle estatístico.\n" if (crit1_flag_MR or crit2_flag_MR or crit3_flag_MR) else "Processo está estável.\n"
+    texto_MR += "🔎 Recomendação: Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+
+    # Salva gráfico
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    plt.close(fig)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+    # Retorna os dois relatórios juntos + imagem
+    return (texto_I + "\n" + texto_MR), img_base64
+
 
 
 def analise_carta_xbarra_r(df, coluna_y, subgrupo):
