@@ -161,6 +161,7 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     r2 = 1 - ss_res / ss_tot
     r2_adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - 2)
 
+    # p-valor do coeficiente angular
     X_mat = np.vstack([np.ones_like(X), X]).T
     beta, residuals, rank, s = np.linalg.lstsq(X_mat, Y, rcond=None)
     mse = ss_res / (len(Y) - 2)
@@ -169,6 +170,7 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     t_stat = beta[1] / se_beta1
     p_valor_beta1 = 2 * (1 - stats.t.cdf(abs(t_stat), df=len(Y)-2))
 
+    # R² preditivo (Leave-One-Out)
     erros = []
     for i in range(len(Y)):
         X_train = np.delete(X, i)
@@ -179,8 +181,13 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     ss_pred = np.sum(erros)
     r2_pred = 1 - ss_pred / ss_tot
 
+    # Testes de normalidade dos resíduos
     residuos = Y - y_pred
+
     ad = stats.anderson(residuos)
+    sw_stat, sw_p = stats.shapiro(residuos)
+    dp_stat, dp_p = stats.normaltest(residuos)
+
     ad_crit = ad.critical_values
     ad_sig = list(ad.significance_level)
     if 5 in ad_sig:
@@ -188,14 +195,21 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
         ad_normal = ad.statistic < ad_crit[idx]
     else:
         ad_normal = False
+    sw_normal = sw_p > 0.05
+    dp_normal = dp_p > 0.05
 
+    # Resultado final de normalidade
+    normalidade_residuos = ad_normal or sw_normal or dp_normal
+
+    # Conclusão
     conclusao = []
-    conclusao.append("✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_normal else "⚠ Resíduos podem não ser normais (Anderson-Darling).")
-    conclusao.append(f"✅ Coeficiente angular significativo (p = {p_valor_beta1:.4f})." if p_valor_beta1 < 0.05 else f"⚠ Coeficiente angular não significativo (p = {p_valor_beta1:.4f}).")
-    if ad_normal and p_valor_beta1 < 0.05 and r2_pred > 0.5:
+    conclusao.append(f"🔹 **Hipótese:** H₀: não há relação linear entre {coluna_x} e {coluna_y}; H₁: existe relação linear.")
+    conclusao.append(f"✅ Resíduos podem ser considerados normais." if normalidade_residuos else "❌ Resíduos não são normais. Recomenda-se verificar a estabilidade do processo ou coletar mais dados.")
+    conclusao.append(f"✅ Coeficiente angular significativo (p = {p_valor_beta1:.4f})." if p_valor_beta1 < 0.05 else f"⚠️ Coeficiente angular não significativo (p = {p_valor_beta1:.4f}).")
+    if normalidade_residuos and p_valor_beta1 < 0.05 and r2_pred > 0.5:
         conclusao.append("✅ Modelo validado.")
     else:
-        conclusao.append("⚠ Modelo pode não ser adequado. Verifique os indicadores acima.")
+        conclusao.append("⚠️ Modelo pode não ser adequado. Verifique os indicadores acima.")
 
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6,4))
@@ -213,19 +227,26 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-**Regressão Linear Simples**
+📊 **Análise – Regressão Linear Simples**
+
+🔎 **Resumo do modelo**
 - Equação: Y = {intercepto:.4f} + {angular:.4f} * X
 - R²: {r2:.4f}
 - R² ajustado: {r2_adj:.4f}
 - R² preditivo: {r2_pred:.4f}
 - p-valor do coeficiente angular: {p_valor_beta1:.4f}
-- Anderson-Darling dos resíduos: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
 
-**Conclusão**
+🔎 **Análise dos resíduos (normalidade)**
+- Anderson-Darling: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Shapiro-Wilk: p-valor={sw_p:.4f}, normalidade={'Aprovada' if sw_normal else 'Reprovada'}
+- D’Agostino-Pearson: p-valor={dp_p:.4f}, normalidade={'Aprovada' if dp_normal else 'Reprovada'}
+
+🔎 **Conclusão**
 {chr(10).join(conclusao)}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
