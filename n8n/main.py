@@ -106,7 +106,7 @@ CONFIG_ANALISES = {
     "Qui-quadrado de Associação": ["df", "coluna_y", "coluna_x"],
     "Qui-quadrado de Ajuste": ["df", "coluna_y", "coluna_x"],
     "Tipo de modelo de regressão": ["df", "coluna_y", "coluna_x"],
-    "Regressão Simples": ["df", "coluna_y", "coluna_x"],
+    "Regressão Linear": ["df", "coluna_y", "coluna_x"],
     "Regressão Quadrática": ["df", "coluna_y", "coluna_x"],
     "Regressão Cúbica": ["df", "coluna_y", "coluna_x"],
     "Regressão Linear Múltipla": ["df", "coluna_y", "lista_x"],
