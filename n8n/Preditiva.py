@@ -1011,16 +1011,20 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     # Resultados simples por variável
     variaveis_relevantes = []
     variaveis_nrelevantes = []
+    pvalores_dict = {}
 
     for nome_coluna in X_final.columns:
         try:
-            pvals_col = res.pvalues.loc[:, nome_coluna]
+            pvals_col = res.pvalues.xs(nome_coluna, level=1)
             min_pval = pvals_col.min()
+            pvalores_dict[nome_coluna] = min_pval
+
             if min_pval < 0.05:
                 variaveis_relevantes.append((nomes_originais[nome_coluna], min_pval))
             else:
                 variaveis_nrelevantes.append((nomes_originais[nome_coluna], min_pval))
         except:
+            pvalores_dict[nome_coluna] = None
             variaveis_nrelevantes.append((nomes_originais[nome_coluna], None))
 
     # Critérios avaliados
@@ -1031,7 +1035,9 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     criterios.append(f"- Percentual de acerto = {round(acerto*100,2):.2f}%")
     for c, v in zip(X_final.columns, vif):
         status_vif = "✅ adequado (<10)" if v < 10 else "❌ alto (>=10)"
-        criterios.append(f"- VIF {nomes_originais[c]} = {str(round(v,2)).replace('.',',')} {status_vif}")
+        pval_str = str(round(pvalores_dict[c],3)).replace('.',',') if pvalores_dict[c] is not None else "N/A"
+        status_pval = "✅ significativo (<0,05)" if pvalores_dict[c] is not None and pvalores_dict[c] < 0.05 else "❌ não significativo (>=0,05)"
+        criterios.append(f"- {nomes_originais[c]}: p-valor = {pval_str} {status_pval}, VIF = {str(round(v,2)).replace('.',',')} {status_vif}")
 
     # Conclusão
     validado = (r2_mcf is not None and r2_mcf > 0.2 and all(v < 10 for v in vif))
@@ -1070,6 +1076,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
