@@ -226,8 +226,6 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
 - **H₀:** Não há relação linear entre {coluna_x} e {coluna_y}
 - **H₁:** Existe relação linear entre {coluna_x} e {coluna_y}
 
----
-
 🔎 **Resumo do modelo**
 - Equação: Y = {intercepto:.4f} + {angular:.4f} * X
 - R²: {r2:.4f}
@@ -235,17 +233,11 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
 - R² preditivo: {r2_pred:.4f}
 - Coeficiente angular: p-valor = {p_valor_beta1:.4f}
 
----
-
 🔎 **Normalidade dos resíduos**
 {conclusao[0]}
 
----
-
 🔎 **Conclusão**
 {conclusao[1]}
-
----
 
 🔧 **Recomendação**
 ➔ Considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva.
@@ -254,6 +246,105 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     return texto.strip(), grafico_base64
 
 
+def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
+    if not coluna_y or not coluna_x:
+        return "❌ A regressão quadrática requer 1 coluna Y e 1 coluna X.", None
+
+    if coluna_y not in df.columns or coluna_x not in df.columns:
+        return f"❌ Coluna {coluna_y} ou {coluna_x} não encontrada no arquivo.", None
+
+    df_valid = df[[coluna_x, coluna_y]].dropna()
+    if len(df_valid) < 5:
+        return "❌ O modelo requer ao menos 5 observações válidas.", None
+
+    X = df_valid[coluna_x].values
+    Y = df_valid[coluna_y].values
+
+    # Ajuste quadrático (2º grau)
+    coef = np.polyfit(X, Y, 2)
+    y_pred = np.polyval(coef, X)
+    a, b, c = coef[0], coef[1], coef[2]
+
+    ss_res = np.sum((Y - y_pred) ** 2)
+    ss_tot = np.sum((Y - np.mean(Y)) ** 2)
+    r2 = 1 - ss_res / ss_tot
+    r2_adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - 3)  # 3 parâmetros: a, b, c
+
+    # R² preditivo (Leave-One-Out)
+    erros = []
+    for i in range(len(Y)):
+        X_train = np.delete(X, i)
+        Y_train = np.delete(Y, i)
+        coef_lo = np.polyfit(X_train, Y_train, 2)
+        y_pred_lo = np.polyval(coef_lo, X[i])
+        erros.append((Y[i] - y_pred_lo) ** 2)
+    ss_pred = np.sum(erros)
+    r2_pred = 1 - ss_pred / ss_tot
+
+    # Testes de normalidade dos resíduos
+    residuos = Y - y_pred
+
+    ad = stats.anderson(residuos)
+    sw_stat, sw_p = stats.shapiro(residuos)
+    dp_stat, dp_p = stats.normaltest(residuos)
+
+    # Melhor teste (maior p-valor)
+    testes_normalidade = {
+        "Anderson-Darling": (ad.statistic, ad.statistic < ad.critical_values[2], 0.05),
+        "Shapiro-Wilk": (sw_p, sw_p > 0.05, sw_p),
+        "D’Agostino-Pearson": (dp_p, dp_p > 0.05, dp_p)
+    }
+    melhor_teste = max(testes_normalidade.items(), key=lambda x: x[1][2])
+    nome_teste, (stat, aprovado, p_valor) = melhor_teste
+
+    normalidade_residuos = aprovado
+
+    # Conclusão
+    conclusao = []
+    conclusao.append(f"✅ Os resíduos podem ser considerados normais (p = {p_valor:.4f}, {nome_teste})." if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste}). Recomenda-se verificar a estabilidade do processo ou coletar mais dados.")
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6,4))
+    ax.scatter(X, Y, color='black', label='Dados')
+
+    # Curva quadrática
+    x_seq = np.linspace(X.min(), X.max(), 300)
+    y_seq = np.polyval(coef, x_seq)
+    ax.plot(x_seq, y_seq, color='blue', label='Curva ajustada')
+
+    ax.set_title("Regressão Quadrática")
+    ax.set_xlabel(coluna_x)
+    ax.set_ylabel(coluna_y)
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+📊 **Análise – Regressão Quadrática**
+
+🔹 **Hipóteses do modelo**
+- **H₀:** Não há relação quadrática entre {coluna_x} e {coluna_y}
+- **H₁:** Existe relação quadrática entre {coluna_x} e {coluna_y}
+
+
+🔎 **Resumo do modelo**
+- Equação: Y = {a:.4f}X² + {b:.4f}X + {c:.4f}
+- R²: {r2:.4f}
+- R² ajustado: {r2_adj:.4f}
+- R² preditivo: {r2_pred:.4f}
+
+🔎 **Normalidade dos resíduos**
+{conclusao[0]}
+
+🔧 **Recomendação**
+➔ Se o R² < 50%, considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva.
+"""
+
+    return texto.strip(), grafico_base64
 
 
 
@@ -971,12 +1062,13 @@ def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
 # Dicionário de análises
 ANALISES = {
     "Tipo de modelo de regressão": analise_melhor_modelo,
-    "Regressão linear simples": analise_regressao_linear_simples,
-    "Regressão linear múltipla": analise_regressao_linear_multipla,
-    "Regressão logística binária": analise_regressao_logistica_binaria,
-    "Regressão logística ordinal": analise_regressao_logistica_ordinal,
-    "Regressão logística nominal": analise_regressao_logistica_nominal,
-    "Árvore de decisão": analise_arvore_decisao,
+    "Regressão Linear": analise_regressao_linear_simples,
+    "Regressão Quadrática": analise_regressao_quadratica,
+    "Regressão Linear Múltipla": analise_regressao_linear_multipla,
+    "Regressão Binária": analise_regressao_logistica_binaria,
+    "Regressão Ordinal": analise_regressao_logistica_ordinal,
+    "Regressão Nominal": analise_regressao_logistica_nominal,
+    "Árvore de Decisão": analise_arvore_decisao,
     "Random Forest": analise_random_forest,
     "ARIMA": analise_arima,
     "Holt-Winters": analise_holt_winters
