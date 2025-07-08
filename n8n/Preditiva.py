@@ -1300,8 +1300,31 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     # Se Data existir e estiver no df, usar como índice ordenado corretamente
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
-        df_valid[Data] = pd.to_datetime(df_valid[Data], errors='coerce')
+
+        # Converter datas com vários formatos comuns
+        df_valid[Data] = pd.to_datetime(
+            df_valid[Data],
+            errors='coerce',
+            dayfirst=False,  # tenta primeiro padrão americano
+            infer_datetime_format=True
+        )
+
+        # Se ainda tiver datas NaT, tenta dayfirst=True (britânico/brasileiro)
+        if df_valid[Data].isna().any():
+            df_valid[Data] = pd.to_datetime(
+                df_valid[Data],
+                errors='coerce',
+                dayfirst=True,
+                infer_datetime_format=True
+            )
+
+        # Remove datas inválidas
         df_valid = df_valid.dropna(subset=[Data])
+
+        # Se datas forem apenas meses abreviados (Aug, Sep, etc.), adiciona ano fictício atual
+        if df_valid[Data].dt.year.min() == 1900:
+            df_valid[Data] = pd.to_datetime(df_valid[Data].dt.strftime("2025-%m-%d"), errors='coerce')
+
         df_valid = df_valid.sort_values(by=Data)
         index = df_valid[Data].values
     else:
@@ -1345,7 +1368,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
 
     ax.set_title(f"📊 Análise – Série Temporal (ARIMA)", fontsize=18, fontweight='bold')
     ax.set_ylabel("Valor", fontsize=16, fontweight='bold')
-    ax.set_xlabel("Observação", fontsize=16, fontweight='bold')
+    ax.set_xlabel("Data" if Data and Data in df.columns else "Observação", fontsize=16, fontweight='bold')
     ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     ax.legend()
 
@@ -1372,6 +1395,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
