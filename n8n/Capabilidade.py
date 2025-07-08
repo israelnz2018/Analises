@@ -7,7 +7,7 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
     from io import BytesIO
     import base64
     from scipy import stats
-    import matplotlib.ticker as mticker
+    import statsmodels.api as sm
 
     aplicar_estilo_minitab()
 
@@ -30,21 +30,14 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
     ks_conc = "Aprovada" if ks_p > 0.05 else "Reprovada"
     normal = any([ad_conc == "Aprovada", sw_conc == "Aprovada", ks_conc == "Aprovada"])
 
-    # Gráfico QQ-Plot estilo Minitab com percentis no eixo Y
-    fig, ax = plt.subplots(figsize=(8,6))
-    stats.probplot(dados, dist="norm", plot=ax)
-    ax.get_lines()[1].set_color('brown')
+    # Gráfico de probabilidade (escala percentual coerente)
+    fig = plt.figure(figsize=(8,6))
+    ax = fig.add_subplot(111)
+    sm.ProbPlot(dados, dist=stats.norm).probplot(ax=ax)
     ax.set_title(f"Gráfico de Probabilidade – {coluna_y}", fontsize=14, fontweight='bold')
     ax.set_xlabel(f"{coluna_y}", fontsize=12, fontweight='bold')
     ax.set_ylabel("Percentual", fontsize=12, fontweight='bold')
-    ax.grid(True)
-
-    # Ajusta eixo Y para mostrar percentis ao invés de z-score
-    percentis = [1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99]
-    y_values = stats.norm.ppf([p/100 for p in percentis])
-    ax.set_yticks(y_values)
-    ax.set_yticklabels([f"{p}%" for p in percentis])
-    ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
+    plt.grid(True)
 
     plt.tight_layout()
     buf = BytesIO()
@@ -54,7 +47,6 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
 
     def fbr(v): return f"{v:.4f}".replace('.', ',')
 
-    # Relatório final – títulos em negrito
     texto = (
         f"📊 **Análise de Normalidade – {coluna_y}**\n\n"
         f"🔎 **Resumo estatístico dos dados**\n"
@@ -81,6 +73,7 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
         )
 
     return texto.strip(), grafico_base64
+
 
 
 
