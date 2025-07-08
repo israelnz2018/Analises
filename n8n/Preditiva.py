@@ -1300,11 +1300,13 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     # Se Data existir e estiver no df, usar como índice ordenado corretamente
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
+        df_valid[Data] = pd.to_datetime(df_valid[Data])
         df_valid = df_valid.sort_values(by=Data)
         index = df_valid[Data].values
     else:
         df_valid = df[[coluna_y]].dropna()
-        index = range(len(df_valid))
+        df_valid = df_valid.reset_index()
+        index = df_valid.index.values
 
     if len(df_valid) < 10:
         return "❌ A série temporal requer pelo menos 10 observações.", None
@@ -1326,8 +1328,19 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(index, Y, label='Série Original', color='black')
-    ax.plot(range(len(Y), len(Y) + horizonte), previsao, label='Previsão', color='blue')
+
+    if Data and Data in df.columns:
+        ult_data = df_valid[Data].iloc[-1]
+        freq = pd.infer_freq(df_valid[Data])
+        if freq is None:
+            freq = 'D'  # assume diário se não identificar
+
+        datas_futuras = pd.date_range(start=ult_data, periods=horizonte + 1, closed='right', freq=freq)
+        ax.plot(df_valid[Data], Y, label='Série Original', color='black')
+        ax.plot(datas_futuras, previsao, label='Previsão', color='blue')
+    else:
+        ax.plot(index, Y, label='Série Original', color='black')
+        ax.plot(range(len(Y), len(Y) + horizonte), previsao, label='Previsão', color='blue')
 
     ax.set_title(f"📊 Análise – Série Temporal (ARIMA)", fontsize=18, fontweight='bold')
     ax.set_ylabel("Valor", fontsize=16, fontweight='bold')
@@ -1344,17 +1357,12 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
 
     previsao_texto = ", ".join([f"{p:.2f}" for p in previsao])
 
-    # Reporte final no formato solicitado
     texto = (
         f"📊 **Análise – Série Temporal (ARIMA)**\n"
         f"🔎 **Modelo:** ARIMA{ordem} ✅\n"
         f"🔎 **AIC:** {aic:.2f} ✅\n"
         f"🔎 **BIC:** {bic:.2f} ✅\n"
         f"🔎 **Previsão para os próximos {horizonte} períodos:** {previsao_texto} ✅\n"
-    )
-
-    # Conclusão e Recomendação ao final
-    texto += (
         "\n🔎 **Conclusão:**\n"
         "✅ Modelo ajustado com sucesso. O processo está estável para previsão com o modelo atual.\n\n"
         "🔎 **Recomendação:**\n"
@@ -1363,6 +1371,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
