@@ -409,7 +409,7 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
 """.strip()
 
     if amplitude is not None:
-        relatorio += f"\n\n**Limites de Especificação**\nLSL: {LSL}\nUSL: {USL}\nAmplitude (USL - LSL): {amplitude}"
+        relatorio += f"\n\n**Limites de Especificação**\nLSL: {LSL}\nUSL: {USL}\nAmplitude (LSE - LIE): {amplitude}"
 
     if Cp is not None and Cpk is not None:
         relatorio += f"\n\n**Índices de Capabilidade (Potencial)**\nCp: {Cp:.2f}\nCpk: {Cpk:.2f}"
@@ -422,11 +422,13 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
         relatorio += f"\n\n**Índice de Desempenho (Performance Real)**\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f} sigma"
 
 
+    # Adicione este bloco separado logo após
     relatorio += f"""
-\n\n**% de Defeitos (Global)**
-Abaixo do LSL: {percent_below:.2f}%
-Acima do USL: {percent_above:.2f}%
-Total: {percent_total:.2f}%
+    \n\n**% de Defeitos (Global)**
+    Abaixo do LSE: {percent_below:.2f}%
+    Acima do LIE: {percent_above:.2f}%
+    Total: {percent_total:.2f}%
+    """
 
 📝 **Interpretação dos Resultados**
 {chr(10).join(interpretacao)}
@@ -443,9 +445,9 @@ Total: {percent_total:.2f}%
     ax.plot(x, y, 'b-', label='Distribuição Normal')
 
     if LSL is not None:
-        ax.axvline(LSL, color='red', linestyle='--', label='LSL')
+        ax.axvline(LSL, color='red', linestyle='--', label='LIE')
     if USL is not None:
-        ax.axvline(USL, color='red', linestyle='--', label='USL')
+        ax.axvline(USL, color='red', linestyle='--', label='LSE')
     ax.axvline(mean, color='green', linestyle='--', label='Média')
     ax.set_title(f'Capabilidade - {coluna_y}')
     ax.legend()
