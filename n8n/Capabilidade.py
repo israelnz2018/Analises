@@ -266,17 +266,14 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         return "❌ Pelo menos um dos limites (LIE ou LSE) deve ser informado.", None
 
     try:
-        LSL = float(field_LIE) if field_LIE else float('-inf')
+        LSL = float(field_LIE) if field_LIE else None
     except:
-        LSL = float('-inf')
+        LSL = None
 
     try:
-        USL = float(field_LSE) if field_LSE else float('inf')
+        USL = float(field_LSE) if field_LSE else None
     except:
-        USL = float('inf')
-
-    if LSL > USL:
-        LSL, USL = USL, LSL
+        USL = None
 
     dados = df[coluna_y].dropna()
     if len(dados) < 30:
@@ -316,50 +313,74 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
     std_global = np.std(dados, ddof=1)
 
     if subgrupo and subgrupo in df.columns:
-        # Com subgrupo ➔ σ_within = sqrt(media das variâncias dos subgrupos)
         grupos = df[[coluna_y, subgrupo]].dropna().groupby(subgrupo)[coluna_y]
         variancias = grupos.var(ddof=1)
         mean_variancia = variancias.mean()
         std_within = np.sqrt(mean_variancia)
     else:
-        # Sem subgrupo ➔ σ_within estimado via Moving Range / d2 (Minitab)
         dados_ordenados = dados.reset_index(drop=True)
         moving_ranges = dados_ordenados.diff().abs().dropna()
         mr_bar = moving_ranges.mean()
         d2 = 1.128
         std_within = mr_bar / d2
 
+    # Inicializar cálculos
+    Cp = Cpk = Pp = Ppk = None
+    amplitude = None
 
-    # Cálculos
-    Cp = (USL - LSL) / (6 * std_within)
-    Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
-    Pp = (USL - LSL) / (6 * std_global)
-    Ppk = min((USL - mean), (mean - LSL)) / (3 * std_global)
+    if LSL is not None and USL is not None:
+        amplitude = USL - LSL
+        Cp = amplitude / (6 * std_within)
+        Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
+        Pp = amplitude / (6 * std_global)
+        Ppk = min((USL - mean), (mean - LSL)) / (3 * std_global)
+    else:
+        # Calcula apenas Cpk ou Ppk dependendo do limite informado
+        if LSL is not None:
+            Cpk = (mean - LSL) / (3 * std_within)
+            Ppk = (mean - LSL) / (3 * std_global)
+        elif USL is not None:
+            Cpk = (USL - mean) / (3 * std_within)
+            Ppk = (USL - mean) / (3 * std_global)
+
+    # Percentual de defeitos (global)
+    ppm_below_lsl = stats.norm.cdf(LSL, loc=mean, scale=std_global) * 1e6 if LSL is not None else 0
+    ppm_above_usl = (1 - stats.norm.cdf(USL, loc=mean, scale=std_global)) * 1e6 if USL is not None else 0
+    ppm_total = ppm_below_lsl + ppm_above_usl
+    percent_below = ppm_below_lsl / 10000
+    percent_above = ppm_above_usl / 10000
+    percent_total = ppm_total / 10000
 
     # Interpretação baseada nos resultados reais
     interpretacao = []
     recomendacoes = []
 
-    if Cp > Pp:
-        interpretacao.append("✔️ **Cp > Pp:** O processo tem bom potencial, mas há variações ao longo do tempo (instabilidade).")
-    elif abs(Cp - Pp) <= 0.05:
-        interpretacao.append("✔️ **Cp ≈ Pp:** O processo está estável.")
-    else:
-        interpretacao.append("⚠️ **Cp < Pp:** Pode haver erro de subgrupamento ou presença de outliers.")
+    if Cp is not None and Pp is not None:
+        if Cp > Pp:
+            interpretacao.append("✔️ **Cp > Pp:** O processo tem bom potencial, mas há variações ao longo do tempo (instabilidade).")
+        elif abs(Cp - Pp) <= 0.05:
+            interpretacao.append("✔️ **Cp ≈ Pp:** O processo está estável.")
+        else:
+            interpretacao.append("⚠️ **Cp < Pp:** Pode haver erro de subgrupamento ou presença de outliers.")
 
-    if Cpk < Cp:
+    if Cpk is not None and Cp is not None and Cpk < Cp:
         interpretacao.append("⚠️ **Cpk < Cp:** O processo está deslocado do centro em direção a um dos limites.")
 
-    min_indice = min(Cp, Cpk, Pp, Ppk)
-    if min_indice > 1.33:
-        recomendacoes.append("✅ Todos os índices estão acima de 1.33, indicando que o processo é capaz e aceitável.")
-    elif min_indice < 1.00:
-        recomendacoes.append("❌ Um ou mais índices estão abaixo de 1.00, indicando que o processo **não é capaz**. Recomenda-se investigar causas especiais de variação ou revisar especificações.")
-    else:
-        recomendacoes.append("⚠️ Alguns índices estão entre 1.00 e 1.33. O processo atende minimamente, mas é recomendável melhorá-lo para maior segurança.")
+    indices = [i for i in [Cp, Cpk, Pp, Ppk] if i is not None]
+    min_indice = min(indices) if indices else None
+
+    if min_indice is not None:
+        if min_indice > 1.33:
+            recomendacoes.append("✅ Todos os índices estão acima de 1.33, indicando que o processo é capaz e aceitável.")
+        elif min_indice < 1.00:
+            recomendacoes.append("❌ Um ou mais índices estão abaixo de 1.00, indicando que o processo **não é capaz**. Recomenda-se investigar causas especiais de variação ou revisar especificações.")
+        else:
+            recomendacoes.append("⚠️ Alguns índices estão entre 1.00 e 1.33. O processo atende minimamente, mas é recomendável melhorá-lo para maior segurança.")
 
     # Relatório
     relatorio = f"""
+✅ Os dados foram considerados **normais**. Segue a análise de capabilidade:
+
 📊 **Análise de Capabilidade de Processo**
 
 **Estatísticas do Processo**
@@ -367,19 +388,26 @@ N: {len(dados)}
 Média: {mean:.3f}
 Desvio Padrão Global (σ_total): {std_global:.3f}
 Desvio Padrão Within (σ_within): {std_within:.3f}
+""".strip()
 
-**Limites de Especificação**
-LSL: {LSL}
-USL: {USL}
-Amplitude (USL - LSL): {USL - LSL}
+    if amplitude is not None:
+        relatorio += f"\n\n**Limites de Especificação**\nLSL: {LSL}\nUSL: {USL}\nAmplitude (USL - LSL): {amplitude}"
 
-**Índices de Capabilidade (Potencial)**
-Cp: {Cp:.2f}
-Cpk: {Cpk:.2f}
+    if Cp is not None and Cpk is not None:
+        relatorio += f"\n\n**Índices de Capabilidade (Potencial)**\nCp: {Cp:.2f}\nCpk: {Cpk:.2f}"
+    elif Cpk is not None:
+        relatorio += f"\n\n**Índice de Capabilidade (Potencial)**\nCpk: {Cpk:.2f}"
 
-**Índices de Desempenho (Performance Real)**
-Pp: {Pp:.2f}
-Ppk: {Ppk:.2f}
+    if Pp is not None and Ppk is not None:
+        relatorio += f"\n\n**Índices de Desempenho (Performance Real)**\nPp: {Pp:.2f}\nPpk: {Ppk:.2f}"
+    elif Ppk is not None:
+        relatorio += f"\n\n**Índice de Desempenho (Performance Real)**\nPpk: {Ppk:.2f}"
+
+    relatorio += f"""
+\n\n**% de Defeitos (Global)**
+Abaixo do LSL: {percent_below:.2f}%
+Acima do USL: {percent_above:.2f}%
+Total: {percent_total:.2f}%
 
 📝 **Interpretação dos Resultados**
 {chr(10).join(interpretacao)}
@@ -395,15 +423,14 @@ Ppk: {Ppk:.2f}
     y = stats.norm.pdf(x, mean, std_global)
     ax.plot(x, y, 'b-', label='Distribuição Normal')
 
-    if LSL != float('-inf'):
+    if LSL is not None:
         ax.axvline(LSL, color='red', linestyle='--', label='LSL')
-    if USL != float('inf'):
+    if USL is not None:
         ax.axvline(USL, color='red', linestyle='--', label='USL')
     ax.axvline(mean, color='green', linestyle='--', label='Média')
-    ax.set_title('Capabilidade - Dados Normais')
+    ax.set_title(f'Capabilidade - {coluna_y}')
     ax.legend()
 
-    # Estilo Minitab manual
     ax.set_facecolor('white')
     ax.grid(True, linestyle=':', color='gray')
     for spine in ax.spines.values():
@@ -417,6 +444,7 @@ Ppk: {Ppk:.2f}
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return relatorio, grafico_base64
+
 
 
 
