@@ -322,8 +322,13 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         mean_variancia = variancias.mean()
         std_within = np.sqrt(mean_variancia)
     else:
-        # Sem subgrupo ➔ σ_within = σ_global
-        std_within = std_global
+        # Sem subgrupo ➔ σ_within estimado via Moving Range / d2 (Minitab)
+        dados_ordenados = dados.reset_index(drop=True)
+        moving_ranges = dados_ordenados.diff().abs().dropna()
+        mr_bar = moving_ranges.mean()
+        d2 = 1.128
+        std_within = mr_bar / d2
+
 
     # Cálculos
     Cp = (USL - LSL) / (6 * std_within)
