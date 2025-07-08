@@ -710,26 +710,23 @@ def analise_carta_p(df, coluna_y, subgrupo):
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
     if not subgrupo or subgrupo not in df.columns:
-        return f"❌ A coluna de subgrupo '{subgrupo}' não foi encontrada no arquivo.", None
+        return f"❌ A coluna de tamanho de amostra '{subgrupo}' não foi encontrada no arquivo.", None
 
     dados = df[[nome_coluna_y, subgrupo]].dropna().copy()
     if dados.empty:
         return "❌ Dados insuficientes para análise.", None
 
-    # Agrupamento em subgrupos
-    grupos = dados.groupby(subgrupo)[nome_coluna_y]
+    # Conversão para float
+    nc = dados[nome_coluna_y].astype(float)
+    n = dados[subgrupo].astype(float)
 
-    # Proporção de não conformes por subgrupo
-    n_defeitos = grupos.sum()
-    n_inspecionados = grupos.count()
-    p = n_defeitos / n_inspecionados
-
-    p_bar = p.mean()
-
-    # Limites de controle
-    UCL = p_bar + 3 * np.sqrt((p_bar * (1 - p_bar)) / n_inspecionados)
-    LCL = p_bar - 3 * np.sqrt((p_bar * (1 - p_bar)) / n_inspecionados)
-    LCL = LCL.clip(lower=0)  # LCL nunca negativo
+    # Proporção
+    p = nc / n
+    p_barra = nc.sum() / n.sum()
+    sigma_p = np.sqrt(p_barra * (1 - p_barra) / n)
+    LSC = p_barra + 3 * sigma_p
+    LIC = p_barra - 3 * sigma_p
+    LIC = LIC.clip(lower=0)
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -737,18 +734,18 @@ def analise_carta_p(df, coluna_y, subgrupo):
     x = p.index.values
     y = p.values
     ax.plot(x, y, color="black", linestyle="-")
-    ax.axhline(p_bar, color="green", linestyle="-")
-    ax.plot(x, UCL, color="red", linestyle="-")
-    ax.plot(x, LCL, color="red", linestyle="-")
+    ax.plot(x, LSC, color="red", linestyle="-")
+    ax.plot(x, LIC, color="red", linestyle="-")
+    ax.axhline(p_barra, color="green", linestyle="-")
     ax.set_title(f"Carta P – Proporção de Defeitos ({nome_coluna_y})", fontsize=18, fontweight='bold')
     ax.set_ylabel("Proporção", fontsize=16, fontweight='bold')
     ax.set_xlabel("Subgrupo", fontsize=16, fontweight='bold')
     ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     xlim = ax.get_xlim()
-    ax.text(xlim[1]+1, p_bar, f"p̄ = {p_bar:.4f}", va='center', fontsize=12, color="green")
-    ax.text(xlim[1]+1, UCL.iloc[0], f"LSC = {UCL.iloc[0]:.4f}", va='center', fontsize=12, color="red")
-    ax.text(xlim[1]+1, LCL.iloc[0], f"LIC = {LCL.iloc[0]:.4f}", va='center', fontsize=12, color="red")
+    ax.text(xlim[1]+1, p_barra, f"p̄ = {p_barra:.4f}", va='center', fontsize=12, color="green")
+    ax.text(xlim[1]+1, LSC.iloc[0], f"LSC = {LSC.iloc[0]:.4f}", va='center', fontsize=12, color="red")
+    ax.text(xlim[1]+1, LIC.iloc[0], f"LIC = {LIC.iloc[0]:.4f}", va='center', fontsize=12, color="red")
 
     # Critérios
     def check_crit2(y, ref_media):
@@ -804,14 +801,14 @@ def analise_carta_p(df, coluna_y, subgrupo):
         return False, []
 
     crit1_flag = []
-    for idx, (xi, yi, ucl_i, lcl_i) in enumerate(zip(x, y, UCL, LCL)):
+    for idx, (xi, yi, lsc_i, lic_i) in enumerate(zip(x, y, LSC, LIC)):
         cor = "black"
-        if yi > ucl_i or yi < lcl_i:
+        if yi > lsc_i or yi < lic_i:
             cor = "red"
             crit1_flag.append((idx+1, yi))
         ax.scatter(xi, yi, color=cor)
 
-    crit2, linhas_crit2 = check_crit2(y, p_bar)
+    crit2, linhas_crit2 = check_crit2(y, p_barra)
     crit3, linhas_crit3 = check_crit3(y)
 
     if crit2:
@@ -826,7 +823,7 @@ def analise_carta_p(df, coluna_y, subgrupo):
     # Report
     texto = f"📊 **Carta P (Proporção de Defeitos – {nome_coluna_y})**\n"
     texto += "🔎 **Estatísticas gerais:**\n"
-    texto += f"- Proporção média de não conformes (p̄): {p_bar:.4f}\n\n"
+    texto += f"- Proporção média de não conformes (p̄): {p_barra:.4f}\n\n"
     texto += "🔎 **Critérios avaliados:**\n"
 
     if crit1_flag:
@@ -860,6 +857,7 @@ def analise_carta_p(df, coluna_y, subgrupo):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto, img_base64
+
 
 
 
