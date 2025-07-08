@@ -259,7 +259,6 @@ A melhor distribuição é: **{nome_melhor}**
 
 
 
-
 def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
@@ -321,75 +320,67 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         # Com subgrupo
         grupos = df[[coluna_y, subgrupo]].dropna().groupby(subgrupo)[coluna_y]
         std_within = np.sqrt(np.mean(grupos.var(ddof=1)))
-
-        Cp = (USL - LSL) / (6 * std_within)
-        Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
-        Pp = (USL - LSL) / (6 * std_overall)
-        Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
-
-        relatorio = f"""
-📊 **Análise de Capabilidade de Processo (Com Subgrupos)**
-
-**Estatísticas do Processo**
-N: {len(dados)}
-Número de Subgrupos: {grupos.ngroups}
-Tamanho Médio do Subgrupo: {grupos.size().mean():.0f}
-Média Geral: {mean:.3f}
-Desvio Padrão Dentro do Subgrupo: {std_within:.3f}
-Desvio Padrão Global: {std_overall:.3f}
-
-**Limites de Especificação**
-LSL: {LSL}
-USL: {USL}
-Amplitude (USL - LSL): {USL - LSL}
-
-**Índices de Capacidade (Potencial do Processo)**
-Cp: {Cp:.2f}
-Cpk: {Cpk:.2f}
-
-**Índices de Desempenho (Performance Real)**
-Pp: {Pp:.2f}
-Ppk: {Ppk:.2f}
-
-📝 **Interpretação dos Resultados**
-- Cp > Pp ➔ processo tem bom potencial, mas há variações ao longo do tempo (instabilidade).
-- Cp ≈ Pp ➔ processo está estável.
-- Cpk < Cp ➔ processo está deslocado do centro.
-
-✔️ **Recomendações:**
-- Cp, Cpk, Pp, Ppk > 1.33 ➔ processo aceitável.
-- Cp, Cpk, Pp, Ppk < 1 ➔ processo não capaz. Verificar causas especiais ou revisar especificações.
-""".strip()
-
     else:
-        # Sem subgrupo
-        Pp = (USL - LSL) / (6 * std_overall)
-        Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
+        # Sem subgrupo ➔ Cp/Cpk usam σ estimado como σ_global
+        std_within = std_overall
 
-        relatorio = f"""
-📊 **Análise de Capabilidade de Processo (Dados Individuais)**
+    # Cálculos
+    Cp = (USL - LSL) / (6 * std_within)
+    Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
+    Pp = (USL - LSL) / (6 * std_overall)
+    Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
+
+    # Interpretação baseada nos resultados
+    interpretacao = []
+    recomendacoes = []
+
+    if Cp > Pp:
+        interpretacao.append("✔️ **Cp > Pp:** O processo tem bom potencial, mas há variações ao longo do tempo (instabilidade).")
+    elif abs(Cp - Pp) <= 0.05:
+        interpretacao.append("✔️ **Cp ≈ Pp:** O processo está estável.")
+    else:
+        interpretacao.append("⚠️ **Cp < Pp:** Pode haver erro de subgrupamento ou outliers influenciando os cálculos.")
+
+    if Cpk < Cp:
+        interpretacao.append("⚠️ **Cpk < Cp:** O processo está deslocado do centro em direção a um dos limites.")
+
+    # Recomendações baseadas nos índices
+    min_indice = min(Cp, Cpk, Pp, Ppk)
+    if min_indice > 1.33:
+        recomendacoes.append("✅ Todos os índices estão acima de 1.33, indicando que o processo é capaz e aceitável.")
+    elif min_indice < 1.00:
+        recomendacoes.append("❌ Um ou mais índices estão abaixo de 1.00, indicando que o processo **não é capaz**. Recomenda-se investigar causas especiais de variação ou revisar especificações.")
+    else:
+        recomendacoes.append("⚠️ Alguns índices estão entre 1.00 e 1.33. O processo atende minimamente, mas é recomendável melhorá-lo para maior segurança.")
+
+    # Relatório
+    relatorio = f"""
+📊 **Análise de Capabilidade de Processo**
 
 **Estatísticas do Processo**
 N: {len(dados)}
 Média: {mean:.3f}
 Desvio Padrão (Global): {std_overall:.3f}
+Desvio Padrão (Within): {std_within:.3f}
 
 **Limites de Especificação**
 LSL: {LSL}
 USL: {USL}
 Amplitude (USL - LSL): {USL - LSL}
 
-**Índices de Desempenho (Performance Real)**
+**Índices de Capabilidade**
+Cp: {Cp:.2f}
+Cpk: {Cpk:.2f}
+
+**Índices de Desempenho**
 Pp: {Pp:.2f}
 Ppk: {Ppk:.2f}
 
 📝 **Interpretação dos Resultados**
-- Cp/Cpk não são calculados sem subgrupo, pois usam σ estimado dentro do subgrupo.
-- Pp/Ppk indicam a performance real considerando toda a variabilidade.
+{chr(10).join(interpretacao)}
 
-✔️ **Recomendações:**
-- Pp, Ppk > 1.33 ➔ processo aceitável.
-- Pp, Ppk < 1 ➔ processo não capaz.
+✔️ **Recomendações**
+{chr(10).join(recomendacoes)}
 """.strip()
 
     # Gráfico
@@ -421,6 +412,7 @@ Ppk: {Ppk:.2f}
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return relatorio, grafico_base64
+
 
 
 
