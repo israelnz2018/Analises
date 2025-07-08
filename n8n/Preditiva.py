@@ -1291,6 +1291,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
+    import locale
 
     aplicar_estilo_minitab()
 
@@ -1301,15 +1302,31 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
 
-        # Tenta converter datas e valida
+        # Tenta primeiro converter com locale padrão
         try:
             df_valid[Data] = pd.to_datetime(df_valid[Data], dayfirst=False, infer_datetime_format=True)
         except:
-            return f"❌ Formato de data inválido. Use datas no formato adequado (ex: 2025-07-08 ou Aug).", None
+            pass
 
-        # Verifica se alguma data não foi convertida corretamente
+        # Se ainda tiver datas NaT, tenta locale português do Brasil
         if df_valid[Data].isnull().any():
-            return f"❌ Existem datas inválidas ou em formato incorreto. Corrija antes de prosseguir.", None
+            try:
+                locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+                df_valid[Data] = pd.to_datetime(df_valid[Data], dayfirst=True, infer_datetime_format=True)
+            except:
+                pass
+
+        # Se ainda tiver datas NaT, tenta locale inglês dos EUA
+        if df_valid[Data].isnull().any():
+            try:
+                locale.setlocale(locale.LC_TIME, 'en_US.UTF-8')
+                df_valid[Data] = pd.to_datetime(df_valid[Data], dayfirst=False, infer_datetime_format=True)
+            except:
+                pass
+
+        # Verifica se ainda existem datas inválidas
+        if df_valid[Data].isnull().any():
+            return f"❌ Existem datas inválidas ou em formato não reconhecido. Use formatos como 2025-07-08, 08/07/2025, Jan, Fev, Aug, etc.", None
 
         df_valid = df_valid.sort_values(by=Data)
         index = df_valid[Data].values
@@ -1381,6 +1398,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
