@@ -335,7 +335,6 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         Pp = amplitude / (6 * std_global)
         Ppk = min((USL - mean), (mean - LSL)) / (3 * std_global)
     else:
-        # Calcula apenas Cpk ou Ppk dependendo do limite informado
         if LSL is not None:
             Cpk = (mean - LSL) / (3 * std_within)
             Ppk = (mean - LSL) / (3 * std_global)
@@ -363,8 +362,24 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         else:
             interpretacao.append("⚠️ **Cp < Pp:** Pode haver erro de subgrupamento ou presença de outliers.")
 
-    if Cpk is not None and Cp is not None and Cpk < Cp:
-        interpretacao.append("⚠️ **Cpk < Cp:** O processo está deslocado do centro em direção a um dos limites.")
+    if Cpk is not None:
+        if Cpk < 1.00:
+            interpretacao.append(f"❌ **Cpk = {Cpk:.2f} < 1.00:** O processo **não é capaz**.")
+        elif Cpk < 1.33:
+            interpretacao.append(f"⚠️ **Cpk = {Cpk:.2f} < 1.33:** O processo **não atende ao valor recomendado (≥ 1.33)**.")
+        else:
+            interpretacao.append(f"✅ **Cpk = {Cpk:.2f} ≥ 1.33:** O processo é capaz e aceitável.")
+
+    if Ppk is not None:
+        if Ppk < 1.00:
+            interpretacao.append(f"❌ **Ppk = {Ppk:.2f} < 1.00:** Performance real não é capaz.")
+        elif Ppk < 1.33:
+            interpretacao.append(f"⚠️ **Ppk = {Ppk:.2f} < 1.33:** Performance real abaixo do recomendado.")
+        else:
+            interpretacao.append(f"✅ **Ppk = {Ppk:.2f} ≥ 1.33:** Performance real aceitável.")
+
+    if Cpk is not None and Ppk is not None and abs(Cpk - Ppk) > 0.1:
+        interpretacao.append("⚠️ **Cpk e Ppk diferem significativamente**, sugerindo variação ao longo do tempo ou instabilidade do processo.")
 
     indices = [i for i in [Cp, Cpk, Pp, Ppk] if i is not None]
     min_indice = min(indices) if indices else None
