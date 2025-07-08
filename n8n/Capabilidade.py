@@ -266,14 +266,14 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         return "❌ Pelo menos um dos limites (LIE ou LSE) deve ser informado.", None
 
     try:
-        LSL = float(field_LIE) if field_LIE else None
+        LIE = float(field_LIE) if field_LIE else None
     except:
-        LSL = None
+        LIE = None
 
     try:
-        USL = float(field_LSE) if field_LSE else None
+        LSE = float(field_LSE) if field_LSE else None
     except:
-        USL = None
+        LSE = None
 
     dados = df[coluna_y].dropna()
     if len(dados) < 30:
@@ -328,29 +328,29 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
     Cp = Cpk = Pp = Ppk = sigma_real = None
     amplitude = None
 
-    if LSL is not None and USL is not None:
-        amplitude = USL - LSL
+    if LIE is not None and LSE is not None:
+        amplitude = LSE - LIE
         Cp = amplitude / (6 * std_within)
-        Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
+        Cpk = min((LSE - mean), (mean - LIE)) / (3 * std_within)
         Pp = amplitude / (6 * std_global)
-        Ppk = min((USL - mean), (mean - LSL)) / (3 * std_global)
-        sigma_real = min((USL - mean), (mean - LSL)) / std_global
+        Ppk = min((LSE - mean), (mean - LIE)) / (3 * std_global)
+        sigma_real = min((LSE - mean), (mean - LIE)) / std_global
     else:
-        if LSL is not None:
-            Cpk = (mean - LSL) / (3 * std_within)
-            Ppk = (mean - LSL) / (3 * std_global)
-            sigma_real = (mean - LSL) / std_global
-        elif USL is not None:
-            Cpk = (USL - mean) / (3 * std_within)
-            Ppk = (USL - mean) / (3 * std_global)
-            sigma_real = (USL - mean) / std_global
+        if LIE is not None:
+            Cpk = (mean - LIE) / (3 * std_within)
+            Ppk = (mean - LIE) / (3 * std_global)
+            sigma_real = (mean - LIE) / std_global
+        elif LSE is not None:
+            Cpk = (LSE - mean) / (3 * std_within)
+            Ppk = (LSE - mean) / (3 * std_global)
+            sigma_real = (LSE - mean) / std_global
 
     # Percentual de defeitos (global)
-    ppm_below_lsl = stats.norm.cdf(LSL, loc=mean, scale=std_global) * 1e6 if LSL is not None else 0
-    ppm_above_usl = (1 - stats.norm.cdf(USL, loc=mean, scale=std_global)) * 1e6 if USL is not None else 0
-    ppm_total = ppm_below_lsl + ppm_above_usl
-    percent_below = ppm_below_lsl / 10000
-    percent_above = ppm_above_usl / 10000
+    ppm_below_lie = stats.norm.cdf(LIE, loc=mean, scale=std_global) * 1e6 if LIE is not None else 0
+    ppm_above_lse = (1 - stats.norm.cdf(LSE, loc=mean, scale=std_global)) * 1e6 if LSE is not None else 0
+    ppm_total = ppm_below_lie + ppm_above_lse
+    percent_below = ppm_below_lie / 10000
+    percent_above = ppm_above_lse / 10000
     percent_total = ppm_total / 10000
 
     # Interpretação baseada nos resultados reais
@@ -409,7 +409,7 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
 """.strip()
 
     if amplitude is not None:
-        relatorio += f"\n\n**Limites de Especificação**\nLSL: {LSL}\nUSL: {USL}\nAmplitude (LSE - LIE): {amplitude}"
+        relatorio += f"\n\n**Limites de Especificação**\nLIE (Limite Inferior de Engenharia): {LIE}\nLSE (Limite Superior de Engenharia): {LSE}\nAmplitude (LSE - LIE): {amplitude}"
 
     if Cp is not None and Cpk is not None:
         relatorio += f"\n\n**Índices de Capabilidade (Potencial)**\nCp: {Cp:.2f}\nCpk: {Cpk:.2f}"
@@ -421,14 +421,11 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
     elif Ppk is not None:
         relatorio += f"\n\n**Índice de Desempenho (Performance Real)**\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f} sigma"
 
-
-    # Adicione este bloco separado logo após
     relatorio += f"""
-    \n\n**% de Defeitos (Global)**
-    Abaixo do LSE: {percent_below:.2f}%
-    Acima do LIE: {percent_above:.2f}%
-    Total: {percent_total:.2f}%
-    """
+\n\n**% de Defeitos (Global)**
+Abaixo do LIE: {percent_below:.2f}%
+Acima do LSE: {percent_above:.2f}%
+Total: {percent_total:.2f}%
 
 📝 **Interpretação dos Resultados**
 {chr(10).join(interpretacao)}
@@ -444,10 +441,10 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
     y = stats.norm.pdf(x, mean, std_global)
     ax.plot(x, y, 'b-', label='Distribuição Normal')
 
-    if LSL is not None:
-        ax.axvline(LSL, color='red', linestyle='--', label='LIE')
-    if USL is not None:
-        ax.axvline(USL, color='red', linestyle='--', label='LSE')
+    if LIE is not None:
+        ax.axvline(LIE, color='red', linestyle='--', label='LIE (Limite Inf. Eng.)')
+    if LSE is not None:
+        ax.axvline(LSE, color='red', linestyle='--', label='LSE (Limite Sup. Eng.)')
     ax.axvline(mean, color='green', linestyle='--', label='Média')
     ax.set_title(f'Capabilidade - {coluna_y}')
     ax.legend()
@@ -465,7 +462,6 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return relatorio, grafico_base64
-
 
 
 
