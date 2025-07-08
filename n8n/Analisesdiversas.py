@@ -1,134 +1,103 @@
 
 from suporte import *
 
-def analise_calculo_probabilidade(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) != 1:
-        return "❌ O cálculo de probabilidade requer 1 coluna Y (variável).", None
-
-    y_col = colunas_usadas[0]
-    dados = df[y_col].dropna()
-    if len(dados) < 5:
-        return "❌ É necessário pelo menos 5 dados para o cálculo de probabilidade.", None
-
+def analise_probabilidade_baixo_X(df, coluna_y, x_ref):
+    import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
     from scipy import stats
+    from fitter import Fitter
     from io import BytesIO
     import base64
 
-    # Interpreta fields
-    fields = field if field else []
-    valor_menor = float(fields[0]) if len(fields) > 0 and fields[0] not in [None, ""] else None
-    valor_maior = float(fields[1]) if len(fields) > 1 and fields[1] not in [None, ""] else None
-    valor_entre_inf = float(fields[2]) if len(fields) > 2 and fields[2] not in [None, ""] else None
-    valor_entre_sup = float(fields[3]) if len(fields) > 3 and fields[3] not in [None, ""] else None
+    aplicar_estilo_minitab()
 
-    # Validação
-    campos_preenchidos = sum([valor_menor is not None, valor_maior is not None, 
-                              (valor_entre_inf is not None and valor_entre_sup is not None)])
-    if campos_preenchidos != 1:
-        return "❌ Preencha apenas um tipo de cálculo: menor que, maior que ou entre dois valores.", None
+    # 🔷 Validação
+    if not coluna_y or coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    # Testa distribuições
-    distros = {
-        "Normal": lambda x: stats.anderson(x, 'norm'),
-        "Lognormal": lambda x: stats.anderson(np.log(x[x > 0]), 'norm') if np.all(x > 0) else None,
-        "Exponencial": lambda x: stats.anderson(x, 'expon'),
-        "Weibull": None,  # Scipy não tem Anderson para Weibull; pode implementar se quiser
-    }
+    try:
+        x_ref = float(x_ref)
+    except:
+        return "❌ O valor de referência X deve ser numérico.", None
 
-    resultados = {}
-    for nome, func in distros.items():
-        if func is None:
-            continue
-        try:
-            res = func(dados)
-            if res is None:
-                continue
-            stat = res.statistic
-            crit = res.critical_values
-            sig = list(res.significance_level)
-            p_aprox = max([s for s, c in zip(sig, crit) if stat < c], default=0)
-            resultados[nome] = p_aprox
-        except:
-            continue
+    dados = df[[coluna_y]].dropna()
+    y = dados[coluna_y].astype(float).values
 
-    if not resultados:
-        return "❌ Nenhuma distribuição pôde ser ajustada aos dados. Sugere-se coletar mais dados ou aplicar transformação (ex: Johnson).", None
+    if len(y) < 5:
+        return "❌ Dados insuficientes para análise.", None
 
-    # Decide distribuição
-    if "Normal" in resultados and resultados["Normal"] >= 5:
-        escolhida = "Normal"
+    # 🔷 3 testes de normalidade (Minitab padrão)
+    ad_p = stats.anderson(y).statistic
+    sw_p = stats.shapiro(y)[1]
+    ks_p = stats.kstest(y, 'norm', args=(np.mean(y), np.std(y, ddof=1)))[1]
+
+    normal_flag = (sw_p > 0.05) and (ks_p > 0.05) and (stats.anderson(y).statistic < 0.752)  # AD crítico approx para 5%
+
+    # 🔷 Se normal, usa normal
+    if normal_flag:
+        dist_name = "Normal"
+        mu = np.mean(y)
+        sigma = np.std(y, ddof=1)
+        prob = stats.norm.cdf(x_ref, mu, sigma)
+
+        x_plot = np.linspace(mu - 4*sigma, mu + 4*sigma, 1000)
+        y_plot = stats.norm.pdf(x_plot, mu, sigma)
+
     else:
-        escolhida = max(resultados, key=resultados.get)
+        # 🔷 Ajusta distribuições alternativas
+        f = Fitter(y, distributions=['lognorm','weibull_min','gamma','expon'])
+        f.fit()
+        best = f.get_best()
+        dist_name = list(best.keys())[0]
+        params = list(best.values())[0]
 
-    if resultados[escolhida] < 5:
-        return "⚠ Nenhuma distribuição passou no teste (p ≥ 5%). Recomenda-se coletar mais dados ou aplicar transformação (ex: Johnson).", None
+        # Calcula probabilidade
+        dist = getattr(stats, dist_name)
+        prob = dist.cdf(x_ref, *params)
 
-    # Ajuste parâmetros
-    if escolhida == "Normal":
-        mu, sigma = np.mean(dados), np.std(dados, ddof=1)
-        dist = stats.norm(loc=mu, scale=sigma)
-        parametros_txt = f"média={mu:.4f}, sigma={sigma:.4f}"
-    elif escolhida == "Lognormal":
-        log_dados = np.log(dados[dados > 0])
-        mu, sigma = np.mean(log_dados), np.std(log_dados, ddof=1)
-        dist = stats.lognorm(s=sigma, scale=np.exp(mu))
-        parametros_txt = f"mu={mu:.4f}, sigma={sigma:.4f}"
-    elif escolhida == "Exponencial":
-        loc, scale = stats.expon.fit(dados)
-        dist = stats.expon(loc=loc, scale=scale)
-        parametros_txt = f"loc={loc:.4f}, scale={scale:.4f}"
-    else:
-        return "⚠ Distribuição escolhida não suportada no cálculo automático.", None
+        # Gera curva para plot
+        x_plot = np.linspace(min(y), max(y), 1000)
+        y_plot = dist.pdf(x_plot, *params)
 
-    # Calcula probabilidade
-    if valor_menor is not None:
-        prob = dist.cdf(valor_menor)
-        texto_prob = f"P(X ≤ {valor_menor}) = {prob:.4%}"
-    elif valor_maior is not None:
-        prob = dist.sf(valor_maior)
-        texto_prob = f"P(X ≥ {valor_maior}) = {prob:.4%}"
-    else:
-        prob = dist.cdf(valor_entre_sup) - dist.cdf(valor_entre_inf)
-        texto_prob = f"P({valor_entre_inf} ≤ X ≤ {valor_entre_sup}) = {prob:.4%}"
-
-    # Gera gráfico
-    x = np.linspace(min(dados), max(dados), 500)
-    y = dist.pdf(x)
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(x, y, label=f'{escolhida} ajustada')
-    ax.fill_between(
-        x,
-        y,
-        0,
-        where=(
-            (valor_menor is not None and x <= valor_menor) |
-            (valor_maior is not None and x >= valor_maior) |
-            (valor_entre_inf is not None and (x >= valor_entre_inf) & (x <= valor_entre_sup))
-        ),
-        alpha=0.3,
-        color='blue',
-        label='Área da probabilidade'
-    )
-    ax.set_title(f"Cálculo de Probabilidade - {escolhida}")
+    # 🔷 Gráfico
+    fig, ax = plt.subplots(figsize=(12,6))
+    ax.plot(x_plot, y_plot, color='black')
+    ax.fill_between(x_plot, y_plot, 0, where=(x_plot <= x_ref), color='red', alpha=0.3)
+    ax.axvline(x_ref, color='red', linestyle='--', label=f'X = {x_ref}')
+    ax.set_title(f"Distribuição {dist_name} - Probabilidade de X ≤ {x_ref}", fontsize=18, fontweight='bold')
+    ax.set_ylabel("Densidade", fontsize=16, fontweight='bold')
+    ax.set_xlabel(coluna_y, fontsize=16, fontweight='bold')
     ax.legend()
-
     plt.tight_layout()
+
+    # 🔷 Converter imagem
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    img_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Texto final
-    texto = f"""
-**Cálculo de Probabilidade**
-- Distribuição escolhida: {escolhida} ({parametros_txt})
-- {texto_prob}
-"""
+    # 🔷 Report
+    texto = (
+        f"📊 **Análise – Probabilidade abaixo de {x_ref}**\n"
+        f"🔎 **Distribuição utilizada:** {dist_name}\n"
+        f"🔎 **Valor X de referência:** {x_ref}\n"
+        f"🔎 **Probabilidade acumulada (X ≤ {x_ref}):** {prob:.2%}\n"
+    )
 
-    return texto.strip(), grafico_base64
+    if normal_flag:
+        texto += "✅ Os dados foram considerados **normais** com base nos testes aplicados.\n"
+    else:
+        texto += "❌ Os dados **não foram normais**. A melhor distribuição foi ajustada automaticamente.\n"
+
+    texto += (
+        "🔎 **Conclusão:**\n"
+        "➡️ O cálculo indica a probabilidade acumulada até o valor X. "
+        "Use esta informação para avaliar riscos ou proporções esperadas no processo.\n"
+    )
+
+    return texto, img_base64
+
 
 
 def analise_cluster_mista(df: pd.DataFrame, colunas_usadas: list, field=None):
@@ -206,7 +175,7 @@ def analise_cluster_mista(df: pd.DataFrame, colunas_usadas: list, field=None):
 
 
 ANALISES = {
-    "Cálculo de Probabilidade": analise_calculo_probabilidade,
+    "Cálculo de probabilidade": analise_probabilidade_baixo_X,
     "Análise de Cluster (mista)": analise_cluster_mista
 
 }
