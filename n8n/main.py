@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile, Form, Request, Response 
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware   
+from fastapi.middleware.cors import CORSMiddleware    
 import traceback   
 import os
 from fastapi import Form
