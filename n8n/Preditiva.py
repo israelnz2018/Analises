@@ -1294,13 +1294,13 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     from datetime import datetime
     import locale
 
-    # Configura locale para BR (casas decimais com vírgula)
+    aplicar_estilo_minitab()
+
+    # Configura locale BR para casas decimais
     try:
         locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
     except:
         locale.setlocale(locale.LC_ALL, '')
-
-    aplicar_estilo_minitab()
 
     if not coluna_y or coluna_y not in df.columns:
         return "❌ O ARIMA requer 1 coluna Y (série temporal).", None
@@ -1345,16 +1345,21 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     except ImportError:
         return "❌ O pacote pmdarima não está disponível neste ambiente.", None
 
+    # Modelo ARIMA com configuração aprimorada para detectar tendência
     modelo = pm.auto_arima(
-    Y,
+        Y,
         seasonal=False,
-        stepwise=True,
+        stepwise=False,  # busca exaustiva para melhor ajuste
         suppress_warnings=True,
-        d=1,  # força 1 diferença para considerar tendência
-        max_p=2,
-        max_q=2,
+        d=None,
+        max_d=2,
         start_p=0,
-        start_q=0
+        max_p=5,
+        start_q=0,
+        max_q=5,
+        trend='t',  # força tendência linear
+        information_criterion='aic',
+        error_action='ignore'
     )
 
     aic = modelo.aic()
@@ -1363,9 +1368,8 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     horizonte = int(field) if field and str(field).isdigit() else 5
     previsao = modelo.predict(n_periods=horizonte)
 
-    # Formata previsão com casas decimais padrão Brasil
+    # Formatação BR (milhar . decimal ,)
     previsao_texto = ", ".join([f"{p:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') for p in previsao])
-
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -1375,7 +1379,6 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
         previsao_labels = [f"Prev{i+1}" for i in range(horizonte)]
         ax.plot(previsao_labels, previsao, label='Previsão', color='blue')
     else:
-        # Index numérico + previsão no final corretamente
         x_full = list(index) + [len(index)+i for i in range(1, horizonte+1)]
         y_full = list(Y) + list(previsao)
         ax.plot(index, Y, label='Série Original', color='black')
@@ -1395,8 +1398,8 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
 
     texto = (
         f"📊 **Análise – Série Temporal (ARIMA)**\n"
-        f"🔎 **AIC:** {aic:,.2f}".replace('.', ',') + " ✅ (quanto menor melhor – valores abaixo de 100 indicam ajuste excelente)\n"
-        f"🔎 **BIC:** {bic:,.2f}".replace('.', ',') + " ✅ (quanto menor melhor – valores abaixo de 100 indicam ajuste excelente)\n"
+        f"🔎 **AIC:** {aic:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') + " ✅ (quanto menor melhor – valores abaixo de 100 indicam ajuste excelente)\n"
+        f"🔎 **BIC:** {bic:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') + " ✅ (quanto menor melhor – valores abaixo de 100 indicam ajuste excelente)\n"
         f"🔎 **Previsão para os próximos {horizonte} períodos:** {previsao_texto} ✅\n"
         "\n🔎 **Conclusão:**\n"
         "✅ Modelo ajustado com sucesso. O processo está estável para previsão com o modelo atual.\n\n"
@@ -1406,6 +1409,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 # Dicionário de análises
