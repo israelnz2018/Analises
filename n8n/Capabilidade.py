@@ -49,22 +49,22 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
     fig = plt.figure(figsize=(8,6))
     ax = fig.add_subplot(111)
     pp = sm.ProbPlot(dados, dist=stats.norm)
-    (osm, osr), (slope, intercept, r) = pp.probplot(ax=ax)
+    (osm, osr), (slope, intercept, r) = pp.probplot()
 
     # Calcular resíduos para definir pontos fora da reta (outliers)
     residuos = osr - (slope * osm + intercept)
-    limite = 2 * np.std(residuos)  # Defina o limite de outlier (2 desvios padrão dos resíduos)
+    limite = 2 * np.std(residuos)  # Define o limite de outlier (2 desvios padrão dos resíduos)
 
-    # Replotar pontos com cor condicional
-    ax.cla()  # Limpa o gráfico atual
-    ax.plot(osm, osr, 'bo')  # Todos como azul inicialmente
+    # Plotar pontos com cor condicional
+    ax.plot(osm, osr, 'bo', label='Dados')  # Todos como azul inicialmente
     outliers = np.abs(residuos) > limite
-    ax.plot(osm[outliers], osr[outliers], 'ro')  # Outliers em vermelho
-    ax.plot(osm, slope*osm + intercept, 'brown')  # Linha de ajuste
+    ax.plot(osm[outliers], osr[outliers], 'ro', label='Outliers')  # Outliers em vermelho
+    ax.plot(osm, slope*osm + intercept, 'brown', label='Linha de ajuste')  # Linha de ajuste
 
     ax.set_title(f"Gráfico de Probabilidade – {coluna_y}", fontsize=14, fontweight='bold')
     ax.set_xlabel(f"{coluna_y}", fontsize=12, fontweight='bold')
     ax.set_ylabel("Percentual", fontsize=12, fontweight='bold')
+    ax.legend()
     plt.grid(True)
 
     plt.tight_layout()
@@ -102,6 +102,7 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
         )
 
     return texto.strip(), grafico_base64
+
 
 
 
