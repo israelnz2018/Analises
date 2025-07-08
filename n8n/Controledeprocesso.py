@@ -225,112 +225,237 @@ def analise_carta_imr(df, coluna_y):
 
 
 
-
 def analise_carta_xbarra_r(df, coluna_y, subgrupo):
-    if not coluna_y or coluna_y not in df.columns:
-        return "❌ A Carta X-Barra R requer uma coluna Y válida.", None
-
-    if not subgrupo or subgrupo not in df.columns:
-        return f"❌ A coluna de subgrupo '{subgrupo}' não foi encontrada.", None
-
-    dados = df[[coluna_y, subgrupo]].dropna()
-    if dados.shape[0] < 5:
-        return "❌ É necessário pelo menos 5 dados para gerar a Carta X-Barra R.", None
-
-    import numpy as np
     import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
     from io import BytesIO
     import base64
 
-    grupos = dados.groupby(subgrupo)[coluna_y]
-    medias = grupos.mean()
-    ranges = grupos.max() - grupos.min()
-    n_sub = grupos.size().mean()
+    aplicar_estilo_minitab()
 
-    if n_sub < 2:
-        return "❌ Cada subgrupo deve ter pelo menos 2 elementos.", None
+    nome_coluna_y = coluna_y if isinstance(coluna_y, str) else (coluna_y[0] if coluna_y else None)
+    if not nome_coluna_y or nome_coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    A2, D3, D4 = 0.577, 0, 2.114
+    if not pd.api.types.is_numeric_dtype(df[nome_coluna_y]):
+        return f"❌ A coluna '{nome_coluna_y}' contém dados não numéricos e não pode ser usada na análise.", None
 
-    media_X = medias.mean()
-    media_R = ranges.mean()
+    dados = df[[nome_coluna_y]].dropna().copy()
 
-    LSC_X = media_X + A2 * media_R
-    LIC_X = media_X - A2 * media_R
-    LSC_R = D4 * media_R
-    LIC_R = D3 * media_R
+    if dados.empty:
+        return "❌ Dados insuficientes para análise.", None
 
-    testes = []
+    # Agrupamento em subgrupos
+    dados["Subgrupo"] = (np.arange(len(dados)) // subgrupo) + 1
+    grupos = dados.groupby("Subgrupo")[nome_coluna_y]
 
-    fora_limite = medias[(medias > LSC_X) | (medias < LIC_X)]
-    if not fora_limite.empty:
-        testes.append(f"🔴 {fora_limite.shape[0]} média(s) de subgrupo fora dos limites de controle.")
+    xbar = grupos.mean()
+    r = grupos.max() - grupos.min()
+    n = subgrupo
 
-    lado = np.where(medias > media_X, 1, -1)
-    conta = 0
-    for i in range(len(lado)):
-        if i == 0 or lado[i] == lado[i-1]:
-            conta += 1
-            if conta >= 9:
-                testes.append("🟠 9 médias consecutivas no mesmo lado da linha central.")
-                break
-        else:
-            conta = 1
+    # Constantes para Xbarra-R
+    A2_table = {2:1.88, 3:1.023, 4:0.729, 5:0.577, 6:0.483, 7:0.419, 8:0.373, 9:0.337, 10:0.308}
+    D3_table = {2:0, 3:0, 4:0, 5:0, 6:0, 7:0.076, 8:0.136, 9:0.184, 10:0.223}
+    D4_table = {2:3.267, 3:2.574, 4:2.282, 5:2.114, 6:2.004, 7:1.924, 8:1.864, 9:1.816, 10:1.777}
 
-    conta_up = conta_down = 0
-    for i in range(1, len(medias)):
-        if medias.iloc[i] > medias.iloc[i-1]:
-            conta_up += 1
-            conta_down = 0
-        elif medias.iloc[i] < medias.iloc[i-1]:
-            conta_down += 1
-            conta_up = 0
-        else:
-            conta_up = conta_down = 0
-        if conta_up >= 6 or conta_down >= 6:
-            testes.append("🟡 6 médias consecutivas em tendência (subindo ou descendo).")
-            break
+    A2 = A2_table.get(n, 0.577)
+    D3 = D3_table.get(n, 0)
+    D4 = D4_table.get(n, 2.114)
 
-    texto = f"""
-**Carta X-Barra R**
-- Média das médias (X-Barra): {media_X:.4f}
-- Média das amplitudes (R): {media_R:.4f}
-- Limites X-Barra: LSC={LSC_X:.4f}, LIC={LIC_X:.4f}
-- Limites R: LSC={LSC_R:.4f}, LIC={LIC_R:.4f}
+    xbar_bar = xbar.mean()
+    r_bar = r.mean()
 
-**Resultados dos testes**
-"""
+    UCL_X = xbar_bar + A2 * r_bar
+    LCL_X = xbar_bar - A2 * r_bar
 
-    if testes:
-        texto += "\n".join(testes)
-        texto += "\n⚠ Recomenda-se investigar causas especiais e revisar estabilidade do processo."
-    else:
-        texto += "✅ Processo dentro dos padrões esperados (nenhum alarme nos testes aplicados).\n✅ O processo está estável no momento da análise."
+    UCL_R = D4 * r_bar
+    LCL_R = D3 * r_bar
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+    # Gráficos
+    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=False)
 
-    ax1.plot(medias.index, medias.values, marker='o')
-    ax1.axhline(media_X, color='black', linestyle='-', label='Média')
-    ax1.axhline(LSC_X, color='red', linestyle='--', label='LSC')
-    ax1.axhline(LIC_X, color='red', linestyle='--', label='LIC')
-    ax1.set_title("Carta X-Barra")
-    ax1.legend()
+    # Carta Xbarra
+    x = xbar.index.values
+    y = xbar.values
+    axs[0].plot(x, y, color="black", linestyle="-")
+    axs[0].axhline(xbar_bar, color="green", linestyle="-")
+    axs[0].axhline(UCL_X, color="red", linestyle="-")
+    axs[0].axhline(LCL_X, color="red", linestyle="-")
+    axs[0].set_title(f"Carta X̄ de {nome_coluna_y}", fontsize=18, fontweight='bold')
+    axs[0].set_ylabel("Média Subgrupo", fontsize=16, fontweight='bold')
+    axs[0].set_xlabel("Subgrupo", fontsize=16, fontweight='bold')
+    axs[0].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
-    ax2.plot(ranges.index, ranges.values, marker='o')
-    ax2.axhline(media_R, color='black', linestyle='-', label='Média R')
-    ax2.axhline(LSC_R, color='red', linestyle='--', label='LSC R')
-    if LIC_R > 0:
-        ax2.axhline(LIC_R, color='red', linestyle='--', label='LIC R')
-    ax2.set_title("Carta R")
-    ax2.legend()
+    xlim = axs[0].get_xlim()
+    axs[0].text(xlim[1]+1, xbar_bar, f"X̄̄ = {xbar_bar:.3f}", va='center', fontsize=12, color="green")
+    axs[0].text(xlim[1]+1, UCL_X, f"LSC = {UCL_X:.3f}", va='center', fontsize=12, color="red")
+    axs[0].text(xlim[1]+1, LCL_X, f"LIC = {LCL_X:.3f}", va='center', fontsize=12, color="red")
+
+    # Critérios 2 e 3
+    def check_crit2(y, ref_media):
+        count = 0
+        seq = []
+        for i, val in enumerate(y):
+            if val > ref_media:
+                if count >= 0:
+                    count += 1
+                    seq.append(i+1)
+                else:
+                    count = 1
+                    seq = [i+1]
+            elif val < ref_media:
+                if count <= 0:
+                    count -= 1
+                    seq.append(i+1)
+                else:
+                    count = -1
+                    seq = [i+1]
+            else:
+                count = 0
+                seq = []
+            if abs(count) >= 9:
+                return True, seq[-9:]
+        return False, []
+
+    def check_crit3(y):
+        count_up = 0
+        seq_up = []
+        count_down = 0
+        seq_down = []
+        for i in range(1, len(y)):
+            if y[i] > y[i-1]:
+                count_up += 1
+                seq_up.append(i+1)
+                count_down = 0
+                seq_down = []
+                if count_up >= 6:
+                    return True, seq_up[-6:]
+            elif y[i] < y[i-1]:
+                count_down += 1
+                seq_down.append(i+1)
+                count_up = 0
+                seq_up = []
+                if count_down >= 6:
+                    return True, seq_down[-6:]
+            else:
+                count_up = 0
+                seq_up = []
+                count_down = 0
+                seq_down = []
+        return False, []
+
+    crit2_X, linhas_crit2_X = check_crit2(y, xbar_bar)
+    crit3_X, linhas_crit3_X = check_crit3(y)
+
+    crit1_flag_X = []
+    for idx, (xi, yi) in enumerate(zip(x, y)):
+        cor = "black"
+        if yi > UCL_X or yi < LCL_X:
+            cor = "red"
+            crit1_flag_X.append((idx+1, yi))
+        elif crit2_X and (idx+1) in linhas_crit2_X:
+            cor = "red"
+        elif crit3_X and (idx+1) in linhas_crit3_X:
+            cor = "red"
+        axs[0].scatter(xi, yi, color=cor)
+
+    # Carta R
+    x_r = r.index.values
+    y_r = r.values
+    axs[1].plot(x_r, y_r, color="black", linestyle="-")
+    axs[1].axhline(r_bar, color="green", linestyle="-")
+    axs[1].axhline(UCL_R, color="red", linestyle="-")
+    axs[1].axhline(LCL_R, color="red", linestyle="-")
+    axs[1].set_title("Carta R", fontsize=18, fontweight='bold')
+    axs[1].set_ylabel("Amplitude", fontsize=16, fontweight='bold')
+    axs[1].set_xlabel("Subgrupo", fontsize=16, fontweight='bold')
+    axs[1].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+    xlim_r = axs[1].get_xlim()
+    axs[1].text(xlim_r[1]+1, r_bar, f"R̄ = {r_bar:.3f}", va='center', fontsize=12, color="green")
+    axs[1].text(xlim_r[1]+1, UCL_R, f"LSC = {UCL_R:.3f}", va='center', fontsize=12, color="red")
+    axs[1].text(xlim_r[1]+1, LCL_R, f"LIC = {LCL_R:.3f}", va='center', fontsize=12, color="red")
+
+    crit2_R, linhas_crit2_R = check_crit2(y_r, r_bar)
+    crit3_R, linhas_crit3_R = check_crit3(y_r)
+
+    crit1_flag_R = []
+    for idx, (xi, yi) in enumerate(zip(x_r, y_r)):
+        cor = "black"
+        if yi > UCL_R or yi < LCL_R:
+            cor = "red"
+            crit1_flag_R.append((idx+1, yi))
+        elif crit2_R and (idx+1) in linhas_crit2_R:
+            cor = "red"
+        elif crit3_R and (idx+1) in linhas_crit3_R:
+            cor = "red"
+        axs[1].scatter(xi, yi, color=cor)
 
     plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    return texto.strip(), grafico_base64
+    # Report – Xbarra
+    texto_X = f"📊 **Carta X̄ ({nome_coluna_y})**\n"
+    texto_X += "🔎 **Critérios avaliados:**\n"
+    if crit1_flag_X:
+        pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_X])
+        texto_X += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
+    else:
+        texto_X += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    if crit2_X:
+        linhas = ", ".join([str(l) for l in linhas_crit2_X])
+        texto_X += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto_X += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
+
+    if crit3_X:
+        linhas = ", ".join([str(l) for l in linhas_crit3_X])
+        texto_X += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto_X += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
+
+    if crit1_flag_X or crit2_X or crit3_X:
+        texto_X += "🔎 **Conclusão:** Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto_X += "🔎 **Recomendação:** Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    else:
+        texto_X += "🔎 **Conclusão:** Processo está estável.\n"
+
+    # Report – R
+    texto_R = f"📊 **Carta R**\n"
+    texto_R += "🔎 **Critérios avaliados:**\n"
+    if crit1_flag_R:
+        pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_R])
+        texto_R += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
+    else:
+        texto_R += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    if crit2_R:
+        linhas = ", ".join([str(l) for l in linhas_crit2_R])
+        texto_R += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto_R += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
+
+    if crit3_R:
+        linhas = ", ".join([str(l) for l in linhas_crit3_R])
+        texto_R += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto_R += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
+
+    if crit1_flag_R or crit2_R or crit3_R:
+        texto_R += "🔎 **Conclusão:** Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto_R += "🔎 **Recomendação:** Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    else:
+        texto_R += "🔎 **Conclusão:** Processo está estável.\n"
+
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    plt.close(fig)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+    return (texto_X + "\n" + texto_R), img_base64
+
 
 def analise_carta_xbarra_s(df, coluna_y, subgrupo):
     if not coluna_y or coluna_y not in df.columns:
