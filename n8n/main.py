@@ -123,6 +123,7 @@ CONFIG_ANALISES = {
     "Carta NP": ["df", "coluna_y", "subgrupo"],
     "Carta C": ["df", "coluna_y"],
     "Carta U": ["df", "coluna_y", "subgrupo"],
+    "Carta EWMA": ["df", "coluna_y"],
     "Teste de normalidade": ["df", "coluna_y"],
     "Análise de distribuição estatística": ["df", "coluna_y"],
     "Capabilidade - dados normais": ["df", "coluna_y", "subgrupo", "field_LIE", "field_LSE"],
