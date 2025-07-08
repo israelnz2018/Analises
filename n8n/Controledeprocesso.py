@@ -39,7 +39,6 @@ def analise_carta_imr(df, coluna_y):
     y = dados[nome_coluna_y].values
     x = dados["Subgrupo"].values
     axs[0].plot(x, y, color="black", linestyle="-")
-    axs[0].scatter(x, y, color="black")
     axs[0].axhline(media, color="green", linestyle="-")
     axs[0].axhline(UCL_I, color="red", linestyle="-")
     axs[0].axhline(LCL_I, color="red", linestyle="-")
@@ -47,7 +46,7 @@ def analise_carta_imr(df, coluna_y):
     axs[0].set_ylabel("Valor Individual", fontsize=16, fontweight='bold')
     axs[0].set_xlabel(nome_coluna_y, fontsize=16, fontweight='bold')
 
-    # Intervalos regulares automáticos no eixo X (Carta I)
+    # Intervalos automáticos no eixo X
     axs[0].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     xlim = axs[0].get_xlim()
@@ -55,43 +54,10 @@ def analise_carta_imr(df, coluna_y):
     axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=12, color="red")
     axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=12, color="red")
 
-    crit1_flag_I = []
-    for idx, (xi, yi) in enumerate(zip(x, y)):
-        if yi > UCL_I or yi < LCL_I:
-            axs[0].scatter(xi, yi, color="red")
-            crit1_flag_I.append((idx+1, yi))  # salva linha e valor
-
-    # Carta MR
-    x_mr = dados["Subgrupo"].values[1:]
-    y_mr = mr[1:].values
-    axs[1].plot(x_mr, y_mr, color="black", linestyle="-")
-    axs[1].scatter(x_mr, y_mr, color="black")
-    axs[1].axhline(mr_mean, color="green", linestyle="-")
-    axs[1].axhline(UCL_MR, color="red", linestyle="-")
-    axs[1].set_title("Carta MR", fontsize=18, fontweight='bold')
-    axs[1].set_ylabel("Amplitude Móvel", fontsize=16, fontweight='bold')
-    axs[1].set_xlabel(nome_coluna_y, fontsize=16, fontweight='bold')
-
-    # Intervalos regulares automáticos no eixo X (Carta MR)
-    axs[1].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
-
-    xlim_mr = axs[1].get_xlim()
-    axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=12, color="green")
-    axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=12, color="red")
-    axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=12, color="red")
-
-    crit1_flag_MR = []
-    for idx, (xi, yi) in enumerate(zip(x_mr, y_mr)):
-        if yi > UCL_MR:
-            axs[1].scatter(xi, yi, color="red")
-            crit1_flag_MR.append((xi, yi))  # salva linha e valor
-
-    plt.tight_layout()
-
     # Critérios 2 e 3 (sequências)
     def check_crit2(y, ref_media):
         count = 1
-        lados = []
+        lados = [1] if (y[0] > ref_media or y[0] < ref_media) else []
         for i in range(1, len(y)):
             if (y[i] > ref_media and y[i-1] > ref_media) or (y[i] < ref_media and y[i-1] < ref_media):
                 count += 1
@@ -132,8 +98,55 @@ def analise_carta_imr(df, coluna_y):
 
     crit2_I, linhas_crit2_I = check_crit2(y, media)
     crit3_I, linhas_crit3_I = check_crit3(y)
-    crit2_MR, linhas_crit2_MR = check_crit2(y_mr, mr_mean)  # corrigido para usar mr_mean
+
+    # Critério 1 – Carta I
+    crit1_flag_I = []
+    for idx, (xi, yi) in enumerate(zip(x, y)):
+        cor = "black"
+        if yi > UCL_I or yi < LCL_I:
+            cor = "red"
+            crit1_flag_I.append((idx+1, yi))
+        elif crit2_I and (idx+1) in linhas_crit2_I:
+            cor = "red"
+        elif crit3_I and (idx+1) in linhas_crit3_I:
+            cor = "red"
+        axs[0].scatter(xi, yi, color=cor)
+
+    # Carta MR
+    x_mr = dados["Subgrupo"].values[1:]
+    y_mr = mr[1:].values
+    axs[1].plot(x_mr, y_mr, color="black", linestyle="-")
+    axs[1].axhline(mr_mean, color="green", linestyle="-")
+    axs[1].axhline(UCL_MR, color="red", linestyle="-")
+    axs[1].set_title("Carta MR", fontsize=18, fontweight='bold')
+    axs[1].set_ylabel("Amplitude Móvel", fontsize=16, fontweight='bold')
+    axs[1].set_xlabel(nome_coluna_y, fontsize=16, fontweight='bold')
+
+    # Intervalos automáticos no eixo X
+    axs[1].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+    xlim_mr = axs[1].get_xlim()
+    axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=12, color="green")
+    axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=12, color="red")
+    axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=12, color="red")
+
+    crit2_MR, linhas_crit2_MR = check_crit2(y_mr, mr_mean)
     crit3_MR, linhas_crit3_MR = check_crit3(y_mr)
+
+    # Critério 1 – Carta MR
+    crit1_flag_MR = []
+    for idx, (xi, yi) in enumerate(zip(x_mr, y_mr)):
+        cor = "black"
+        if yi > UCL_MR:
+            cor = "red"
+            crit1_flag_MR.append((xi, yi))
+        elif crit2_MR and (idx+2) in linhas_crit2_MR:
+            cor = "red"
+        elif crit3_MR and (idx+2) in linhas_crit3_MR:
+            cor = "red"
+        axs[1].scatter(xi, yi, color=cor)
+
+    plt.tight_layout()
 
     # 🔷 REPORT – Individual
     texto_I = f"📊 **Carta I ({nome_coluna_y})**\n"
@@ -198,6 +211,7 @@ def analise_carta_imr(df, coluna_y):
 
     # Retorna os dois relatórios juntos + imagem
     return (texto_I + "\n" + texto_MR), img_base64
+
 
 
 
