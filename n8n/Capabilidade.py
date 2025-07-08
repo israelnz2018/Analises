@@ -257,7 +257,6 @@ A melhor distribuição é: **{nome_melhor}**
     return texto, grafico_base64
 
 
-
 def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
@@ -421,16 +420,16 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
     elif Ppk is not None:
         relatorio += f"\n\n**Índice de Desempenho (Performance Real)**\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f} sigma"
 
-
-# Adicione este bloco separado logo após
-relatorio += f"""
+    # % de Defeitos em bloco separado
+    relatorio += f"""
 \n\n**% de Defeitos (Global)**
 Abaixo do LIE: {percent_below:.2f}%
 Acima do LSE: {percent_above:.2f}%
 Total: {percent_total:.2f}%
 """
 
-📝 **Interpretação dos Resultados**
+    relatorio += f"""
+\n📝 **Interpretação dos Resultados**
 {chr(10).join(interpretacao)}
 
 ✔️ **Recomendações**
@@ -465,10 +464,6 @@ Total: {percent_total:.2f}%
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return relatorio, grafico_base64
-
-
-
-
 
 
 
