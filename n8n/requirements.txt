@@ -13,4 +13,6 @@ jinja2
 fitter
 requests
 firebase-admin
+pmdarima
+
 
