@@ -30,20 +30,20 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
     ks_conc = "Aprovada" if ks_p > 0.05 else "Reprovada"
     normal = any([ad_conc == "Aprovada", sw_conc == "Aprovada", ks_conc == "Aprovada"])
 
-    # Gráfico QQ-Plot com eixo Y em escala de probabilidade (percentil)
+    # Gráfico QQ-Plot estilo Minitab com percentis no eixo Y
     fig, ax = plt.subplots(figsize=(8,6))
-    res = stats.probplot(dados, dist="norm", plot=ax)
+    stats.probplot(dados, dist="norm", plot=ax)
     ax.get_lines()[1].set_color('brown')
     ax.set_title(f"Gráfico de Probabilidade – {coluna_y}", fontsize=14, fontweight='bold')
-    ax.set_xlabel(f"{coluna_y}", fontsize=12)
-    ax.set_ylabel("Percentual", fontsize=12)
+    ax.set_xlabel(f"{coluna_y}", fontsize=12, fontweight='bold')
+    ax.set_ylabel("Percentual", fontsize=12, fontweight='bold')
     ax.grid(True)
 
-    # Configura eixo Y como escala probabilística (percentis) igual Minitab
+    # Ajusta eixo Y para mostrar percentis ao invés de z-score
     percentis = [1, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99]
     y_values = stats.norm.ppf([p/100 for p in percentis])
     ax.set_yticks(y_values)
-    ax.set_yticklabels([str(p) for p in percentis])
+    ax.set_yticklabels([f"{p}%" for p in percentis])
     ax.yaxis.set_major_formatter(mticker.ScalarFormatter())
 
     plt.tight_layout()
@@ -54,26 +54,26 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
 
     def fbr(v): return f"{v:.4f}".replace('.', ',')
 
-    # Relatório final – limpo sem “####” nem markdown
+    # Relatório final – títulos em negrito
     texto = (
-        f"📊 Análise de Normalidade – {coluna_y}\n\n"
-        f"🔎 Resumo estatístico dos dados\n"
-        f"- Média: {fbr(media)}\n"
-        f"- Desvio Padrão: {fbr(desvio)}\n"
-        f"- N (amostras): {N}\n\n"
-        f"ℹ️ Critério de normalidade\n"
+        f"📊 **Análise de Normalidade – {coluna_y}**\n\n"
+        f"🔎 **Resumo estatístico dos dados**\n"
+        f"- **Média:** {fbr(media)}\n"
+        f"- **Desvio Padrão:** {fbr(desvio)}\n"
+        f"- **N (amostras):** {N}\n\n"
+        f"ℹ️ **Critério de normalidade**\n"
         f"Se pelo menos um dos testes abaixo indicar normalidade (p-valor > 0,05), considera-se que os dados seguem distribuição normal e podem ser analisados com métodos paramétricos.\n\n"
-        f"✅ Resultados dos Testes de Normalidade\n\n"
+        f"✅ **Resultados dos Testes de Normalidade**\n\n"
         f"Anderson-Darling: estat={fbr(ad_stat)} | Conclusão: {'Normalidade aprovada' if ad_conc == 'Aprovada' else 'Normalidade reprovada'}\n"
         f"Shapiro-Wilk: estat={fbr(sw_stat)} | p-valor={fbr(sw_p)} | Conclusão: {'Normalidade aprovada' if sw_conc == 'Aprovada' else 'Normalidade reprovada'}\n"
         f"Kolmogorov-Smirnov: estat={fbr(ks_stat)} | p-valor={fbr(ks_p)} | Conclusão: {'Normalidade aprovada' if ks_conc == 'Aprovada' else 'Normalidade reprovada'}\n\n"
-        f"📝 Conclusão\n"
-        f"{'✅ Os dados seguem distribuição normal. Pode-se prosseguir com métodos paramétricos sem restrições.' if normal else '❌ Os dados não seguem distribuição normal.'}\n\n"
+        f"📝 **Conclusão**\n"
+        f"{'✅ **Os dados seguem distribuição normal. Pode-se prosseguir com métodos paramétricos sem restrições.**' if normal else '❌ **Os dados não seguem distribuição normal.**'}\n\n"
     )
 
     if not normal:
         texto += (
-            "⚠️ Recomendações\n"
+            "**⚠️ Recomendações**\n"
             "1. Verificar estabilidade do processo\n"
             "2. Coletar mais dados\n"
             "3. Buscar outra distribuição que melhor se ajuste\n"
@@ -81,6 +81,7 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
         )
 
     return texto.strip(), grafico_base64
+
 
 
 
