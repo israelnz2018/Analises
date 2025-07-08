@@ -290,6 +290,7 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
     from io import BytesIO
     import base64
 
+    # Testes de normalidade
     ad_res = stats.anderson(dados)
     sw_stat, sw_p = stats.shapiro(dados)
     ks_stat, ks_p = stats.kstest((dados - np.mean(dados)) / np.std(dados, ddof=1), 'norm')
@@ -303,52 +304,110 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
 
     if not dados_normais:
         texto = f"""
-⚠ Os dados **não são normais** com base nos testes Anderson-Darling, Shapiro-Wilk e Kolmogorov-Smirnov.
-Recomenda-se realizar a análise de capabilidade para dados **não normais**.
+❌ **Os dados não seguem distribuição normal.**
+
+✔️ Recomendações:
+- Verificar a estabilidade do processo.
+- Adicionar mais dados para análise.
+- Realizar análise de capabilidade para dados não normais (ex: transformação de Johnson ou capabilidade não paramétrica).
 """
         return texto.strip(), None
 
+    # Estatísticas gerais
     mean = np.mean(dados)
     std_overall = np.std(dados, ddof=1)
 
     if subgrupo and subgrupo in df.columns:
+        # Com subgrupo
         grupos = df[[coluna_y, subgrupo]].dropna().groupby(subgrupo)[coluna_y]
         std_within = np.sqrt(np.mean(grupos.var(ddof=1)))
+
+        Cp = (USL - LSL) / (6 * std_within)
+        Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
+        Pp = (USL - LSL) / (6 * std_overall)
+        Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
+
+        relatorio = f"""
+📊 **Análise de Capabilidade de Processo (Com Subgrupos)**
+
+**Estatísticas do Processo**
+N: {len(dados)}
+Número de Subgrupos: {grupos.ngroups}
+Tamanho Médio do Subgrupo: {grupos.size().mean():.0f}
+Média Geral: {mean:.3f}
+Desvio Padrão Dentro do Subgrupo: {std_within:.3f}
+Desvio Padrão Global: {std_overall:.3f}
+
+**Limites de Especificação**
+LSL: {LSL}
+USL: {USL}
+Amplitude (USL - LSL): {USL - LSL}
+
+**Índices de Capacidade (Potencial do Processo)**
+Cp: {Cp:.2f}
+Cpk: {Cpk:.2f}
+
+**Índices de Desempenho (Performance Real)**
+Pp: {Pp:.2f}
+Ppk: {Ppk:.2f}
+
+📝 **Interpretação dos Resultados**
+- Cp > Pp ➔ processo tem bom potencial, mas há variações ao longo do tempo (instabilidade).
+- Cp ≈ Pp ➔ processo está estável.
+- Cpk < Cp ➔ processo está deslocado do centro.
+
+✔️ **Recomendações:**
+- Cp, Cpk, Pp, Ppk > 1.33 ➔ processo aceitável.
+- Cp, Cpk, Pp, Ppk < 1 ➔ processo não capaz. Verificar causas especiais ou revisar especificações.
+""".strip()
+
     else:
-        std_within = np.std(dados, ddof=1)
+        # Sem subgrupo
+        Pp = (USL - LSL) / (6 * std_overall)
+        Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
 
-    Cp = (USL - LSL) / (6 * std_within)
-    Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
-    Pp = (USL - LSL) / (6 * std_overall)
-    Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
+        relatorio = f"""
+📊 **Análise de Capabilidade de Processo (Dados Individuais)**
 
-    nivel_sigma_within = min((USL - mean), (mean - LSL)) / std_within
-    nivel_sigma_overall = min((USL - mean), (mean - LSL)) / std_overall
+**Estatísticas do Processo**
+N: {len(dados)}
+Média: {mean:.3f}
+Desvio Padrão (Global): {std_overall:.3f}
 
-    ppm_within_total = 1e6 * (stats.norm.cdf(LSL, loc=mean, scale=std_within) +
-                              (1 - stats.norm.cdf(USL, loc=mean, scale=std_within)))
-    ppm_overall_total = 1e6 * (stats.norm.cdf(LSL, loc=mean, scale=std_overall) +
-                               (1 - stats.norm.cdf(USL, loc=mean, scale=std_overall)))
+**Limites de Especificação**
+LSL: {LSL}
+USL: {USL}
+Amplitude (USL - LSL): {USL - LSL}
 
-    percent_defeito_within = ppm_within_total / 10000
-    percent_defeito_overall = ppm_overall_total / 10000
+**Índices de Desempenho (Performance Real)**
+Pp: {Pp:.2f}
+Ppk: {Ppk:.2f}
 
+📝 **Interpretação dos Resultados**
+- Cp/Cpk não são calculados sem subgrupo, pois usam σ estimado dentro do subgrupo.
+- Pp/Ppk indicam a performance real considerando toda a variabilidade.
+
+✔️ **Recomendações:**
+- Pp, Ppk > 1.33 ➔ processo aceitável.
+- Pp, Ppk < 1 ➔ processo não capaz.
+""".strip()
+
+    # Gráfico
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
     x = np.linspace(min(dados), max(dados), 100)
-    y_within = stats.norm.pdf(x, mean, std_within)
-    y_overall = stats.norm.pdf(x, mean, std_overall)
-    ax.plot(x, y_within, 'r-', label='Curto prazo')
-    ax.plot(x, y_overall, 'k--', label='Longo prazo')
+    y = stats.norm.pdf(x, mean, std_overall)
+    ax.plot(x, y, 'b-', label='Distribuição Normal')
+
     if LSL != float('-inf'):
-        ax.axvline(LSL, color='red', linestyle='--', label='LIE')
+        ax.axvline(LSL, color='red', linestyle='--', label='LSL')
     if USL != float('inf'):
-        ax.axvline(USL, color='red', linestyle='--', label='LSE')
+        ax.axvline(USL, color='red', linestyle='--', label='USL')
     ax.axvline(mean, color='green', linestyle='--', label='Média')
     ax.set_title('Capabilidade - Dados Normais')
     ax.legend()
 
-    # Estilo Minitab manual (sem usar suporte)
+    # Estilo Minitab manual
     ax.set_facecolor('white')
     ax.grid(True, linestyle=':', color='gray')
     for spine in ax.spines.values():
@@ -361,38 +420,8 @@ Recomenda-se realizar a análise de capabilidade para dados **não normais**.
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    conclusoes = []
-    if Ppk < 1.33:
-        conclusoes.append("❌ O índice **Ppk < 1.33**, indicando que o processo **não atende aos requisitos de qualidade**.")
-        conclusoes.append("🔧 Ações recomendadas: **reduzir a variabilidade** e/ou **ajustar a média do processo**.")
-    else:
-        conclusoes.append("✅ O índice **Ppk ≥ 1.33**, indicando que o processo atende aos requisitos de qualidade.")
+    return relatorio, grafico_base64
 
-    if abs(Ppk - Cpk) > 0.1:
-        conclusoes.append("⚠ Diferença significativa entre Ppk e Cpk sugere **instabilidade no processo** ou **causas especiais de variação**.")
-
-    texto = f"""
-✅ Os dados foram considerados **normais** com base em pelo menos um teste de normalidade.
-
-**Índices de Capabilidade**
-- Cp = {Cp:.2f}
-- Cpk = {Cpk:.2f}
-- Pp = {Pp:.2f}
-- Ppk = {Ppk:.2f}
-
-**Nível Sigma**
-- Curto prazo: {nivel_sigma_within:.2f}
-- Longo prazo: {nivel_sigma_overall:.2f}
-
-**% de defeito**
-- Curto prazo: {percent_defeito_within:.2f}%
-- Longo prazo: {percent_defeito_overall:.2f}%
-
-**Conclusão**
-{chr(10).join(conclusoes)}
-""".strip()
-
-    return texto, grafico_base64
 
 
 
