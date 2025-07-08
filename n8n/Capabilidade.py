@@ -304,7 +304,7 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
 ✔️ Recomendações:
 - Verificar a estabilidade do processo.
 - Adicionar mais dados para análise.
-- Realizar análise de capabilidade para dados não normais (ex: transformação de Johnson ou capabilidade não paramétrica).
+- Realizar análise de capabilidade para dados não normais (ex: transformação de Johnson ou encontrar melhor distribuição).
 """
         return texto.strip(), None
 
@@ -364,19 +364,19 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
 
     if Cpk is not None:
         if Cpk < 1.00:
-            interpretacao.append(f"❌ **Cpk = {Cpk:.2f} < 1.00:** O processo **não é capaz**.")
+            interpretacao.append(f"❌ **Cpk = {Cpk:.2f} < 1.00:** O processo potencial **não é capaz**.")
         elif Cpk < 1.33:
-            interpretacao.append(f"⚠️ **Cpk = {Cpk:.2f} < 1.33:** O processo **não atende ao valor recomendado (≥ 1.33)**.")
+            interpretacao.append(f"⚠️ **Cpk = {Cpk:.2f} < 1.33:** O processo potencial **não atende ao valor recomendado (≥ 1.33)**.")
         else:
-            interpretacao.append(f"✅ **Cpk = {Cpk:.2f} ≥ 1.33:** O processo é capaz e aceitável.")
+            interpretacao.append(f"✅ **Cpk = {Cpk:.2f} ≥ 1.33:** O processo potencial é capaz e aceitável.")
 
     if Ppk is not None:
         if Ppk < 1.00:
-            interpretacao.append(f"❌ **Ppk = {Ppk:.2f} < 1.00:** Performance real não é capaz.")
+            interpretacao.append(f"❌ **Ppk = {Ppk:.2f} < 1.00:** O processo real não é capaz.")
         elif Ppk < 1.33:
-            interpretacao.append(f"⚠️ **Ppk = {Ppk:.2f} < 1.33:** Performance real abaixo do recomendado.")
+            interpretacao.append(f"⚠️ **Ppk = {Ppk:.2f} < 1.33:** O processo real abaixo do recomendado.")
         else:
-            interpretacao.append(f"✅ **Ppk = {Ppk:.2f} ≥ 1.33:** Performance real aceitável.")
+            interpretacao.append(f"✅ **Ppk = {Ppk:.2f} ≥ 1.33:** O processo real aceitável.")
 
     if Cpk is not None and Ppk is not None and abs(Cpk - Ppk) > 0.1:
         interpretacao.append("⚠️ **Cpk e Ppk diferem significativamente**, sugerindo variação ao longo do tempo ou instabilidade do processo.")
@@ -388,7 +388,7 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         if min_indice > 1.33:
             recomendacoes.append("✅ Todos os índices estão acima de 1.33, indicando que o processo é capaz e aceitável.")
         elif min_indice < 1.00:
-            recomendacoes.append("❌ Um ou mais índices estão abaixo de 1.00, indicando que o processo **não é capaz**. Recomenda-se investigar causas especiais de variação ou revisar especificações.")
+            recomendacoes.append("❌ Um ou mais índices estão abaixo de 1.00, indicando que o processo **não é capaz**. Recomenda-se investigar causas especiais de variação, revisar especificações ou fazer um projeto de melhoria para reduzir a variabilidade do processo.")
         else:
             recomendacoes.append("⚠️ Alguns índices estão entre 1.00 e 1.33. O processo atende minimamente, mas é recomendável melhorá-lo para maior segurança.")
 
