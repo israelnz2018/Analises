@@ -59,9 +59,12 @@ def analise_probabilidade_baixo_X(df, coluna_y, field=None):
         dist = getattr(stats, dist_name)
 
         # 🔷 Validação de tipos numéricos e estrutura de params
-        params = [float(p) for p in params]
+        try:
+            params = [float(p) for p in params]
+        except:
+            return "❌ Não foi possível ajustar a distribuição alternativa devido a parâmetros inválidos. Verifique seus dados.", None
 
-        # 🔷 Separando shape, loc, scale
+        # 🔷 Separando shape, loc, scale conforme distribuição
         if dist_name == 'lognorm':
             shape, loc, scale = params
             prob = dist.cdf(x_ref, shape, loc=loc, scale=scale)
