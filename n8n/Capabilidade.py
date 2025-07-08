@@ -671,7 +671,7 @@ def analise_capabilidade_discretizado(df, coluna_y, field_LIE=None, field_LSE=No
 
 
 ANALISES = {
-    "Teste de normalidade": analise_teste_normalidade,
+    "Teste de normalidade": teste_normalidade,
     "Análise de estabilidade": analise_estabilidade,
     "Análise de distribuição estatística": analise_distribuicao_estatistica,
     "Capabilidade - dados normais": analise_capabilidade_normal,
