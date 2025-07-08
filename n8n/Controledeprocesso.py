@@ -45,8 +45,6 @@ def analise_carta_imr(df, coluna_y):
     axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18, fontweight='bold')
     axs[0].set_ylabel("Valor Individual", fontsize=16, fontweight='bold')
     axs[0].set_xlabel(nome_coluna_y, fontsize=16, fontweight='bold')
-
-    # Intervalos automáticos no eixo X
     axs[0].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     xlim = axs[0].get_xlim()
@@ -54,48 +52,60 @@ def analise_carta_imr(df, coluna_y):
     axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=12, color="red")
     axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=12, color="red")
 
-    # Critérios 2 e 3 (sequências)
+    # Critérios 2 e 3 (funções revisadas)
     def check_crit2(y, ref_media):
-        count = 1
-        lados = [1] if (y[0] > ref_media or y[0] < ref_media) else []
-        for i in range(1, len(y)):
-            if (y[i] > ref_media and y[i-1] > ref_media) or (y[i] < ref_media and y[i-1] < ref_media):
-                count += 1
-                lados.append(i+1)
-                if count >= 9:
-                    return True, lados[-9:]
+        count = 0
+        seq = []
+        for i, val in enumerate(y):
+            if val > ref_media:
+                if count < 0:
+                    count = 1
+                    seq = [i+1]
+                else:
+                    count += 1
+                    seq.append(i+1)
+            elif val < ref_media:
+                if count > 0:
+                    count = -1
+                    seq = [i+1]
+                else:
+                    count -= 1
+                    seq.append(i+1)
             else:
-                count = 1
-                lados = [i+1] if (y[i] > ref_media or y[i] < ref_media) else []
+                count = 0
+                seq = []
+            if abs(count) >= 9:
+                return True, seq[-9:]
         return False, []
 
     def check_crit3(y):
-        count_up = 1
-        seq_up = [1]
-        count_down = 1
-        seq_down = [1]
+        count_up = 0
+        seq_up = []
+        count_down = 0
+        seq_down = []
         for i in range(1, len(y)):
             if y[i] > y[i-1]:
                 count_up += 1
                 seq_up.append(i+1)
-                count_down = 1
-                seq_down = [i+1]
+                count_down = 0
+                seq_down = []
                 if count_up >= 6:
                     return True, seq_up[-6:]
             elif y[i] < y[i-1]:
                 count_down += 1
                 seq_down.append(i+1)
-                count_up = 1
-                seq_up = [i+1]
+                count_up = 0
+                seq_up = []
                 if count_down >= 6:
                     return True, seq_down[-6:]
             else:
-                count_up = 1
-                seq_up = [i+1]
-                count_down = 1
-                seq_down = [i+1]
+                count_up = 0
+                seq_up = []
+                count_down = 0
+                seq_down = []
         return False, []
 
+    # Critérios Carta I
     crit2_I, linhas_crit2_I = check_crit2(y, media)
     crit3_I, linhas_crit3_I = check_crit3(y)
 
@@ -118,11 +128,10 @@ def analise_carta_imr(df, coluna_y):
     axs[1].plot(x_mr, y_mr, color="black", linestyle="-")
     axs[1].axhline(mr_mean, color="green", linestyle="-")
     axs[1].axhline(UCL_MR, color="red", linestyle="-")
+    axs[1].axhline(0, color="red", linestyle="-")  # LIC=0 linha vermelha
     axs[1].set_title("Carta MR", fontsize=18, fontweight='bold')
     axs[1].set_ylabel("Amplitude Móvel", fontsize=16, fontweight='bold')
     axs[1].set_xlabel(nome_coluna_y, fontsize=16, fontweight='bold')
-
-    # Intervalos automáticos no eixo X
     axs[1].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     xlim_mr = axs[1].get_xlim()
@@ -130,6 +139,7 @@ def analise_carta_imr(df, coluna_y):
     axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=12, color="red")
     axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=12, color="red")
 
+    # Critérios Carta MR
     crit2_MR, linhas_crit2_MR = check_crit2(y_mr, mr_mean)
     crit3_MR, linhas_crit3_MR = check_crit3(y_mr)
 
@@ -209,8 +219,8 @@ def analise_carta_imr(df, coluna_y):
     buffer.seek(0)
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
-    # Retorna os dois relatórios juntos + imagem
     return (texto_I + "\n" + texto_MR), img_base64
+
 
 
 
