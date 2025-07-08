@@ -1291,6 +1291,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
+    from datetime import datetime
 
     aplicar_estilo_minitab()
 
@@ -1300,22 +1301,30 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
 
-        # Converter datas com coerção para NaT em inválidas
-        df_valid[Data] = pd.to_datetime(df_valid[Data], errors='coerce', dayfirst=False, infer_datetime_format=True)
+        # Trata datas como meses abreviados (Jan, Fev, etc.)
+        meses_pt = {'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6,
+                    'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12}
+        meses_en = {'jan':1, 'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6,
+                    'jul':7, 'aug':8, 'sep':9, 'oct':10, 'nov':11, 'dec':12}
 
-        # Verifica se ainda há datas inválidas
+        def converter_mes(mes_str):
+            mes_lower = str(mes_str).strip().lower()[:3]
+            mes_num = meses_pt.get(mes_lower) or meses_en.get(mes_lower)
+            if mes_num:
+                # Usa ano atual para criar data completa
+                return datetime(datetime.now().year, mes_num, 1)
+            else:
+                return pd.to_datetime(mes_str, errors='coerce', dayfirst=False, infer_datetime_format=True)
+
+        df_valid[Data] = df_valid[Data].apply(converter_mes)
+
+        # Verifica datas inválidas
         if df_valid[Data].isnull().any():
-            return "❌ Existem datas inválidas ou fora do intervalo suportado. Corrija antes de prosseguir.", None
-
-        # Verifica limites válidos do pandas (anos suportados ~1677-2262)
-        min_valid_date = pd.Timestamp.min
-        max_valid_date = pd.Timestamp.max
-
-        if (df_valid[Data] < min_valid_date).any() or (df_valid[Data] > max_valid_date).any():
-            return "❌ Existem datas fora do limite suportado pelo sistema (anos muito antigos ou futuros). Corrija antes de prosseguir.", None
+            return "❌ Existem datas inválidas ou em formato não reconhecido. Use abreviações corretas como Jan, Fev, etc.", None
 
         df_valid = df_valid.sort_values(by=Data)
         index = df_valid[Data].values
+
     else:
         df_valid = df[[coluna_y]].dropna()
         df_valid = df_valid.reset_index()
@@ -1346,7 +1355,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
         ult_data = df_valid[Data].iloc[-1]
         freq = pd.infer_freq(df_valid[Data])
         if freq is None:
-            freq = 'D'  # assume diário se não identificar
+            freq = 'M'  # assume mensal se não identificar
 
         datas_futuras = pd.date_range(start=ult_data, periods=horizonte + 1, closed='right', freq=freq)
         ax.plot(df_valid[Data], Y, label='Série Original', color='black')
@@ -1384,6 +1393,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
