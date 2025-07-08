@@ -258,7 +258,6 @@ A melhor distribuição é: **{nome_melhor}**
 
 
 
-
 def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
@@ -314,23 +313,25 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
 
     # Estatísticas gerais
     mean = np.mean(dados)
-    std_overall = np.std(dados, ddof=1)
+    std_global = np.std(dados, ddof=1)
 
     if subgrupo and subgrupo in df.columns:
-        # Com subgrupo
+        # Com subgrupo ➔ σ_within = sqrt(media das variâncias dos subgrupos)
         grupos = df[[coluna_y, subgrupo]].dropna().groupby(subgrupo)[coluna_y]
-        std_within = np.sqrt(np.mean(grupos.var(ddof=1)))
+        variancias = grupos.var(ddof=1)
+        mean_variancia = variancias.mean()
+        std_within = np.sqrt(mean_variancia)
     else:
-        # Sem subgrupo ➔ Cp/Cpk usam σ estimado como σ_global
-        std_within = std_overall
+        # Sem subgrupo ➔ σ_within = σ_global
+        std_within = std_global
 
     # Cálculos
     Cp = (USL - LSL) / (6 * std_within)
     Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
-    Pp = (USL - LSL) / (6 * std_overall)
-    Ppk = min((USL - mean), (mean - LSL)) / (3 * std_overall)
+    Pp = (USL - LSL) / (6 * std_global)
+    Ppk = min((USL - mean), (mean - LSL)) / (3 * std_global)
 
-    # Interpretação baseada nos resultados
+    # Interpretação baseada nos resultados reais
     interpretacao = []
     recomendacoes = []
 
@@ -339,12 +340,11 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
     elif abs(Cp - Pp) <= 0.05:
         interpretacao.append("✔️ **Cp ≈ Pp:** O processo está estável.")
     else:
-        interpretacao.append("⚠️ **Cp < Pp:** Pode haver erro de subgrupamento ou outliers influenciando os cálculos.")
+        interpretacao.append("⚠️ **Cp < Pp:** Pode haver erro de subgrupamento ou presença de outliers.")
 
     if Cpk < Cp:
         interpretacao.append("⚠️ **Cpk < Cp:** O processo está deslocado do centro em direção a um dos limites.")
 
-    # Recomendações baseadas nos índices
     min_indice = min(Cp, Cpk, Pp, Ppk)
     if min_indice > 1.33:
         recomendacoes.append("✅ Todos os índices estão acima de 1.33, indicando que o processo é capaz e aceitável.")
@@ -360,19 +360,19 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
 **Estatísticas do Processo**
 N: {len(dados)}
 Média: {mean:.3f}
-Desvio Padrão (Global): {std_overall:.3f}
-Desvio Padrão (Within): {std_within:.3f}
+Desvio Padrão Global (σ_total): {std_global:.3f}
+Desvio Padrão Within (σ_within): {std_within:.3f}
 
 **Limites de Especificação**
 LSL: {LSL}
 USL: {USL}
 Amplitude (USL - LSL): {USL - LSL}
 
-**Índices de Capabilidade**
+**Índices de Capabilidade (Potencial)**
 Cp: {Cp:.2f}
 Cpk: {Cpk:.2f}
 
-**Índices de Desempenho**
+**Índices de Desempenho (Performance Real)**
 Pp: {Pp:.2f}
 Ppk: {Ppk:.2f}
 
@@ -387,7 +387,7 @@ Ppk: {Ppk:.2f}
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
     x = np.linspace(min(dados), max(dados), 100)
-    y = stats.norm.pdf(x, mean, std_overall)
+    y = stats.norm.pdf(x, mean, std_global)
     ax.plot(x, y, 'b-', label='Distribuição Normal')
 
     if LSL != float('-inf'):
@@ -412,6 +412,7 @@ Ppk: {Ppk:.2f}
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return relatorio, grafico_base64
+
 
 
 
