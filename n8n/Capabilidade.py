@@ -143,7 +143,6 @@ def analise_estabilidade(df, coluna_y):
 
     return texto_resumo, img_base64
 
-    
 def analise_distribuicao_estatistica(df, coluna_y):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A análise de distribuição requer 1 coluna Y válido.", None
@@ -202,6 +201,8 @@ def analise_distribuicao_estatistica(df, coluna_y):
     kurt = dados.kurtosis()
 
     estatisticas = f"""
+**Análise de Distribuição Estatística**
+
 **Estatísticas Descritivas**
 
 N: {int(desc['count'])}
@@ -214,12 +215,12 @@ Assimetria (Skewness): {skew:.3f}
 Curtose (Kurtosis): {kurt:.3f}
 """.strip()
 
-    # Tabela de resultados formatada bonita
-    linhas = ["**Distribuição**           **AD**     **P-valor**"]
+    # Tabela de resultados formatada bonita e alinhada
+    linhas = ["\n**Distribuição**       **AD**      **P-valor**"]
     for r in resultados:
         ad_str = f"{r['AD']:.3f}" if not np.isnan(r['AD']) else "-"
         p_str = f"{r['P-valor']:.3f}" if r['P-valor'] >= 0.001 else "<0.001"
-        linhas.append(f"{r['Distribuição']:<25} {ad_str:<8} {p_str}")
+        linhas.append(f"{r['Distribuição']:<18} {ad_str:<8} {p_str}")
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -243,13 +244,17 @@ Curtose (Kurtosis): {kurt:.3f}
 
 {chr(10).join(linhas)}
 
-🔎 Critério de Seleção
+**🔎 Critério de Seleção**  
 Para escolher a melhor distribuição, foi utilizado:
 - Menor AD (Anderson-Darling), indica melhor ajuste aos dados.
 - P-valor > 0.05, quando possível, para não rejeitar a hipótese de aderência.
+
+**✅ Conclusão**  
+A melhor distribuição é: **{nome_melhor}**
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
