@@ -201,9 +201,9 @@ def analise_distribuicao_estatistica(df, coluna_y):
     kurt = dados.kurtosis()
 
     estatisticas = f"""
-**Análise de Distribuição Estatística**
+📊 **Análise de Distribuição Estatística**
 
-**Estatísticas Descritivas**
+📈 **Estatísticas Descritivas**
 
 N: {int(desc['count'])}
 Média: {desc['mean']:.3f}
@@ -216,7 +216,8 @@ Curtose (Kurtosis): {kurt:.3f}
 """.strip()
 
     # Tabela de resultados formatada bonita e alinhada
-    linhas = ["\n**Distribuição**       **AD**      **P-valor**"]
+    linhas = ["\n📊 **Resultados do Teste de Aderência**",
+              "**Distribuição**       **AD**      **P-valor**"]
     for r in resultados:
         ad_str = f"{r['AD']:.3f}" if not np.isnan(r['AD']) else "-"
         p_str = f"{r['P-valor']:.3f}" if r['P-valor'] >= 0.001 else "<0.001"
@@ -244,16 +245,17 @@ Curtose (Kurtosis): {kurt:.3f}
 
 {chr(10).join(linhas)}
 
-**🔎 Critério de Seleção**  
+📝 **Critério de Seleção**  
 Para escolher a melhor distribuição, foi utilizado:
 - Menor AD (Anderson-Darling), indica melhor ajuste aos dados.
 - P-valor > 0.05, quando possível, para não rejeitar a hipótese de aderência.
 
-**✅ Conclusão**  
+✅ **Conclusão**  
 A melhor distribuição é: **{nome_melhor}**
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
