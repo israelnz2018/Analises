@@ -22,6 +22,21 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
     # Testes de normalidade
     ad_result = stats.anderson(dados, dist='norm')
     ad_stat = ad_result.statistic
+
+    # p-valor aproximado para Anderson-Darling (método padrão)
+    if ad_stat < 0.2:
+        ad_p = "> 0,25"
+    elif ad_stat < 0.34:
+        ad_p = "≈ 0,15"
+    elif ad_stat < 0.6:
+        ad_p = "≈ 0,10"
+    elif ad_stat < 0.8:
+        ad_p = "≈ 0,05"
+    elif ad_stat < 1.1:
+        ad_p = "≈ 0,025"
+    else:
+        ad_p = "< 0,01"
+
     sw_stat, sw_p = stats.shapiro(dados)
     ks_stat, ks_p = stats.kstest(dados, 'norm', args=(media, desvio))
 
@@ -30,14 +45,19 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
     ks_conc = "Aprovada" if ks_p > 0.05 else "Reprovada"
     normal = any([ad_conc == "Aprovada", sw_conc == "Aprovada", ks_conc == "Aprovada"])
 
-    # Gráfico de probabilidade (escala percentual coerente)
+    # Gráfico de probabilidade com linha da média dos dados
     fig = plt.figure(figsize=(8,6))
     ax = fig.add_subplot(111)
-    sm.ProbPlot(dados, dist=stats.norm).probplot(ax=ax)
+    pp = sm.ProbPlot(dados, dist=stats.norm)
+    pp.probplot(ax=ax)
     ax.set_title(f"Gráfico de Probabilidade – {coluna_y}", fontsize=14, fontweight='bold')
     ax.set_xlabel(f"{coluna_y}", fontsize=12, fontweight='bold')
     ax.set_ylabel("Percentual", fontsize=12, fontweight='bold')
     plt.grid(True)
+
+    # Adiciona linha vertical na média dos dados
+    ax.axvline(x=media, color='red', linestyle='--', label='Média dos dados')
+    ax.legend()
 
     plt.tight_layout()
     buf = BytesIO()
@@ -47,6 +67,7 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
 
     def fbr(v): return f"{v:.4f}".replace('.', ',')
 
+    # Relatório final – títulos em negrito
     texto = (
         f"📊 **Análise de Normalidade – {coluna_y}**\n\n"
         f"🔎 **Resumo estatístico dos dados**\n"
@@ -56,7 +77,7 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
         f"ℹ️ **Critério de normalidade**\n"
         f"Se pelo menos um dos testes abaixo indicar normalidade (p-valor > 0,05), considera-se que os dados seguem distribuição normal e podem ser analisados com métodos paramétricos.\n\n"
         f"✅ **Resultados dos Testes de Normalidade**\n\n"
-        f"Anderson-Darling: estat={fbr(ad_stat)} | Conclusão: {'Normalidade aprovada' if ad_conc == 'Aprovada' else 'Normalidade reprovada'}\n"
+        f"Anderson-Darling: estat={fbr(ad_stat)} | p-valor={ad_p} | Conclusão: {'Normalidade aprovada' if ad_conc == 'Aprovada' else 'Normalidade reprovada'}\n"
         f"Shapiro-Wilk: estat={fbr(sw_stat)} | p-valor={fbr(sw_p)} | Conclusão: {'Normalidade aprovada' if sw_conc == 'Aprovada' else 'Normalidade reprovada'}\n"
         f"Kolmogorov-Smirnov: estat={fbr(ks_stat)} | p-valor={fbr(ks_p)} | Conclusão: {'Normalidade aprovada' if ks_conc == 'Aprovada' else 'Normalidade reprovada'}\n\n"
         f"📝 **Conclusão**\n"
