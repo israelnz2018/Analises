@@ -223,8 +223,6 @@ def analise_carta_imr(df, coluna_y):
 
 
 
-
-
 def analise_carta_xbarra_r(df, coluna_y, subgrupo):
     import matplotlib.pyplot as plt
     import numpy as np
@@ -241,18 +239,23 @@ def analise_carta_xbarra_r(df, coluna_y, subgrupo):
     if not pd.api.types.is_numeric_dtype(df[nome_coluna_y]):
         return f"❌ A coluna '{nome_coluna_y}' contém dados não numéricos e não pode ser usada na análise.", None
 
+    # 🔷 Conversão segura do subgrupo
+    try:
+        n = int(subgrupo)
+    except:
+        return "❌ O parâmetro 'subgrupo' deve ser um número inteiro.", None
+
     dados = df[[nome_coluna_y]].dropna().copy()
 
     if dados.empty:
         return "❌ Dados insuficientes para análise.", None
 
     # Agrupamento em subgrupos
-    dados["Subgrupo"] = (np.arange(len(dados)) // subgrupo) + 1
+    dados["Subgrupo"] = (np.arange(len(dados)) // n) + 1
     grupos = dados.groupby("Subgrupo")[nome_coluna_y]
 
     xbar = grupos.mean()
     r = grupos.max() - grupos.min()
-    n = subgrupo
 
     # Constantes para Xbarra-R
     A2_table = {2:1.88, 3:1.023, 4:0.729, 5:0.577, 6:0.483, 7:0.419, 8:0.373, 9:0.337, 10:0.308}
@@ -455,6 +458,7 @@ def analise_carta_xbarra_r(df, coluna_y, subgrupo):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return (texto_X + "\n" + texto_R), img_base64
+
 
 
 def analise_carta_xbarra_s(df, coluna_y, subgrupo):
