@@ -1,68 +1,46 @@
 from suporte import *
 
-def analise_teste_normalidade(df: pd.DataFrame, coluna_y):
-    if not coluna_y:
-        return "❌ O teste de normalidade requer 1 coluna Y.", None
-
-    if coluna_y not in df.columns:
-        return f"❌ A coluna '{coluna_y}' não foi encontrada no arquivo.", None
-
-    dados = df[coluna_y].dropna()
-    if len(dados) < 5:
-        return "❌ É necessário pelo menos 5 dados para o teste de normalidade.", None
-
-    from scipy import stats
-    import matplotlib.pyplot as plt
+def teste_normalidade(df: pd.DataFrame, coluna: str):
+    import pandas as pd
     import numpy as np
+    import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
+    from scipy import stats
 
-    # Anderson-Darling
-    ad_res = stats.anderson(dados)
-    ad_stat = ad_res.statistic
-    ad_crit = ad_res.critical_values
-    ad_sig = list(ad_res.significance_level)
-    if 5 in ad_sig:
-        idx = ad_sig.index(5)
-        ad_normal = ad_stat < ad_crit[idx]
-    else:
-        ad_normal = False
+    aplicar_estilo_minitab()
 
-    # Shapiro-Wilk
+    if coluna not in df.columns:
+        return "❌ Coluna não encontrada para teste de normalidade.", None
+
+    dados = df[coluna].dropna()
+    N = len(dados)
+    media = np.mean(dados)
+    desvio = np.std(dados, ddof=1)
+
+    # Testes de normalidade
+    ad_stat, ad_crit, ad_sig = stats.anderson(dados, dist='norm')
     sw_stat, sw_p = stats.shapiro(dados)
-    sw_normal = sw_p > 0.05
+    ks_stat, ks_p = stats.kstest(dados, 'norm', args=(media, desvio))
 
-    # Kolmogorov-Smirnov
-    ks_stat, ks_p = stats.kstest((dados - np.mean(dados)) / np.std(dados, ddof=1), 'norm')
-    ks_normal = ks_p > 0.05
+    # Determina conclusões
+    ad_conc = "Aprovada" if ad_stat < 0.752 else "Reprovada"
+    sw_conc = "Aprovada" if sw_p > 0.05 else "Reprovada"
+    ks_conc = "Aprovada" if ks_p > 0.05 else "Reprovada"
 
-    # Texto
-    texto = f"""
-**Teste de Normalidade**
-- Anderson-Darling: estat={ad_stat:.4f}, normalidade={"Aprovada" if ad_normal else "Reprovada"}
-- Shapiro-Wilk: estat={sw_stat:.4f}, p-valor={sw_p:.4f}, normalidade={"Aprovada" if sw_normal else "Reprovada"}
-- Kolmogorov-Smirnov: estat={ks_stat:.4f}, p-valor={ks_p:.4f}, normalidade={"Aprovada" if ks_normal else "Reprovada"}
-"""
+    # Verifica normalidade geral
+    normal = any([ad_conc == "Aprovada", sw_conc == "Aprovada", ks_conc == "Aprovada"])
 
-    # Conclusão
-    if ad_normal or sw_normal or ks_normal:
-        normal_txt = "✅ Pelo menos um teste indica normalidade. Modelo pode prosseguir com métodos paramétricos."
-    else:
-        normal_txt = "⚠ Nenhum teste indicou normalidade. Recomenda-se coletar pelo menos 50 amostras e realizar teste de estabilidade."
-
-    texto += f"\n**Conclusão**\n{normal_txt}"
-
-    # Gráfico
-    fig, ax = plt.subplots(figsize=(6, 4))
+    # Gráfico – QQ Plot estilo Minitab
+    fig, ax = plt.subplots(figsize=(8,6))
     stats.probplot(dados, dist="norm", plot=ax)
-    if ad_normal:
-        ax.set_title("QQ-Plot (Anderson-Darling indicou normalidade)")
-    elif sw_normal:
-        ax.set_title("QQ-Plot (Shapiro-Wilk indicou normalidade)")
-    elif ks_normal:
-        ax.set_title("QQ-Plot (Kolmogorov-Smirnov indicou normalidade)")
-    else:
-        ax.set_title("QQ-Plot (Nenhum teste indicou normalidade)")
+    ax.set_title("Gráfico de Probabilidade – " + coluna, fontsize=14, fontweight='bold')
+    ax.set_xlabel(f"{coluna}", fontsize=12)
+    ax.set_ylabel("Percentual", fontsize=12)
+    ax.grid(True)
+
+    # Remove texto lateral padrão do scipy
+    ax.get_lines()[1].set_color('brown')  # linha de tendência marrom como no exemplo
 
     plt.tight_layout()
     buf = BytesIO()
@@ -70,7 +48,40 @@ def analise_teste_normalidade(df: pd.DataFrame, coluna_y):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Formata números padrão BR
+    def fbr(v): return f"{v:.4f}".replace('.', ',')
+
+    # Relatório final
+    texto = (
+        f"📊 **Análise de Normalidade – {coluna}**\n\n"
+        f"#### 🔎 **Resumo estatístico dos dados**\n"
+        f"- **Média:** {fbr(media)}\n"
+        f"- **Desvio Padrão:** {fbr(desvio)}\n"
+        f"- **N (amostras):** {N}\n\n"
+        f"#### ℹ️ **Critério de normalidade**\n"
+        f"Se **pelo menos um dos testes abaixo indicar normalidade (p-valor > 0,05)**, considera-se que os dados seguem distribuição normal e podem ser analisados com métodos paramétricos.\n\n"
+        f"#### ✅ **Resultados dos Testes de Normalidade**\n\n"
+        f"| Teste | Estatística | P-valor | Conclusão |\n"
+        f"|---|---|---|---|\n"
+        f"| **Anderson-Darling** | {fbr(ad_stat)} | – | {'✅ Normalidade aprovada' if ad_conc == 'Aprovada' else '❌ Normalidade reprovada'} |\n"
+        f"| **Shapiro-Wilk** | {fbr(sw_stat)} | {fbr(sw_p)} | {'✅ Normalidade aprovada' if sw_conc == 'Aprovada' else '❌ Normalidade reprovada'} |\n"
+        f"| **Kolmogorov-Smirnov** | {fbr(ks_stat)} | {fbr(ks_p)} | {'✅ Normalidade aprovada' if ks_conc == 'Aprovada' else '❌ Normalidade reprovada'} |\n\n"
+        f"#### 📝 **Conclusão**\n"
+        f"{'✅ **Os dados seguem distribuição normal.** Pode-se prosseguir com métodos paramétricos sem restrições.' if normal else '❌ **Os dados não seguem distribuição normal.**'}\n\n"
+    )
+
+    # Recomendações se não for normal
+    if not normal:
+        texto += (
+            "#### ⚠️ **Recomendação**\n"
+            "1. Verificar estabilidade do processo\n"
+            "2. Coletar mais dados\n"
+            "3. Buscar outra distribuição que melhor se ajuste\n"
+            "4. Como último recurso, aplicar transformações matemáticas (ex: Box-Cox, Johnson)\n"
+        )
+
     return texto.strip(), grafico_base64
+
 
 
 def analise_estabilidade(df, coluna_y):
