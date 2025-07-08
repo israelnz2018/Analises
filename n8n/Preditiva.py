@@ -1301,29 +1301,15 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
 
-        # Converter datas com vários formatos comuns
-        df_valid[Data] = pd.to_datetime(
-            df_valid[Data],
-            errors='coerce',
-            dayfirst=False,  # tenta primeiro padrão americano
-            infer_datetime_format=True
-        )
+        # Tenta converter datas e valida
+        try:
+            df_valid[Data] = pd.to_datetime(df_valid[Data], dayfirst=False, infer_datetime_format=True)
+        except:
+            return f"❌ Formato de data inválido. Use datas no formato adequado (ex: 2025-07-08 ou Aug).", None
 
-        # Se ainda tiver datas NaT, tenta dayfirst=True (britânico/brasileiro)
-        if df_valid[Data].isna().any():
-            df_valid[Data] = pd.to_datetime(
-                df_valid[Data],
-                errors='coerce',
-                dayfirst=True,
-                infer_datetime_format=True
-            )
-
-        # Remove datas inválidas
-        df_valid = df_valid.dropna(subset=[Data])
-
-        # Se datas forem apenas meses abreviados (Aug, Sep, etc.), adiciona ano fictício atual
-        if df_valid[Data].dt.year.min() == 1900:
-            df_valid[Data] = pd.to_datetime(df_valid[Data].dt.strftime("2025-%m-%d"), errors='coerce')
+        # Verifica se alguma data não foi convertida corretamente
+        if df_valid[Data].isnull().any():
+            return f"❌ Existem datas inválidas ou em formato incorreto. Corrija antes de prosseguir.", None
 
         df_valid = df_valid.sort_values(by=Data)
         index = df_valid[Data].values
@@ -1395,11 +1381,6 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     )
 
     return texto.strip(), grafico_base64
-
-
-
-
-
 
 
 
