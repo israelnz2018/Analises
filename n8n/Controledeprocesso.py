@@ -1357,6 +1357,100 @@ def analise_carta_u(df, coluna_y, subgrupo):
     return texto, img_base64
 
 
+def analise_carta_ewma(df, coluna_y, lambda_val=0.2):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    from io import BytesIO
+    import base64
+
+    aplicar_estilo_minitab()
+
+    # Validação coluna
+    nome_coluna_y = coluna_y if isinstance(coluna_y, str) else (coluna_y[0] if coluna_y else None)
+    if not nome_coluna_y or nome_coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
+
+    dados = df[[nome_coluna_y]].dropna().copy()
+    if dados.empty:
+        return "❌ Dados insuficientes para análise.", None
+
+    # Parâmetros
+    x = dados.index.values
+    y = dados[nome_coluna_y].astype(float).values
+    mu = np.mean(y)
+    sigma = np.std(y, ddof=1)
+    L = 3
+
+    # Calcular EWMA
+    ewma = []
+    ewma.append(mu)  # inicia com média do processo
+    for i in range(1, len(y)):
+        ewma.append(lambda_val * y[i] + (1 - lambda_val) * ewma[i-1])
+    ewma = np.array(ewma)
+
+    # Calcular limites de controle
+    t = np.arange(1, len(y)+1)
+    sigma_ewma = sigma * np.sqrt((lambda_val / (2 - lambda_val)) * (1 - (1 - lambda_val) ** (2 * t)))
+    UCL = mu + L * sigma_ewma
+    LCL = mu - L * sigma_ewma
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    ax.plot(x, y, color="lightgrey", linestyle="--", label="Dados Originais")
+    ax.plot(x, ewma, color="black", linestyle="-", label="EWMA")
+    ax.plot(x, UCL, color="red", linestyle="-", label="LSC")
+    ax.plot(x, LCL, color="red", linestyle="-", label="LIC")
+    ax.axhline(mu, color="green", linestyle="-", label="Média")
+
+    ax.set_title(f"Carta EWMA ({nome_coluna_y})", fontsize=18, fontweight='bold')
+    ax.set_ylabel("Valor EWMA", fontsize=16, fontweight='bold')
+    ax.set_xlabel("Observação", fontsize=16, fontweight='bold')
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    ax.legend()
+
+    xlim = ax.get_xlim()
+    ax.text(xlim[1]+1, mu, f"μ = {mu:.3f}", va='center', fontsize=12, color="green")
+    ax.text(xlim[1]+1, UCL[-1], f"LSC = {UCL[-1]:.3f}", va='center', fontsize=12, color="red")
+    ax.text(xlim[1]+1, LCL[-1], f"LIC = {LCL[-1]:.3f}", va='center', fontsize=12, color="red")
+
+    # Critério 1 – Pontos EWMA fora dos limites
+    crit1_flag = []
+    for idx, val in enumerate(ewma):
+        cor = "black"
+        if val > UCL[idx] or val < LCL[idx]:
+            cor = "red"
+            crit1_flag.append((idx+1, val))
+        ax.scatter(x[idx], val, color=cor)
+
+    plt.tight_layout()
+
+    # Report
+    texto = f"📊 **Carta EWMA ({nome_coluna_y})**\n"
+    texto += f"🔎 **Parâmetros:** λ = {lambda_val}, Média = {mu:.3f}, Sigma = {sigma:.3f}\n\n"
+    texto += "🔎 **Critérios avaliados:**\n"
+
+    if crit1_flag:
+        pontos = ", ".join([f"{linha}: {valor:.3f}" for linha, valor in crit1_flag])
+        texto += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado (Observações {pontos})\n"
+    else:
+        texto += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    # Conclusão
+    if crit1_flag:
+        texto += "🔎 **Conclusão:** Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto += "🔎 **Recomendação:** Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    else:
+        texto += "🔎 **Conclusão:** Processo está estável.\n"
+
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    plt.close(fig)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+    return texto, img_base64
 
 
 
@@ -1367,7 +1461,9 @@ ANALISES = {
     "Carta P": analise_carta_p,
     "Carta NP": analise_carta_np,
     "Carta C": analise_carta_c,
-    "Carta U": analise_carta_u
+    "Carta U": analise_carta_u,
+    "Carta EWMA": analise_carta_ewma,
+    
 
     
 }
