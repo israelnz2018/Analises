@@ -54,30 +54,29 @@ def analise_carta_imr(df, coluna_y):
 
     # Critérios 2 e 3 (funções revisadas)
     def check_crit2(y, ref_media):
-    count = 0
-    seq = []
-    for i, val in enumerate(y):
-        if val > ref_media:
-            if count >= 0:
-                count += 1
-                seq.append(i+1)
+        count = 0
+        seq = []
+        for i, val in enumerate(y):
+            if val > ref_media:
+                if count >= 0:
+                    count += 1
+                    seq.append(i+1)
+                else:
+                    count = 1
+                    seq = [i+1]
+            elif val < ref_media:
+                if count <= 0:
+                    count -= 1
+                    seq.append(i+1)
+                else:
+                    count = -1
+                    seq = [i+1]
             else:
-                count = 1
-                seq = [i+1]
-        elif val < ref_media:
-            if count <= 0:
-                count -= 1
-                seq.append(i+1)
-            else:
-                count = -1
-                seq = [i+1]
-        else:
-            count = 0
-            seq = []
-        if abs(count) >= 9:
-            return True, seq[-9:]
-    return False, []
-
+                count = 0
+                seq = []
+            if abs(count) >= 9:
+                return True, seq[-9:]
+        return False, []
 
     def check_crit3(y):
         count_up = 0
@@ -221,6 +220,7 @@ def analise_carta_imr(df, coluna_y):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return (texto_I + "\n" + texto_MR), img_base64
+
 
 
 
