@@ -1,7 +1,7 @@
 
 from suporte import *
 
-def analise_probabilidade_baixo_X(df, coluna_y, field):
+def analise_probabilidade_baixo_X(df, coluna_y, field=None):
     import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
@@ -57,10 +57,37 @@ def analise_probabilidade_baixo_X(df, coluna_y, field):
         params = list(best.values())[0]
 
         dist = getattr(stats, dist_name)
-        prob = dist.cdf(x_ref, *params)
 
-        x_plot = np.linspace(min(y), max(y), 1000)
-        y_plot = dist.pdf(x_plot, *params)
+        # 🔷 Validação de tipos numéricos e estrutura de params
+        params = [float(p) for p in params]
+
+        # 🔷 Separando shape, loc, scale
+        if dist_name == 'lognorm':
+            shape, loc, scale = params
+            prob = dist.cdf(x_ref, shape, loc=loc, scale=scale)
+            x_plot = np.linspace(min(y), max(y), 1000)
+            y_plot = dist.pdf(x_plot, shape, loc=loc, scale=scale)
+
+        elif dist_name == 'weibull_min':
+            c, loc, scale = params
+            prob = dist.cdf(x_ref, c, loc=loc, scale=scale)
+            x_plot = np.linspace(min(y), max(y), 1000)
+            y_plot = dist.pdf(x_plot, c, loc=loc, scale=scale)
+
+        elif dist_name == 'gamma':
+            a, loc, scale = params
+            prob = dist.cdf(x_ref, a, loc=loc, scale=scale)
+            x_plot = np.linspace(min(y), max(y), 1000)
+            y_plot = dist.pdf(x_plot, a, loc=loc, scale=scale)
+
+        elif dist_name == 'expon':
+            loc, scale = params
+            prob = dist.cdf(x_ref, loc=loc, scale=scale)
+            x_plot = np.linspace(min(y), max(y), 1000)
+            y_plot = dist.pdf(x_plot, loc=loc, scale=scale)
+
+        else:
+            return f"❌ Distribuição '{dist_name}' não suportada no momento.", None
 
     # 🔷 Gráfico
     fig, ax = plt.subplots(figsize=(12,6))
@@ -99,6 +126,7 @@ def analise_probabilidade_baixo_X(df, coluna_y, field):
     )
 
     return texto.strip(), img_base64
+
 
 
 
