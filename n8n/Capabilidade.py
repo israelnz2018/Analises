@@ -152,18 +152,20 @@ def analise_distribuicao_estatistica(df, coluna_y):
     if len(dados) < 10:
         return "❌ A análise de distribuição requer pelo menos 10 dados.", None
 
-    from scipy import stats
     import matplotlib.pyplot as plt
     import numpy as np
+    import pandas as pd
+    from scipy import stats
     from io import BytesIO
     import base64
 
+    # Lista final de distribuições (apenas implementadas no scipy)
     distribs = {
         'Normal': stats.norm,
         'Lognormal': stats.lognorm,
         'Exponencial': stats.expon,
         'Weibull': stats.weibull_min,
-        'Gama': stats.gamma
+        'Gamma': stats.gamma
     }
 
     resultados = []
@@ -171,6 +173,7 @@ def analise_distribuicao_estatistica(df, coluna_y):
     for nome, dist in distribs.items():
         try:
             params = dist.fit(dados)
+            # AD apenas para Normal como exemplo (Anderson-Darling completo exige implementações específicas)
             ad_res = stats.anderson(dados, dist='norm') if nome == 'Normal' else None
             d, p = stats.kstest(dados, dist.cdf, args=params)
             resultados.append({
@@ -185,15 +188,43 @@ def analise_distribuicao_estatistica(df, coluna_y):
                 'P-valor': 0
             })
 
-    melhor = max(resultados, key=lambda r: r['P-valor'])
+    # Escolha do melhor modelo: AD menor + P-valor > 0.05
+    df_res = pd.DataFrame(resultados)
+    df_res_validos = df_res[df_res['P-valor'] > 0.05]
+    if not df_res_validos.empty:
+        melhor = df_res_validos.loc[df_res_validos['AD'].idxmin()] if df_res_validos['AD'].notna().any() else df_res_validos.iloc[0]
+    else:
+        melhor = df_res.loc[df_res['P-valor'].idxmax()]
+
     nome_melhor = melhor['Distribuição']
 
-    linhas = ["Distribuição                 AD        P-valor"]
+    # Estatísticas descritivas
+    desc = dados.describe()
+    skew = dados.skew()
+    kurt = dados.kurtosis()
+
+    estatisticas = f"""
+### 📊 Estatísticas Descritivas
+
+- N: {int(desc['count'])}
+- Média: {desc['mean']:.3f}
+- Desvio Padrão: {desc['std']:.3f}
+- Mediana: {dados.median():.3f}
+- Mínimo: {desc['min']:.3f}
+- Máximo: {desc['max']:.3f}
+- Assimetria (Skewness): {skew:.3f}
+- Curtose (Kurtosis): {kurt:.3f}
+""".strip()
+
+    # Tabela de resultados
+    linhas = ["| Distribuição | AD | P-valor |",
+              "|--------------|----|---------|"]
     for r in resultados:
         ad_str = f"{r['AD']:.3f}" if not np.isnan(r['AD']) else "-"
         p_str = f"{r['P-valor']:.3f}" if r['P-valor'] >= 0.001 else "<0.001"
-        linhas.append(f"{r['Distribuição']:<25} {ad_str:<8} {p_str}")
+        linhas.append(f"| {r['Distribuição']} | {ad_str} | {p_str} |")
 
+    # Gráfico
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.hist(dados, bins=10, density=True, alpha=0.6, color='gray', edgecolor='black')
     params = distribs[nome_melhor].fit(dados)
@@ -209,16 +240,27 @@ def analise_distribuicao_estatistica(df, coluna_y):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Relatório final
     texto = f"""
-**Goodness of Fit Test (Teste de Aderência)**
+## ✅ Análise de Distribuição Estatística
+
+{estatisticas}
+
+### 📝 Teste de Aderência (Goodness of Fit Test)
 
 {chr(10).join(linhas)}
 
-**Conclusão**
-✅ A melhor distribuição é: {nome_melhor} (maior P-valor).
-"""
+### 🔎 Critério de Seleção
+Para escolher a **melhor distribuição**, foi utilizado:
+- **Menor AD (Anderson-Darling)** ➔ indica melhor ajuste aos dados.
+- **P-valor > 0.05**, quando possível, para não rejeitar a hipótese de aderência.
 
-    return texto.strip(), grafico_base64
+### ✅ Conclusão Final
+A distribuição que melhor se ajusta aos dados é **{nome_melhor}**.
+""".strip()
+
+    return texto, grafico_base64
+
 
 def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
