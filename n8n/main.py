@@ -130,7 +130,7 @@ CONFIG_ANALISES = {
     "Capabilidade - outras distribuições": ["df", "coluna_y", "subgrupo", "field_dist", "field_LIE", "field_LSE"],
     "Capabilidade - com dados transformados": ["df", "coluna_y", "subgrupo", "field_LIE", "field_LSE"],
     "Capabilidade - com dados discretizados": ["df", "coluna_y", "field_LIE", "field_LSE"],
-    "Cálculo de Probabilidade": ["df", "coluna_y", "field"]
+    "Cálculo de probabilidade": ["df", "coluna_y", "field"],
 }
 
 
