@@ -304,7 +304,7 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
 ✔️ Recomendações:
 - Verificar a estabilidade do processo.
 - Adicionar mais dados para análise.
-- Realizar análise de capabilidade para dados não normais (ex: transformação de Johnson ou encontrar melhor distribuição).
+- Realizar análise de capabilidade para dados não normais (ex: transformação de Johnson ou capabilidade não paramétrica).
 """
         return texto.strip(), None
 
@@ -325,7 +325,7 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         std_within = mr_bar / d2
 
     # Inicializar cálculos
-    Cp = Cpk = Pp = Ppk = None
+    Cp = Cpk = Pp = Ppk = sigma_real = None
     amplitude = None
 
     if LSL is not None and USL is not None:
@@ -334,13 +334,16 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         Cpk = min((USL - mean), (mean - LSL)) / (3 * std_within)
         Pp = amplitude / (6 * std_global)
         Ppk = min((USL - mean), (mean - LSL)) / (3 * std_global)
+        sigma_real = min((USL - mean), (mean - LSL)) / std_global
     else:
         if LSL is not None:
             Cpk = (mean - LSL) / (3 * std_within)
             Ppk = (mean - LSL) / (3 * std_global)
+            sigma_real = (mean - LSL) / std_global
         elif USL is not None:
             Cpk = (USL - mean) / (3 * std_within)
             Ppk = (USL - mean) / (3 * std_global)
+            sigma_real = (USL - mean) / std_global
 
     # Percentual de defeitos (global)
     ppm_below_lsl = stats.norm.cdf(LSL, loc=mean, scale=std_global) * 1e6 if LSL is not None else 0
@@ -364,19 +367,19 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
 
     if Cpk is not None:
         if Cpk < 1.00:
-            interpretacao.append(f"❌ **Cpk = {Cpk:.2f} < 1.00:** O processo potencial **não é capaz**.")
+            interpretacao.append(f"❌ **Cpk = {Cpk:.2f} < 1.00:** O processo **não é capaz**.")
         elif Cpk < 1.33:
-            interpretacao.append(f"⚠️ **Cpk = {Cpk:.2f} < 1.33:** O processo potencial **não atende ao valor recomendado (≥ 1.33)**.")
+            interpretacao.append(f"⚠️ **Cpk = {Cpk:.2f} < 1.33:** O processo **não atende ao valor recomendado (≥ 1.33)**.")
         else:
-            interpretacao.append(f"✅ **Cpk = {Cpk:.2f} ≥ 1.33:** O processo potencial é capaz e aceitável.")
+            interpretacao.append(f"✅ **Cpk = {Cpk:.2f} ≥ 1.33:** O processo é capaz e aceitável.")
 
     if Ppk is not None:
         if Ppk < 1.00:
-            interpretacao.append(f"❌ **Ppk = {Ppk:.2f} < 1.00:** O processo real não é capaz.")
+            interpretacao.append(f"❌ **Ppk = {Ppk:.2f} < 1.00:** Performance real não é capaz.")
         elif Ppk < 1.33:
-            interpretacao.append(f"⚠️ **Ppk = {Ppk:.2f} < 1.33:** O processo real abaixo do recomendado.")
+            interpretacao.append(f"⚠️ **Ppk = {Ppk:.2f} < 1.33:** Performance real abaixo do recomendado.")
         else:
-            interpretacao.append(f"✅ **Ppk = {Ppk:.2f} ≥ 1.33:** O processo real aceitável.")
+            interpretacao.append(f"✅ **Ppk = {Ppk:.2f} ≥ 1.33:** Performance real aceitável.")
 
     if Cpk is not None and Ppk is not None and abs(Cpk - Ppk) > 0.1:
         interpretacao.append("⚠️ **Cpk e Ppk diferem significativamente**, sugerindo variação ao longo do tempo ou instabilidade do processo.")
@@ -388,7 +391,7 @@ def analise_capabilidade_normal(df, coluna_y, subgrupo=None, field_LIE=None, fie
         if min_indice > 1.33:
             recomendacoes.append("✅ Todos os índices estão acima de 1.33, indicando que o processo é capaz e aceitável.")
         elif min_indice < 1.00:
-            recomendacoes.append("❌ Um ou mais índices estão abaixo de 1.00, indicando que o processo **não é capaz**. Recomenda-se investigar causas especiais de variação, revisar especificações ou fazer um projeto de melhoria para reduzir a variabilidade do processo.")
+            recomendacoes.append("❌ Um ou mais índices estão abaixo de 1.00, indicando que o processo **não é capaz**. Recomenda-se investigar causas especiais de variação ou revisar especificações.")
         else:
             recomendacoes.append("⚠️ Alguns índices estão entre 1.00 e 1.33. O processo atende minimamente, mas é recomendável melhorá-lo para maior segurança.")
 
@@ -414,9 +417,9 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
         relatorio += f"\n\n**Índice de Capabilidade (Potencial)**\nCpk: {Cpk:.2f}"
 
     if Pp is not None and Ppk is not None:
-        relatorio += f"\n\n**Índices de Desempenho (Performance Real)**\nPp: {Pp:.2f}\nPpk: {Ppk:.2f}"
+        relatorio += f"\n\n**Índices de Desempenho (Performance Real)**\nPp: {Pp:.2f}\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f}"
     elif Ppk is not None:
-        relatorio += f"\n\n**Índice de Desempenho (Performance Real)**\nPpk: {Ppk:.2f}"
+        relatorio += f"\n\n**Índice de Desempenho (Performance Real)**\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f}"
 
     relatorio += f"""
 \n\n**% de Defeitos (Global)**
@@ -459,6 +462,7 @@ Total: {percent_total:.2f}%
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return relatorio, grafico_base64
+
 
 
 
