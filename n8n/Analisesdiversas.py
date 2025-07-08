@@ -52,48 +52,64 @@ def analise_probabilidade_baixo_X(df, coluna_y, field=None):
         # 🔷 Ajusta distribuições alternativas
         f = Fitter(y, distributions=['lognorm','weibull_min','gamma','expon'])
         f.fit()
-        best = f.get_best()
-        dist_name = list(best.keys())[0]
-        params = list(best.values())[0]
+        best_dict = f.get_best(method = 'sumsquare_error')
 
-        dist = getattr(stats, dist_name)
+        # 🔷 Loop pelas distribuições para encontrar a primeira válida
+        found_valid = False
+        for dist_name, params in best_dict.items():
+            dist = getattr(stats, dist_name, None)
+            if dist is None:
+                continue
 
-        # 🔷 Validação de tipos numéricos e estrutura de params
-        params_float = []
-        for p in params:
+            # 🔷 Validação de tipos numéricos
+            params_float = []
+            for p in params:
+                try:
+                    params_float.append(float(p))
+                except:
+                    params_float = None
+                    break
+
+            if params_float is None:
+                continue  # tenta a próxima distribuição
+
             try:
-                params_float.append(float(p))
-            except:
-                return f"❌ Não foi possível ajustar a distribuição '{dist_name}' devido a parâmetro inválido ({p}). Verifique seus dados.", None
-        params = params_float
+                # 🔷 Separando shape, loc, scale conforme distribuição
+                if dist_name == 'lognorm':
+                    shape, loc, scale = params_float
+                    prob = dist.cdf(x_ref, shape, loc=loc, scale=scale)
+                    x_plot = np.linspace(min(y), max(y), 1000)
+                    y_plot = dist.pdf(x_plot, shape, loc=loc, scale=scale)
 
-        # 🔷 Separando shape, loc, scale conforme distribuição
-        if dist_name == 'lognorm':
-            shape, loc, scale = params
-            prob = dist.cdf(x_ref, shape, loc=loc, scale=scale)
-            x_plot = np.linspace(min(y), max(y), 1000)
-            y_plot = dist.pdf(x_plot, shape, loc=loc, scale=scale)
+                elif dist_name == 'weibull_min':
+                    c, loc, scale = params_float
+                    prob = dist.cdf(x_ref, c, loc=loc, scale=scale)
+                    x_plot = np.linspace(min(y), max(y), 1000)
+                    y_plot = dist.pdf(x_plot, c, loc=loc, scale=scale)
 
-        elif dist_name == 'weibull_min':
-            c, loc, scale = params
-            prob = dist.cdf(x_ref, c, loc=loc, scale=scale)
-            x_plot = np.linspace(min(y), max(y), 1000)
-            y_plot = dist.pdf(x_plot, c, loc=loc, scale=scale)
+                elif dist_name == 'gamma':
+                    a, loc, scale = params_float
+                    prob = dist.cdf(x_ref, a, loc=loc, scale=scale)
+                    x_plot = np.linspace(min(y), max(y), 1000)
+                    y_plot = dist.pdf(x_plot, a, loc=loc, scale=scale)
 
-        elif dist_name == 'gamma':
-            a, loc, scale = params
-            prob = dist.cdf(x_ref, a, loc=loc, scale=scale)
-            x_plot = np.linspace(min(y), max(y), 1000)
-            y_plot = dist.pdf(x_plot, a, loc=loc, scale=scale)
+                elif dist_name == 'expon':
+                    loc, scale = params_float
+                    prob = dist.cdf(x_ref, loc=loc, scale=scale)
+                    x_plot = np.linspace(min(y), max(y), 1000)
+                    y_plot = dist.pdf(x_plot, loc=loc, scale=scale)
 
-        elif dist_name == 'expon':
-            loc, scale = params
-            prob = dist.cdf(x_ref, loc=loc, scale=scale)
-            x_plot = np.linspace(min(y), max(y), 1000)
-            y_plot = dist.pdf(x_plot, loc=loc, scale=scale)
+                else:
+                    continue  # distribuição não suportada
 
-        else:
-            return f"❌ Distribuição '{dist_name}' não suportada no momento.", None
+                found_valid = True
+                break
+
+            except Exception as e:
+                continue  # tenta a próxima distribuição
+
+        if not found_valid:
+            return "❌ Não foi possível ajustar nenhuma distribuição alternativa com parâmetros válidos. Verifique seus dados.", None
 
     # 🔷 Gráfico
     fig, ax = plt.subplots(figsize=(12,6))
@@ -132,6 +148,7 @@ def analise_probabilidade_baixo_X(df, coluna_y, field=None):
     )
 
     return texto.strip(), img_base64
+
 
 
 
