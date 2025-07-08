@@ -1,7 +1,7 @@
 
 from suporte import *
 
-def analise_probabilidade_baixo_X(df, coluna_y, x_ref):
+def analise_probabilidade_baixo_X(df, coluna_y, field):
     import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
@@ -12,12 +12,16 @@ def analise_probabilidade_baixo_X(df, coluna_y, x_ref):
 
     aplicar_estilo_minitab()
 
-    # 🔷 Validação
+    # 🔷 Validação coluna
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
+    # 🔷 Validação do field como valor de referência
+    if field is None:
+        return "❌ O valor de referência X (field) deve ser informado.", None
+
     try:
-        x_ref = float(x_ref)
+        x_ref = float(field)
     except:
         return "❌ O valor de referência X deve ser numérico.", None
 
@@ -28,11 +32,11 @@ def analise_probabilidade_baixo_X(df, coluna_y, x_ref):
         return "❌ Dados insuficientes para análise.", None
 
     # 🔷 3 testes de normalidade (Minitab padrão)
-    ad_p = stats.anderson(y).statistic
+    ad_stat, ad_crit, _ = stats.anderson(y)
     sw_p = stats.shapiro(y)[1]
     ks_p = stats.kstest(y, 'norm', args=(np.mean(y), np.std(y, ddof=1)))[1]
 
-    normal_flag = (sw_p > 0.05) and (ks_p > 0.05) and (stats.anderson(y).statistic < 0.752)  # AD crítico approx para 5%
+    normal_flag = (sw_p > 0.05) and (ks_p > 0.05) and (ad_stat < ad_crit[2])  # Anderson critical value 5%
 
     # 🔷 Se normal, usa normal
     if normal_flag:
@@ -52,11 +56,9 @@ def analise_probabilidade_baixo_X(df, coluna_y, x_ref):
         dist_name = list(best.keys())[0]
         params = list(best.values())[0]
 
-        # Calcula probabilidade
         dist = getattr(stats, dist_name)
         prob = dist.cdf(x_ref, *params)
 
-        # Gera curva para plot
         x_plot = np.linspace(min(y), max(y), 1000)
         y_plot = dist.pdf(x_plot, *params)
 
@@ -65,7 +67,7 @@ def analise_probabilidade_baixo_X(df, coluna_y, x_ref):
     ax.plot(x_plot, y_plot, color='black')
     ax.fill_between(x_plot, y_plot, 0, where=(x_plot <= x_ref), color='red', alpha=0.3)
     ax.axvline(x_ref, color='red', linestyle='--', label=f'X = {x_ref}')
-    ax.set_title(f"Distribuição {dist_name} - Probabilidade de X ≤ {x_ref}", fontsize=18, fontweight='bold')
+    ax.set_title(f"📊 Probabilidade de X ≤ {x_ref} ({dist_name})", fontsize=18, fontweight='bold')
     ax.set_ylabel("Densidade", fontsize=16, fontweight='bold')
     ax.set_xlabel(coluna_y, fontsize=16, fontweight='bold')
     ax.legend()
@@ -96,7 +98,8 @@ def analise_probabilidade_baixo_X(df, coluna_y, x_ref):
         "Use esta informação para avaliar riscos ou proporções esperadas no processo.\n"
     )
 
-    return texto, img_base64
+    return texto.strip(), img_base64
+
 
 
 
