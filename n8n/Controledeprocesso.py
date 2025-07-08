@@ -1035,173 +1035,327 @@ def analise_carta_np(df, coluna_y, subgrupo):
 
 
 def analise_carta_c(df, coluna_y):
-    if not coluna_y or coluna_y not in df.columns:
-        return "❌ A Carta C requer uma coluna Y válida.", None
-
-    dados = df[coluna_y].dropna()
-    if len(dados) < 5:
-        return "❌ É necessário pelo menos 5 dados para gerar a Carta C.", None
-
-    import numpy as np
     import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
     from io import BytesIO
     import base64
 
-    c_barra = np.mean(dados)
-    sigma_c = np.sqrt(c_barra)
-
-    LSC = c_barra + 3 * sigma_c
-    LIC = max(c_barra - 3 * sigma_c, 0)
-
-    testes = []
-
-    fora_limite = dados[(dados > LSC) | (dados < LIC)]
-    if len(fora_limite) > 0:
-        testes.append(f"🔴 {len(fora_limite)} unidade(s) com defeitos fora dos limites de controle.")
-
-    lado = np.where(dados > c_barra, 1, -1)
-    conta = 0
-    for i in range(len(lado)):
-        if i == 0 or lado[i] == lado[i-1]:
-            conta += 1
-            if conta >= 9:
-                testes.append("🟠 9 contagens consecutivas no mesmo lado da linha central.")
-                break
-        else:
-            conta = 1
-
-    conta_up = conta_down = 0
-    for i in range(1, len(dados)):
-        if dados.iloc[i] > dados.iloc[i-1]:
-            conta_up += 1
-            conta_down = 0
-        elif dados.iloc[i] < dados.iloc[i-1]:
-            conta_down += 1
-            conta_up = 0
-        else:
-            conta_up = conta_down = 0
-        if conta_up >= 6 or conta_down >= 6:
-            testes.append("🟡 6 contagens consecutivas em tendência (subindo ou descendo).")
-            break
-
-    texto = f"""
-**Carta C**
-- Número médio de defeitos (c̄): {c_barra:.4f}
-- Limites: LSC={LSC:.4f}, LIC={LIC:.4f}
-
-**Resultados dos testes**
-"""
-
-    if testes:
-        texto += "\n".join(testes)
-        texto += "\n⚠ Recomenda-se investigar causas especiais e revisar estabilidade do processo."
-    else:
-        texto += "✅ Processo dentro dos padrões esperados (nenhum alarme nos testes aplicados).\n✅ O processo está estável no momento da análise."
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.plot(dados.index, dados.values, marker='o', label='Defeitos')
-    ax.axhline(c_barra, color='black', linestyle='-', label='Média (c̄)')
-    ax.axhline(LSC, color='red', linestyle='--', label='LSC')
-    ax.axhline(LIC, color='red', linestyle='--', label='LIC')
-    ax.set_title("Carta C")
-    ax.legend()
-
-    plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-    return texto.strip(), grafico_base64
-
-def analise_carta_u(df, coluna_y, subgrupo):
-    if not coluna_y or coluna_y not in df.columns:
-        return "❌ A Carta U requer uma coluna Y válida.", None
-
-    if not subgrupo or subgrupo not in df.columns:
-        return f"❌ A coluna de subgrupo '{subgrupo}' não foi encontrada.", None
-
-    dados = df[[coluna_y, subgrupo]].dropna()
-    if dados.shape[0] < 5:
-        return "❌ É necessário pelo menos 5 dados para gerar a Carta U.", None
-
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-    from suporte import aplicar_estilo_minitab
-
-    grupos = dados.groupby(subgrupo)[coluna_y]
-    defeitos = grupos.sum()
-    tamanhos = grupos.count()
-
-    u = defeitos / tamanhos
-    u_barra = defeitos.sum() / tamanhos.sum()
-    sigma_u = np.sqrt(u_barra / tamanhos)
-    LSC = u_barra + 3 * sigma_u
-    LIC = np.clip(u_barra - 3 * sigma_u, 0, None)
-
-    testes = []
-
-    fora_limite = u[(u > LSC) | (u < LIC)]
-    if not fora_limite.empty:
-        testes.append(f"🔴 {fora_limite.shape[0]} subgrupo(s) com taxa fora dos limites de controle.")
-
-    lado = np.where(u > u_barra, 1, -1)
-    conta = 0
-    for i in range(len(lado)):
-        if i == 0 or lado[i] == lado[i-1]:
-            conta += 1
-            if conta >= 9:
-                testes.append("🟠 9 taxas consecutivas no mesmo lado da linha central.")
-                break
-        else:
-            conta = 1
-
-    conta_up = conta_down = 0
-    for i in range(1, len(u)):
-        if u.iloc[i] > u.iloc[i-1]:
-            conta_up += 1
-            conta_down = 0
-        elif u.iloc[i] < u.iloc[i-1]:
-            conta_down += 1
-            conta_up = 0
-        else:
-            conta_up = conta_down = 0
-        if conta_up >= 6 or conta_down >= 6:
-            testes.append("🟡 6 taxas consecutivas em tendência (subindo ou descendo).")
-            break
-
-    texto = f"""
-**Carta U**
-- Taxa média de defeitos por unidade (ū): {u_barra:.4f}
-
-**Resultados dos testes**
-"""
-    if testes:
-        texto += "\n".join(testes)
-        texto += "\n⚠ Recomenda-se investigar causas especiais e revisar estabilidade do processo."
-    else:
-        texto += "✅ Processo dentro dos padrões esperados (nenhum alarme nos testes aplicados).\n✅ O processo está estável no momento da análise."
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.plot(u.index, u.values, marker='o', label='Taxa de defeitos')
-    ax.plot(u.index, LSC, linestyle='--', color='red', label='LSC')
-    ax.plot(u.index, LIC, linestyle='--', color='red', label='LIC')
-    ax.axhline(u_barra, color='black', linestyle='-', label='Média (ū)')
-    ax.set_title("Carta U")
-    ax.set_ylabel("Taxa de Defeitos por Unidade")
-    ax.set_xlabel("Subgrupos")
-    ax.legend()
     aplicar_estilo_minitab()
 
-    plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+    nome_coluna_y = coluna_y if isinstance(coluna_y, str) else (coluna_y[0] if coluna_y else None)
+    if not nome_coluna_y or nome_coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    return texto.strip(), grafico_base64
+    dados = df[[nome_coluna_y]].dropna().copy()
+    if dados.empty:
+        return "❌ Dados insuficientes para análise.", None
+
+    # Conversão para float
+    c = dados[nome_coluna_y].astype(float)
+    c_barra = c.mean()
+
+    # Limites de controle
+    sigma_c = np.sqrt(c_barra)
+    LSC = c_barra + 3 * sigma_c
+    LIC = c_barra - 3 * sigma_c
+    LIC = max(0, LIC)  # LIC nunca negativo
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    x = c.index.values
+    y = c.values
+    ax.plot(x, y, color="black", linestyle="-")
+    ax.axhline(c_barra, color="green", linestyle="-")
+    ax.axhline(LSC, color="red", linestyle="-")
+    ax.axhline(LIC, color="red", linestyle="-")
+    ax.set_title(f"Carta C – Contagem de Não Conformes ({nome_coluna_y})", fontsize=18, fontweight='bold')
+    ax.set_ylabel("Contagem de Não Conformes", fontsize=16, fontweight='bold')
+    ax.set_xlabel("Subgrupo", fontsize=16, fontweight='bold')
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+    xlim = ax.get_xlim()
+    ax.text(xlim[1]+1, c_barra, f"c̄ = {c_barra:.2f}", va='center', fontsize=12, color="green")
+    ax.text(xlim[1]+1, LSC, f"LSC = {LSC:.2f}", va='center', fontsize=12, color="red")
+    ax.text(xlim[1]+1, LIC, f"LIC = {LIC:.2f}", va='center', fontsize=12, color="red")
+
+    # Critérios
+    def check_crit2(y, ref_media):
+        count = 0
+        seq = []
+        for i, val in enumerate(y):
+            if val > ref_media:
+                if count >= 0:
+                    count += 1
+                    seq.append(i+1)
+                else:
+                    count = 1
+                    seq = [i+1]
+            elif val < ref_media:
+                if count <= 0:
+                    count -= 1
+                    seq.append(i+1)
+                else:
+                    count = -1
+                    seq = [i+1]
+            else:
+                count = 0
+                seq = []
+            if abs(count) >= 9:
+                return True, seq[-9:]
+        return False, []
+
+    def check_crit3(y):
+        count_up = 0
+        seq_up = []
+        count_down = 0
+        seq_down = []
+        for i in range(1, len(y)):
+            if y[i] > y[i-1]:
+                count_up += 1
+                seq_up.append(i+1)
+                count_down = 0
+                seq_down = []
+                if count_up >= 6:
+                    return True, seq_up[-6:]
+            elif y[i] < y[i-1]:
+                count_down += 1
+                seq_down.append(i+1)
+                count_up = 0
+                seq_up = []
+                if count_down >= 6:
+                    return True, seq_down[-6:]
+            else:
+                count_up = 0
+                seq_up = []
+                count_down = 0
+                seq_down = []
+        return False, []
+
+    crit1_flag = []
+    for idx, (xi, yi) in enumerate(zip(x, y)):
+        cor = "black"
+        if yi > LSC or yi < LIC:
+            cor = "red"
+            crit1_flag.append((idx+1, yi))
+        ax.scatter(xi, yi, color=cor)
+
+    crit2, linhas_crit2 = check_crit2(y, c_barra)
+    crit3, linhas_crit3 = check_crit3(y)
+
+    if crit2:
+        for i in linhas_crit2:
+            ax.scatter(x[i-1], y[i-1], color="red")
+    if crit3:
+        for i in linhas_crit3:
+            ax.scatter(x[i-1], y[i-1], color="red")
+
+    plt.tight_layout()
+
+    # Report
+    texto = f"📊 **Carta C (Contagem de Não Conformes – {nome_coluna_y})**\n"
+    texto += "🔎 **Estatísticas gerais:**\n"
+    texto += f"- Contagem média de não conformes (c̄): {c_barra:.2f}\n\n"
+    texto += "🔎 **Critérios avaliados:**\n"
+
+    if crit1_flag:
+        pontos = ", ".join([f"Subgrupo {linha}: {valor:.0f}" for linha, valor in crit1_flag])
+        texto += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
+    else:
+        texto += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    if crit2:
+        linhas = ", ".join([str(l) for l in linhas_crit2])
+        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
+
+    if crit3:
+        linhas = ", ".join([str(l) for l in linhas_crit3])
+        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
+
+    if crit1_flag or crit2 or crit3:
+        texto += "🔎 **Conclusão:** Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto += "🔎 **Recomendação:** Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    else:
+        texto += "🔎 **Conclusão:** Processo está estável.\n"
+
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    plt.close(fig)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+    return texto, img_base64
+
+
+def analise_carta_u(df, coluna_y, subgrupo):
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    from io import BytesIO
+    import base64
+
+    aplicar_estilo_minitab()
+
+    nome_coluna_y = coluna_y if isinstance(coluna_y, str) else (coluna_y[0] if coluna_y else None)
+    if not nome_coluna_y or nome_coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
+
+    if not subgrupo or subgrupo not in df.columns:
+        return f"❌ A coluna de tamanho de amostra '{subgrupo}' não foi encontrada no arquivo.", None
+
+    dados = df[[nome_coluna_y, subgrupo]].dropna().copy()
+    if dados.empty:
+        return "❌ Dados insuficientes para análise.", None
+
+    # Conversão para float
+    c = dados[nome_coluna_y].astype(float)
+    n = dados[subgrupo].astype(float)
+
+    # Taxa de não conformes por unidade
+    u = c / n
+    u_barra = c.sum() / n.sum()
+
+    # Limites de controle
+    sigma_u = np.sqrt(u_barra / n)
+    LSC = u_barra + 3 * sigma_u
+    LIC = u_barra - 3 * sigma_u
+    LIC = LIC.clip(lower=0)
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    x = u.index.values
+    y = u.values
+    ax.plot(x, y, color="black", linestyle="-")
+    ax.axhline(u_barra, color="green", linestyle="-")
+    ax.plot(x, LSC, color="red", linestyle="-")
+    ax.plot(x, LIC, color="red", linestyle="-")
+    ax.set_title(f"Carta U – Taxa de Não Conformes por Unidade ({nome_coluna_y})", fontsize=18, fontweight='bold')
+    ax.set_ylabel("Taxa de Não Conformes", fontsize=16, fontweight='bold')
+    ax.set_xlabel("Subgrupo", fontsize=16, fontweight='bold')
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+    xlim = ax.get_xlim()
+    ax.text(xlim[1]+1, u_barra, f"ū = {u_barra:.4f}", va='center', fontsize=12, color="green")
+    ax.text(xlim[1]+1, LSC.iloc[0], f"LSC = {LSC.iloc[0]:.4f}", va='center', fontsize=12, color="red")
+    ax.text(xlim[1]+1, LIC.iloc[0], f"LIC = {LIC.iloc[0]:.4f}", va='center', fontsize=12, color="red")
+
+    # Critérios
+    def check_crit2(y, ref_media):
+        count = 0
+        seq = []
+        for i, val in enumerate(y):
+            if val > ref_media:
+                if count >= 0:
+                    count += 1
+                    seq.append(i+1)
+                else:
+                    count = 1
+                    seq = [i+1]
+            elif val < ref_media:
+                if count <= 0:
+                    count -= 1
+                    seq.append(i+1)
+                else:
+                    count = -1
+                    seq = [i+1]
+            else:
+                count = 0
+                seq = []
+            if abs(count) >= 9:
+                return True, seq[-9:]
+        return False, []
+
+    def check_crit3(y):
+        count_up = 0
+        seq_up = []
+        count_down = 0
+        seq_down = []
+        for i in range(1, len(y)):
+            if y[i] > y[i-1]:
+                count_up += 1
+                seq_up.append(i+1)
+                count_down = 0
+                seq_down = []
+                if count_up >= 6:
+                    return True, seq_up[-6:]
+            elif y[i] < y[i-1]:
+                count_down += 1
+                seq_down.append(i+1)
+                count_up = 0
+                seq_up = []
+                if count_down >= 6:
+                    return True, seq_down[-6:]
+            else:
+                count_up = 0
+                seq_up = []
+                count_down = 0
+                seq_down = []
+        return False, []
+
+    crit1_flag = []
+    for idx, (xi, yi, lsc_i, lic_i) in enumerate(zip(x, y, LSC, LIC)):
+        cor = "black"
+        if yi > lsc_i or yi < lic_i:
+            cor = "red"
+            crit1_flag.append((idx+1, yi))
+        ax.scatter(xi, yi, color=cor)
+
+    crit2, linhas_crit2 = check_crit2(y, u_barra)
+    crit3, linhas_crit3 = check_crit3(y)
+
+    if crit2:
+        for i in linhas_crit2:
+            ax.scatter(x[i-1], y[i-1], color="red")
+    if crit3:
+        for i in linhas_crit3:
+            ax.scatter(x[i-1], y[i-1], color="red")
+
+    plt.tight_layout()
+
+    # Report
+    texto = f"📊 **Carta U (Taxa de Não Conformes por Unidade – {nome_coluna_y})**\n"
+    texto += "🔎 **Estatísticas gerais:**\n"
+    texto += f"- Taxa média de não conformes por unidade (ū): {u_barra:.4f}\n\n"
+    texto += "🔎 **Critérios avaliados:**\n"
+
+    if crit1_flag:
+        pontos = ", ".join([f"Subgrupo {linha}: {valor:.4f}" for linha, valor in crit1_flag])
+        texto += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
+    else:
+        texto += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    if crit2:
+        linhas = ", ".join([str(l) for l in linhas_crit2])
+        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
+
+    if crit3:
+        linhas = ", ".join([str(l) for l in linhas_crit3])
+        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
+
+    if crit1_flag or crit2 or crit3:
+        texto += "🔎 **Conclusão:** Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto += "🔎 **Recomendação:** Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    else:
+        texto += "🔎 **Conclusão:** Processo está estável.\n"
+
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    plt.close(fig)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+    return texto, img_base64
+
 
 
 
