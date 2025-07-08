@@ -56,7 +56,7 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
     plt.grid(True)
 
     # Adiciona linha vertical na média dos dados
-    ax.axvline(x=media, color='red', linestyle='--', label='Média dos dados')
+    ax.axvline(x=media, color='red', linestyle='--', linewidth=2, label='Média dos dados')
     ax.legend()
 
     plt.tight_layout()
@@ -94,6 +94,7 @@ def teste_normalidade(df: pd.DataFrame, coluna_y: str):
         )
 
     return texto.strip(), grafico_base64
+
 
 
 
