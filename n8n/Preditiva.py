@@ -1301,6 +1301,9 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
 
+        # Guarda os textos originais para usar no eixo X
+        textos_originais = df_valid[Data].tolist()
+
         # Trata datas como meses abreviados (Jan, Fev, etc.)
         meses_pt = {'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6,
                     'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12}
@@ -1311,24 +1314,23 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
             mes_lower = str(mes_str).strip().lower()[:3]
             mes_num = meses_pt.get(mes_lower) or meses_en.get(mes_lower)
             if mes_num:
-                # Usa ano atual para criar data completa
                 return datetime(datetime.now().year, mes_num, 1)
             else:
                 return pd.to_datetime(mes_str, errors='coerce', dayfirst=False, infer_datetime_format=True)
 
-        df_valid[Data] = df_valid[Data].apply(converter_mes)
+        df_valid['DataConvertida'] = df_valid[Data].apply(converter_mes)
 
         # Verifica datas inválidas
-        if df_valid[Data].isnull().any():
+        if df_valid['DataConvertida'].isnull().any():
             return "❌ Existem datas inválidas ou em formato não reconhecido. Use abreviações corretas como Jan, Fev, etc.", None
 
-        df_valid = df_valid.sort_values(by=Data)
-        index = df_valid[Data].values
+        df_valid = df_valid.sort_values(by='DataConvertida')
+        index = textos_originais
 
     else:
         df_valid = df[[coluna_y]].dropna()
         df_valid = df_valid.reset_index()
-        index = df_valid.index.values
+        index = df_valid.index.values.tolist()
 
     if len(df_valid) < 10:
         return "❌ A série temporal requer pelo menos 10 observações.", None
@@ -1351,25 +1353,19 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     # Gráfico
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    if Data and Data in df.columns:
-        ult_data = df_valid[Data].iloc[-1]
-        freq = pd.infer_freq(df_valid[Data])
-        if freq is None:
-            freq = 'M'  # assume mensal se não identificar
+    # Eixo X com textos originais
+    ax.plot(index, Y, label='Série Original', color='black')
 
-        datas_futuras = pd.date_range(start=ult_data, periods=horizonte + 1, closed='right', freq=freq)
-        ax.plot(df_valid[Data], Y, label='Série Original', color='black')
-        ax.plot(datas_futuras, previsao, label='Previsão', color='blue')
-    else:
-        ax.plot(index, Y, label='Série Original', color='black')
-        ax.plot(range(len(Y), len(Y) + horizonte), previsao, label='Previsão', color='blue')
+    # Previsão – adiciona labels como "Prev1", "Prev2", etc.
+    previsao_labels = [f"Prev{i+1}" for i in range(horizonte)]
+    ax.plot(previsao_labels, previsao, label='Previsão', color='blue')
 
     ax.set_title(f"📊 Análise – Série Temporal (ARIMA)", fontsize=18, fontweight='bold')
     ax.set_ylabel("Valor", fontsize=16, fontweight='bold')
-    ax.set_xlabel("Data" if Data and Data in df.columns else "Observação", fontsize=16, fontweight='bold')
-    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    ax.set_xlabel("Período", fontsize=16, fontweight='bold')
     ax.legend()
 
+    plt.xticks(rotation=45)
     plt.tight_layout()
 
     buf = BytesIO()
