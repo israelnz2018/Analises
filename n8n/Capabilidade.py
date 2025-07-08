@@ -1,6 +1,6 @@
 from suporte import *
 
-def teste_normalidade(df: pd.DataFrame, coluna: str):
+def teste_normalidade(df: pd.DataFrame, coluna_y: str):
     import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
@@ -10,37 +10,35 @@ def teste_normalidade(df: pd.DataFrame, coluna: str):
 
     aplicar_estilo_minitab()
 
-    if coluna not in df.columns:
+    if coluna_y not in df.columns:
         return "❌ Coluna não encontrada para teste de normalidade.", None
 
-    dados = df[coluna].dropna()
+    dados = df[coluna_y].dropna()
     N = len(dados)
     media = np.mean(dados)
     desvio = np.std(dados, ddof=1)
 
     # Testes de normalidade
-    ad_stat, ad_crit, ad_sig = stats.anderson(dados, dist='norm')
+    ad_result = stats.anderson(dados, dist='norm')
+    ad_stat = ad_result.statistic
     sw_stat, sw_p = stats.shapiro(dados)
     ks_stat, ks_p = stats.kstest(dados, 'norm', args=(media, desvio))
 
-    # Determina conclusões
+    # Conclusões
     ad_conc = "Aprovada" if ad_stat < 0.752 else "Reprovada"
     sw_conc = "Aprovada" if sw_p > 0.05 else "Reprovada"
     ks_conc = "Aprovada" if ks_p > 0.05 else "Reprovada"
-
-    # Verifica normalidade geral
     normal = any([ad_conc == "Aprovada", sw_conc == "Aprovada", ks_conc == "Aprovada"])
 
     # Gráfico – QQ Plot estilo Minitab
     fig, ax = plt.subplots(figsize=(8,6))
     stats.probplot(dados, dist="norm", plot=ax)
-    ax.set_title("Gráfico de Probabilidade – " + coluna, fontsize=14, fontweight='bold')
-    ax.set_xlabel(f"{coluna}", fontsize=12)
+    ax.set_title(f"Gráfico de Probabilidade – {coluna_y}", fontsize=14, fontweight='bold')
+    ax.set_xlabel(f"{coluna_y}", fontsize=12)
     ax.set_ylabel("Percentual", fontsize=12)
     ax.grid(True)
 
-    # Remove texto lateral padrão do scipy
-    ax.get_lines()[1].set_color('brown')  # linha de tendência marrom como no exemplo
+    ax.get_lines()[1].set_color('brown')  # linha tendência marrom
 
     plt.tight_layout()
     buf = BytesIO()
@@ -48,12 +46,12 @@ def teste_normalidade(df: pd.DataFrame, coluna: str):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Formata números padrão BR
+    # Formata padrão BR
     def fbr(v): return f"{v:.4f}".replace('.', ',')
 
     # Relatório final
     texto = (
-        f"📊 **Análise de Normalidade – {coluna}**\n\n"
+        f"📊 **Análise de Normalidade – {coluna_y}**\n\n"
         f"#### 🔎 **Resumo estatístico dos dados**\n"
         f"- **Média:** {fbr(media)}\n"
         f"- **Desvio Padrão:** {fbr(desvio)}\n"
@@ -70,7 +68,6 @@ def teste_normalidade(df: pd.DataFrame, coluna: str):
         f"{'✅ **Os dados seguem distribuição normal.** Pode-se prosseguir com métodos paramétricos sem restrições.' if normal else '❌ **Os dados não seguem distribuição normal.**'}\n\n"
     )
 
-    # Recomendações se não for normal
     if not normal:
         texto += (
             "#### ⚠️ **Recomendação**\n"
@@ -79,6 +76,8 @@ def teste_normalidade(df: pd.DataFrame, coluna: str):
             "3. Buscar outra distribuição que melhor se ajuste\n"
             "4. Como último recurso, aplicar transformações matemáticas (ex: Box-Cox, Johnson)\n"
         )
+
+    return texto.strip(), grafico_base64
 
     return texto.strip(), grafico_base64
 
