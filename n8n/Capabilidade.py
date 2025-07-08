@@ -417,9 +417,10 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
         relatorio += f"\n\n**Índice de Capabilidade (Potencial)**\nCpk: {Cpk:.2f}"
 
     if Pp is not None and Ppk is not None:
-        relatorio += f"\n\n**Índices de Desempenho (Performance Real)**\nPp: {Pp:.2f}\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f}"
+        relatorio += f"\n\n**Índices de Desempenho (Performance Real)**\nPp: {Pp:.2f}\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f} sigma"
     elif Ppk is not None:
-        relatorio += f"\n\n**Índice de Desempenho (Performance Real)**\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f}"
+        relatorio += f"\n\n**Índice de Desempenho (Performance Real)**\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f} sigma"
+
 
     relatorio += f"""
 \n\n**% de Defeitos (Global)**
