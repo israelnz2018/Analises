@@ -462,110 +462,239 @@ def analise_carta_xbarra_r(df, coluna_y, subgrupo):
 
 
 def analise_carta_xbarra_s(df, coluna_y, subgrupo):
-    if not coluna_y or coluna_y not in df.columns:
-        return "❌ A Carta X-Barra S requer uma coluna Y válida.", None
-
-    if not subgrupo or subgrupo not in df.columns:
-        return f"❌ A coluna de subgrupo '{subgrupo}' não foi encontrada.", None
-
-    dados = df[[coluna_y, subgrupo]].dropna()
-    if dados.shape[0] < 5:
-        return "❌ É necessário pelo menos 5 dados para gerar a Carta X-Barra S.", None
-
-    import numpy as np
     import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
     from io import BytesIO
     import base64
 
-    grupos = dados.groupby(subgrupo)[coluna_y]
-    medias = grupos.mean()
-    desvios = grupos.std(ddof=1)
-    n_sub = grupos.size().mean()
+    aplicar_estilo_minitab()
 
-    if n_sub < 2:
-        return "❌ Cada subgrupo deve ter pelo menos 2 elementos.", None
+    nome_coluna_y = coluna_y if isinstance(coluna_y, str) else (coluna_y[0] if coluna_y else None)
+    if not nome_coluna_y or nome_coluna_y not in df.columns:
+        return "❌ A coluna Y informada não foi encontrada no arquivo.", None
 
-    A3, B3, B4 = 1.427, 0, 2.089
+    if not pd.api.types.is_numeric_dtype(df[nome_coluna_y]):
+        return f"❌ A coluna '{nome_coluna_y}' contém dados não numéricos e não pode ser usada na análise.", None
 
-    media_X = medias.mean()
-    media_S = desvios.mean()
+    # 🔷 Verificação do subgrupo como coluna existente
+    if not subgrupo or subgrupo not in df.columns:
+        return f"❌ A coluna de subgrupo '{subgrupo}' não foi encontrada no arquivo.", None
 
-    LSC_X = media_X + A3 * media_S
-    LIC_X = media_X - A3 * media_S
-    LSC_S = B4 * media_S
-    LIC_S = B3 * media_S
+    dados = df[[nome_coluna_y, subgrupo]].dropna().copy()
 
-    testes = []
+    if dados.empty:
+        return "❌ Dados insuficientes para análise.", None
 
-    fora_limite = medias[(medias > LSC_X) | (medias < LIC_X)]
-    if not fora_limite.empty:
-        testes.append(f"🔴 {fora_limite.shape[0]} média(s) de subgrupo fora dos limites de controle.")
+    # Agrupamento em subgrupos
+    grupos = dados.groupby(subgrupo)[nome_coluna_y]
 
-    lado = np.where(medias > media_X, 1, -1)
-    conta = 0
-    for i in range(len(lado)):
-        if i == 0 or lado[i] == lado[i-1]:
-            conta += 1
-            if conta >= 9:
-                testes.append("🟠 9 médias consecutivas no mesmo lado da linha central.")
-                break
-        else:
-            conta = 1
+    xbar = grupos.mean()
+    s = grupos.std()
+    n = grupos.size().mean()
 
-    conta_up = conta_down = 0
-    for i in range(1, len(medias)):
-        if medias.iloc[i] > medias.iloc[i-1]:
-            conta_up += 1
-            conta_down = 0
-        elif medias.iloc[i] < medias.iloc[i-1]:
-            conta_down += 1
-            conta_up = 0
-        else:
-            conta_up = conta_down = 0
-        if conta_up >= 6 or conta_down >= 6:
-            testes.append("🟡 6 médias consecutivas em tendência (subindo ou descendo).")
-            break
+    # Constantes para Xbarra-S
+    A3_table = {2:2.659, 3:1.954, 4:1.628, 5:1.427, 6:1.287, 7:1.182, 8:1.099, 9:1.032, 10:0.975}
+    B3_table = {2:0, 3:0, 4:0, 5:0, 6:0, 7:0.075, 8:0.136, 9:0.184, 10:0.223}
+    B4_table = {2:3.267, 3:2.568, 4:2.266, 5:2.089, 6:1.97, 7:1.882, 8:1.815, 9:1.761, 10:1.716}
 
-    texto = f"""
-**Carta X-Barra S**
-- Média das médias (X-Barra): {media_X:.4f}
-- Média dos desvios padrão (S): {media_S:.4f}
-- Limites X-Barra: LSC={LSC_X:.4f}, LIC={LIC_X:.4f}
-- Limites S: LSC={LSC_S:.4f}, LIC={LIC_S:.4f}
+    A3 = A3_table.get(int(n), 1.023)
+    B3 = B3_table.get(int(n), 0)
+    B4 = B4_table.get(int(n), 2.114)
 
-**Resultados dos testes**
-"""
+    xbar_bar = xbar.mean()
+    s_bar = s.mean()
 
-    if testes:
-        texto += "\n".join(testes)
-        texto += "\n⚠ Recomenda-se investigar causas especiais e revisar estabilidade do processo."
-    else:
-        texto += "✅ Processo dentro dos padrões esperados (nenhum alarme nos testes aplicados).\n✅ O processo está estável no momento da análise."
+    UCL_X = xbar_bar + A3 * s_bar
+    LCL_X = xbar_bar - A3 * s_bar
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+    UCL_S = B4 * s_bar
+    LCL_S = B3 * s_bar
 
-    ax1.plot(medias.index, medias.values, marker='o')
-    ax1.axhline(media_X, color='black', linestyle='-', label='Média')
-    ax1.axhline(LSC_X, color='red', linestyle='--', label='LSC')
-    ax1.axhline(LIC_X, color='red', linestyle='--', label='LIC')
-    ax1.set_title("Carta X-Barra")
-    ax1.legend()
+    # Gráficos
+    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=False)
 
-    ax2.plot(desvios.index, desvios.values, marker='o')
-    ax2.axhline(media_S, color='black', linestyle='-', label='Média S')
-    ax2.axhline(LSC_S, color='red', linestyle='--', label='LSC S')
-    if LIC_S > 0:
-        ax2.axhline(LIC_S, color='red', linestyle='--', label='LIC S')
-    ax2.set_title("Carta S")
-    ax2.legend()
+    # Carta Xbarra
+    x = xbar.index.values
+    y = xbar.values
+    axs[0].plot(x, y, color="black", linestyle="-")
+    axs[0].axhline(xbar_bar, color="green", linestyle="-")
+    axs[0].axhline(UCL_X, color="red", linestyle="-")
+    axs[0].axhline(LCL_X, color="red", linestyle="-")
+    axs[0].set_title(f"Carta X̄ de {nome_coluna_y}", fontsize=18, fontweight='bold')
+    axs[0].set_ylabel("Média Subgrupo", fontsize=16, fontweight='bold')
+    axs[0].set_xlabel("Subgrupo", fontsize=16, fontweight='bold')
+    axs[0].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+    xlim = axs[0].get_xlim()
+    axs[0].text(xlim[1]+1, xbar_bar, f"X̄̄ = {xbar_bar:.3f}", va='center', fontsize=12, color="green")
+    axs[0].text(xlim[1]+1, UCL_X, f"LSC = {UCL_X:.3f}", va='center', fontsize=12, color="red")
+    axs[0].text(xlim[1]+1, LCL_X, f"LIC = {LCL_X:.3f}", va='center', fontsize=12, color="red")
+
+    # Critérios 2 e 3
+    def check_crit2(y, ref_media):
+        count = 0
+        seq = []
+        for i, val in enumerate(y):
+            if val > ref_media:
+                if count >= 0:
+                    count += 1
+                    seq.append(i+1)
+                else:
+                    count = 1
+                    seq = [i+1]
+            elif val < ref_media:
+                if count <= 0:
+                    count -= 1
+                    seq.append(i+1)
+                else:
+                    count = -1
+                    seq = [i+1]
+            else:
+                count = 0
+                seq = []
+            if abs(count) >= 9:
+                return True, seq[-9:]
+        return False, []
+
+    def check_crit3(y):
+        count_up = 0
+        seq_up = []
+        count_down = 0
+        seq_down = []
+        for i in range(1, len(y)):
+            if y[i] > y[i-1]:
+                count_up += 1
+                seq_up.append(i+1)
+                count_down = 0
+                seq_down = []
+                if count_up >= 6:
+                    return True, seq_up[-6:]
+            elif y[i] < y[i-1]:
+                count_down += 1
+                seq_down.append(i+1)
+                count_up = 0
+                seq_up = []
+                if count_down >= 6:
+                    return True, seq_down[-6:]
+            else:
+                count_up = 0
+                seq_up = []
+                count_down = 0
+                seq_down = []
+        return False, []
+
+    crit2_X, linhas_crit2_X = check_crit2(y, xbar_bar)
+    crit3_X, linhas_crit3_X = check_crit3(y)
+
+    crit1_flag_X = []
+    for idx, (xi, yi) in enumerate(zip(x, y)):
+        cor = "black"
+        if yi > UCL_X or yi < LCL_X:
+            cor = "red"
+            crit1_flag_X.append((idx+1, yi))
+        elif crit2_X and (idx+1) in linhas_crit2_X:
+            cor = "red"
+        elif crit3_X and (idx+1) in linhas_crit3_X:
+            cor = "red"
+        axs[0].scatter(xi, yi, color=cor)
+
+    # Carta S
+    x_s = s.index.values
+    y_s = s.values
+    axs[1].plot(x_s, y_s, color="black", linestyle="-")
+    axs[1].axhline(s_bar, color="green", linestyle="-")
+    axs[1].axhline(UCL_S, color="red", linestyle="-")
+    axs[1].axhline(LCL_S, color="red", linestyle="-")
+    axs[1].set_title("Carta S", fontsize=18, fontweight='bold')
+    axs[1].set_ylabel("Desvio Padrão", fontsize=16, fontweight='bold')
+    axs[1].set_xlabel("Subgrupo", fontsize=16, fontweight='bold')
+    axs[1].xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+    xlim_s = axs[1].get_xlim()
+    axs[1].text(xlim_s[1]+1, s_bar, f"S̄ = {s_bar:.3f}", va='center', fontsize=12, color="green")
+    axs[1].text(xlim_s[1]+1, UCL_S, f"LSC = {UCL_S:.3f}", va='center', fontsize=12, color="red")
+    axs[1].text(xlim_s[1]+1, LCL_S, f"LIC = {LCL_S:.3f}", va='center', fontsize=12, color="red")
+
+    crit2_S, linhas_crit2_S = check_crit2(y_s, s_bar)
+    crit3_S, linhas_crit3_S = check_crit3(y_s)
+
+    crit1_flag_S = []
+    for idx, (xi, yi) in enumerate(zip(x_s, y_s)):
+        cor = "black"
+        if yi > UCL_S or yi < LCL_S:
+            cor = "red"
+            crit1_flag_S.append((idx+1, yi))
+        elif crit2_S and (idx+1) in linhas_crit2_S:
+            cor = "red"
+        elif crit3_S and (idx+1) in linhas_crit3_S:
+            cor = "red"
+        axs[1].scatter(xi, yi, color=cor)
 
     plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    return texto.strip(), grafico_base64
+    # Report – Xbarra
+    texto_X = f"📊 **Carta X̄ ({nome_coluna_y})**\n"
+    texto_X += "🔎 **Critérios avaliados:**\n"
+    if crit1_flag_X:
+        pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_X])
+        texto_X += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
+    else:
+        texto_X += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    if crit2_X:
+        linhas = ", ".join([str(l) for l in linhas_crit2_X])
+        texto_X += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto_X += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
+
+    if crit3_X:
+        linhas = ", ".join([str(l) for l in linhas_crit3_X])
+        texto_X += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto_X += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
+
+    if crit1_flag_X or crit2_X or crit3_X:
+        texto_X += "🔎 **Conclusão:** Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto_X += "🔎 **Recomendação:** Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    else:
+        texto_X += "🔎 **Conclusão:** Processo está estável.\n"
+
+    # Report – S
+    texto_S = f"📊 **Carta S**\n"
+    texto_S += "🔎 **Critérios avaliados:**\n"
+    if crit1_flag_S:
+        pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_S])
+        texto_S += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
+    else:
+        texto_S += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
+
+    if crit2_S:
+        linhas = ", ".join([str(l) for l in linhas_crit2_S])
+        texto_S += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto_S += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
+
+    if crit3_S:
+        linhas = ", ".join([str(l) for l in linhas_crit3_S])
+        texto_S += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+    else:
+        texto_S += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
+
+    if crit1_flag_S or crit2_S or crit3_S:
+        texto_S += "🔎 **Conclusão:** Causa especial detectada. O processo não está sob controle estatístico.\n"
+        texto_S += "🔎 **Recomendação:** Investigue o processo para entender e se possível remover a causa especial identificada.\n"
+    else:
+        texto_S += "🔎 **Conclusão:** Processo está estável.\n"
+
+    buffer = BytesIO()
+    plt.savefig(buffer, format="png")
+    plt.close(fig)
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+
+    return (texto_X + "\n" + texto_S), img_base64
+
 
 def analise_carta_p(df, coluna_y, subgrupo):
     if not coluna_y or coluna_y not in df.columns:
