@@ -1345,7 +1345,18 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     except ImportError:
         return "❌ O pacote pmdarima não está disponível neste ambiente.", None
 
-    modelo = pm.auto_arima(Y, seasonal=False, stepwise=True, suppress_warnings=True)
+    modelo = pm.auto_arima(
+    Y,
+        seasonal=False,
+        stepwise=True,
+        suppress_warnings=True,
+        d=1,  # força 1 diferença para considerar tendência
+        max_p=2,
+        max_q=2,
+        start_p=0,
+        start_q=0
+    )
+
     aic = modelo.aic()
     bic = modelo.bic()
 
@@ -1353,7 +1364,8 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     previsao = modelo.predict(n_periods=horizonte)
 
     # Formata previsão com casas decimais padrão Brasil
-    previsao_texto = ", ".join([f"{p:,.2f}".replace('.', ',') for p in previsao])
+    previsao_texto = ", ".join([f"{p:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') for p in previsao])
+
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(12, 6))
