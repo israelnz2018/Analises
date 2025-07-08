@@ -1300,7 +1300,8 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     # Se Data existir e estiver no df, usar como índice ordenado corretamente
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
-        df_valid[Data] = pd.to_datetime(df_valid[Data])
+        df_valid[Data] = pd.to_datetime(df_valid[Data], errors='coerce')
+        df_valid = df_valid.dropna(subset=[Data])
         df_valid = df_valid.sort_values(by=Data)
         index = df_valid[Data].values
     else:
