@@ -1292,6 +1292,13 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     from io import BytesIO
     import base64
     from datetime import datetime
+    import locale
+
+    # Configura locale para BR (casas decimais com vírgula)
+    try:
+        locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+    except:
+        locale.setlocale(locale.LC_ALL, '')
 
     aplicar_estilo_minitab()
 
@@ -1300,11 +1307,8 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
 
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
-
-        # Guarda os textos originais para usar no eixo X
         textos_originais = df_valid[Data].tolist()
 
-        # Trata datas como meses abreviados (Jan, Fev, etc.)
         meses_pt = {'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6,
                     'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12}
         meses_en = {'jan':1, 'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6,
@@ -1320,7 +1324,6 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
 
         df_valid['DataConvertida'] = df_valid[Data].apply(converter_mes)
 
-        # Verifica datas inválidas
         if df_valid['DataConvertida'].isnull().any():
             return "❌ Existem datas inválidas ou em formato não reconhecido. Use abreviações corretas como Jan, Fev, etc.", None
 
@@ -1343,28 +1346,33 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
         return "❌ O pacote pmdarima não está disponível neste ambiente.", None
 
     modelo = pm.auto_arima(Y, seasonal=False, stepwise=True, suppress_warnings=True)
-    ordem = modelo.order
     aic = modelo.aic()
     bic = modelo.bic()
 
     horizonte = int(field) if field and str(field).isdigit() else 5
     previsao = modelo.predict(n_periods=horizonte)
 
+    # Formata previsão com casas decimais padrão Brasil
+    previsao_texto = ", ".join([f"{p:,.2f}".replace('.', ',') for p in previsao])
+
     # Gráfico
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Eixo X com textos originais
-    ax.plot(index, Y, label='Série Original', color='black')
+    if Data and Data in df.columns:
+        ax.plot(index, Y, label='Série Original', color='black')
+        previsao_labels = [f"Prev{i+1}" for i in range(horizonte)]
+        ax.plot(previsao_labels, previsao, label='Previsão', color='blue')
+    else:
+        # Index numérico + previsão no final corretamente
+        x_full = list(index) + [len(index)+i for i in range(1, horizonte+1)]
+        y_full = list(Y) + list(previsao)
+        ax.plot(index, Y, label='Série Original', color='black')
+        ax.plot(x_full[-horizonte:], previsao, label='Previsão', color='blue')
 
-    # Previsão – adiciona labels como "Prev1", "Prev2", etc.
-    previsao_labels = [f"Prev{i+1}" for i in range(horizonte)]
-    ax.plot(previsao_labels, previsao, label='Previsão', color='blue')
-
-    ax.set_title(f"📊 Análise – Série Temporal (ARIMA)", fontsize=18, fontweight='bold')
+    ax.set_title("📊 Análise – Série Temporal (ARIMA)", fontsize=18, fontweight='bold')
     ax.set_ylabel("Valor", fontsize=16, fontweight='bold')
     ax.set_xlabel("Período", fontsize=16, fontweight='bold')
     ax.legend()
-
     plt.xticks(rotation=45)
     plt.tight_layout()
 
@@ -1373,13 +1381,10 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    previsao_texto = ", ".join([f"{p:.2f}" for p in previsao])
-
     texto = (
         f"📊 **Análise – Série Temporal (ARIMA)**\n"
-        f"🔎 **Modelo:** ARIMA{ordem} ✅\n"
-        f"🔎 **AIC:** {aic:.2f} ✅\n"
-        f"🔎 **BIC:** {bic:.2f} ✅\n"
+        f"🔎 **AIC:** {aic:,.2f}".replace('.', ',') + " ✅ (quanto menor melhor – valores abaixo de 100 indicam ajuste excelente)\n"
+        f"🔎 **BIC:** {bic:,.2f}".replace('.', ',') + " ✅ (quanto menor melhor – valores abaixo de 100 indicam ajuste excelente)\n"
         f"🔎 **Previsão para os próximos {horizonte} períodos:** {previsao_texto} ✅\n"
         "\n🔎 **Conclusão:**\n"
         "✅ Modelo ajustado com sucesso. O processo está estável para previsão com o modelo atual.\n\n"
@@ -1389,10 +1394,6 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     )
 
     return texto.strip(), grafico_base64
-
-
-
-
 
 
 # Dicionário de análises
