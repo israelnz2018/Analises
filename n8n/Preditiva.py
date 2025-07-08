@@ -1291,42 +1291,28 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
-    import locale
 
     aplicar_estilo_minitab()
 
     if not coluna_y or coluna_y not in df.columns:
         return "❌ O ARIMA requer 1 coluna Y (série temporal).", None
 
-    # Se Data existir e estiver no df, usar como índice ordenado corretamente
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
 
-        # Tenta primeiro converter com locale padrão
-        try:
-            df_valid[Data] = pd.to_datetime(df_valid[Data], dayfirst=False, infer_datetime_format=True)
-        except:
-            pass
+        # Converter datas com coerção para NaT em inválidas
+        df_valid[Data] = pd.to_datetime(df_valid[Data], errors='coerce', dayfirst=False, infer_datetime_format=True)
 
-        # Se ainda tiver datas NaT, tenta locale português do Brasil
+        # Verifica se ainda há datas inválidas
         if df_valid[Data].isnull().any():
-            try:
-                locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
-                df_valid[Data] = pd.to_datetime(df_valid[Data], dayfirst=True, infer_datetime_format=True)
-            except:
-                pass
+            return "❌ Existem datas inválidas ou fora do intervalo suportado. Corrija antes de prosseguir.", None
 
-        # Se ainda tiver datas NaT, tenta locale inglês dos EUA
-        if df_valid[Data].isnull().any():
-            try:
-                locale.setlocale(locale.LC_TIME, 'en_US.UTF-8')
-                df_valid[Data] = pd.to_datetime(df_valid[Data], dayfirst=False, infer_datetime_format=True)
-            except:
-                pass
+        # Verifica limites válidos do pandas (anos suportados ~1677-2262)
+        min_valid_date = pd.Timestamp.min
+        max_valid_date = pd.Timestamp.max
 
-        # Verifica se ainda existem datas inválidas
-        if df_valid[Data].isnull().any():
-            return f"❌ Existem datas inválidas ou em formato não reconhecido. Use formatos como 2025-07-08, 08/07/2025, Jan, Fev, Aug, etc.", None
+        if (df_valid[Data] < min_valid_date).any() or (df_valid[Data] > max_valid_date).any():
+            return "❌ Existem datas fora do limite suportado pelo sistema (anos muito antigos ou futuros). Corrija antes de prosseguir.", None
 
         df_valid = df_valid.sort_values(by=Data)
         index = df_valid[Data].values
@@ -1398,6 +1384,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
