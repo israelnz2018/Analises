@@ -624,7 +624,6 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
         return relatorio.strip(), grafico_final_base64
 
 
-
 def analise_capabilidade_johnson(df, coluna_y, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
@@ -653,13 +652,14 @@ def analise_capabilidade_johnson(df, coluna_y, subgrupo=None, field_LIE=None, fi
     import base64
 
     # Fit Johnson SU
-    try:
-        params = stats.johnsonsu.fit(dados)
-        gamma, delta, xi, lam = params
-        dados_t = gamma + delta * np.arcsinh((dados - xi) / lam)
+    params = stats.johnsonsu.fit(dados)
+    gamma, delta, xi, lam = params
 
-    except Exception as e:
-        return f"❌ Erro na transformação Johnson SU: {str(e)}", None
+    # Aplicação manual da transformação SU
+    dados_t = gamma + delta * np.arcsinh((dados - xi) / lam)
+
+    # Teste de normalidade no transformado
+    sw_stat, sw_p = stats.shapiro(dados_t)
 
     mean = np.mean(dados_t)
     std = np.std(dados_t, ddof=1)
@@ -702,17 +702,17 @@ def analise_capabilidade_johnson(df, coluna_y, subgrupo=None, field_LIE=None, fi
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Relatório no formato alinhado
+    # Relatório final formatado
     relatorio = f"""
-📊 Análise de Capabilidade com Transformação Johnson
+📊 **Análise de Capabilidade com Transformação Johnson**
 
-🔹 Resultado
+🔹 **Resultado**
 
 - Transformação Johnson SU aplicada para normalizar os dados
-- Equação da transformação (params): {', '.join([f"{p:.4f}" for p in params])}
-- Transformação validada: SIM
+- Equação da transformação: z = {gamma:.4f} + {delta:.4f} * arcsinh((x - {xi:.4f}) / {lam:.4f})
+- Transformação validada: SIM (p-valor Shapiro-Wilk = {sw_p:.4f})
 
-✔️ Resultados
+✔️ **Análises**
 
 - Pp: {Pp:.2f} ➔ {'Muito abaixo do mínimo recomendado (1.33)' if Pp < 1.33 else 'Aceitável'}
 - Ppk: {Ppk:.2f} ➔ {'Processo fora de especificação' if Ppk < 1 else 'Processo aceitável'}
@@ -721,14 +721,14 @@ def analise_capabilidade_johnson(df, coluna_y, subgrupo=None, field_LIE=None, fi
 - % Defeito acima LSE: {percent_above:.2f}%
 - % Defeito Total: {percent_total:.2f}%
 
-✔️ Recomendações
+✔️ **Recomendações**
 
-- Validar a adequação do modelo transformado antes de usá-lo em decisões críticas.
 - Processo incapaz de atender aos limites especificados. Ações urgentes de melhoria são necessárias.
 - Revisar especificações ou melhorar a capacidade do processo através de projetos de melhoria contínua.
 """.strip()
 
     return relatorio, grafico_base64
+
 
 
 
