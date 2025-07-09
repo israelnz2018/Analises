@@ -466,7 +466,6 @@ Total: {percent_total:.2f}%
 
 
 
-
 def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
@@ -494,9 +493,8 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
     from io import BytesIO
     import base64
 
-    # Distribuições suportadas
+    # Distribuições suportadas (Normal removida)
     distros = {
-        "Normal": stats.norm,
         "Lognormal": stats.lognorm,
         "Exponencial": stats.expon,
         "Weibull": stats.weibull_min,
@@ -540,10 +538,14 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
             ppm_total = ppm_lie + ppm_lse
             perc_defeitos = ppm_total / 10000
 
-            # Estimativa de nível sigma (simplificada, interpretação qualitativa)
-            nivel_sigma = round(6 - stats.norm.ppf(ppm_total / 1e6 / 2) * 2, 2)
+            # Calcular Nível Sigma corretamente
+            if perc_defeitos == 0:
+                nivel_sigma = ">6"
+            else:
+                p_defeito = ppm_total / 1e6
+                nivel_sigma = round(stats.norm.ppf(1 - p_defeito / 2), 2)
 
-            # Gráfico
+            # Gráfico (apenas curva da distribuição escolhida)
             fig, ax = plt.subplots(figsize=(8, 5))
             ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
             x = np.linspace(min(dados), max(dados), 100)
@@ -569,11 +571,16 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
             # Interpretação
             ajuste = "✅ A distribuição se ajusta bem aos dados." if ks_p >= 0.05 else "⚠️ A distribuição não se ajusta bem aos dados. Considere testar outra."
 
+            # Recomendações detalhadas
             recomendacoes = []
             if perc_defeitos > 1.0:
-                recomendacoes.append("- Alta taxa de defeitos. Recomenda-se ação corretiva.")
-            if nivel_sigma < 3:
-                recomendacoes.append("- Nível sigma abaixo de 3. Processo precisa ser melhorado.")
+                recomendacoes.append("- Alta taxa de defeitos (>1%). Recomenda-se revisão do processo, investigação de causas especiais e ações corretivas.")
+            else:
+                recomendacoes.append("- Baixa taxa de defeitos. Manter controle e monitoramento periódico.")
+            if isinstance(nivel_sigma, (int, float)) and nivel_sigma < 3:
+                recomendacoes.append("- Nível sigma abaixo de 3. Processo precisa ser melhorado para reduzir variação e aumentar qualidade.")
+            elif isinstance(nivel_sigma, (int, float)) and nivel_sigma >= 3:
+                recomendacoes.append("- Nível sigma adequado. Buscar oportunidades de melhoria contínua.")
 
             relatorio += f"""
 🔹 **{grupo_nome}**
@@ -581,10 +588,9 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
 - {ajuste}
 - Porcentagem de defeitos estimada: {perc_defeitos:.2f}%
 - Nível Sigma estimado: {nivel_sigma}
+✔️ **Recomendações**
+{chr(10).join(recomendacoes)}
 """.strip()
-
-            if recomendacoes:
-                relatorio += "\n✔️ **Recomendações**\n" + "\n".join(recomendacoes)
 
         except Exception as e:
             relatorio += f"\n❌ Erro no grupo {grupo_nome}: {str(e)}\n"
@@ -605,6 +611,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
         imagem_final.save(buffer, format="PNG")
         grafico_final_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
         return relatorio.strip(), grafico_final_base64
+
 
 
 
