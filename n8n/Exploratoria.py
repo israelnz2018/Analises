@@ -517,87 +517,114 @@ def analise_limpeza_dados(df):
     return texto_final, None
 
 
-def analise_cluster_kmeans(df, lista_x, n_clusters=3):
+def analise_cluster_hierarchical(df, lista_x, field=None):
     """
-    Análise de Cluster KMeans com múltiplas variáveis (lista_x).
+    Hierarchical Clustering com dendrograma colorido por cluster
+    field = número de clusters (opcional)
     """
-
-    # ⚠️ Verificar se lista_x foi fornecida
-    if not lista_x or any(col not in df.columns for col in lista_x):
-        return "❌ É necessário informar uma lista de colunas X válidas.", None
 
     import numpy as np
     import pandas as pd
     import matplotlib.pyplot as plt
-    from sklearn.cluster import KMeans
-    from sklearn.preprocessing import StandardScaler
+    import seaborn as sns
+    from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
     from io import BytesIO
     import base64
 
-    # 🔹 Selecionar os dados e remover NA
+    # Verificar entradas
+    if not lista_x:
+        return "❌ É necessário selecionar pelo menos uma variável (X).", None
+
     dados = df[lista_x].dropna()
 
-    # ⚠️ Verificar se há dados suficientes
-    if len(dados) < n_clusters:
-        return f"❌ Dados insuficientes para formar {n_clusters} clusters.", None
+    if len(dados) < 2:
+        return "❌ Dados insuficientes para análise de cluster.", None
 
-    # 🔹 Padronizar os dados
-    scaler = StandardScaler()
-    dados_scaled = scaler.fit_transform(dados)
+    # Criar linkage matrix
+    Z = linkage(dados, method='ward')
 
-    # 🔹 Aplicar KMeans
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-    clusters = kmeans.fit_predict(dados_scaled)
+    plt.figure(figsize=(10, 6))
 
-    # 🔹 Adicionar cluster ao dataframe original
-    df_resultado = dados.copy()
-    df_resultado['Cluster'] = clusters
+    if field:
+        try:
+            n_clusters = int(field)
+            max_d = None  # Desabilita corte por distância
+            dendrogram(Z, labels=dados.index.tolist(), leaf_rotation=90, color_threshold=None)
+            clusters = fcluster(Z, n_clusters, criterion='maxclust')
 
-    # 🔹 Gráfico (primeiras duas variáveis)
-    fig, ax = plt.subplots(figsize=(8, 5))
-    scatter = ax.scatter(
-        dados_scaled[:, 0],
-        dados_scaled[:, 1] if dados_scaled.shape[1] > 1 else np.zeros_like(dados_scaled[:, 0]),
-        c=clusters,
-        cmap='viridis',
-        edgecolor='k'
-    )
-    ax.set_xlabel(lista_x[0])
-    if len(lista_x) > 1:
-        ax.set_ylabel(lista_x[1])
-    else:
-        ax.set_ylabel('')
+            # Replot com color_threshold definido para número de clusters
+            plt.clf()  # Limpa figura
+            dendrogram(Z, labels=dados.index.tolist(), leaf_rotation=90, color_threshold=Z[-n_clusters+1, 2])
 
-    ax.set_title('📊 Cluster KMeans')
-    legend1 = ax.legend(*scatter.legend_elements(), title="Clusters")
-    ax.add_artist(legend1)
+            # Adiciona coluna de cluster no dataframe para reporte
+            dados['Cluster'] = clusters
+            cluster_counts = dados['Cluster'].value_counts().sort_index()
+            resumo_clusters = "\n".join([f"- Cluster {i}: {c} observações" for i, c in cluster_counts.items()])
 
-    plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+            plt.title("📊 Análise de Cluster Hierárquico (cores por cluster)")
+            plt.ylabel("Distância Euclidiana")
+            plt.xlabel("Observações")
+            plt.tight_layout()
 
-    # 🔹 Reporte
-    texto = f"""
-📊 **Análise de Cluster KMeans**
+            buf = BytesIO()
+            plt.savefig(buf, format='png')
+            plt.close()
+            grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+            texto = f"""
+📊 **Análise de Cluster Hierárquico**
 
 🔹 **Resultado**
 
-- Número de clusters: {n_clusters}
-- Variáveis utilizadas: {', '.join(lista_x)}
+- Número de clusters especificado: {n_clusters}
+- Método: linkage ward, distância euclidiana
 
-✔️ **Centroides**
-
-{pd.DataFrame(scaler.inverse_transform(kmeans.cluster_centers_), columns=lista_x).round(4).to_string(index=False)}
+✔️ **Resumo dos clusters**
+{resumo_clusters}
 
 ✔️ **Recomendações**
+- Use esses grupos para análises adicionais (ANOVA, regressão ou controle de processo).
+- Reveja o dendrograma colorido para avaliar se o número de clusters definido faz sentido estatístico e prático.
+""".strip()
 
-- Avaliar se o número de clusters escolhido faz sentido prático.
-- Verificar a separação visual e estatística entre os clusters para interpretar os grupos formados.
-    """.strip()
+        except Exception as e:
+            texto = f"""
+📊 **Análise de Cluster Hierárquico**
+
+🔹 **Resultado**
+
+❌ Erro ao processar número de clusters: {str(e)}
+
+✔️ **Recomendações**
+- Verifique se o número de clusters foi informado corretamente como número inteiro.
+""".strip()
+            grafico_base64 = None
+
+    else:
+        dendrogram(Z, labels=dados.index.tolist(), leaf_rotation=90)
+        plt.title("📊 Análise de Cluster Hierárquico")
+        plt.ylabel("Distância Euclidiana")
+        plt.xlabel("Observações")
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close()
+        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+        texto = f"""
+📊 **Análise de Cluster Hierárquico**
+
+🔹 **Resultado**
+
+- Nenhum número de clusters especificado. O dendrograma acima mostra a hierarquia completa.
+
+✔️ **Recomendações**
+- Analise o dendrograma para definir o número ideal de clusters antes de segmentar seus dados.
+""".strip()
 
     return texto, grafico_base64
+
 
 
 
@@ -609,7 +636,7 @@ ANALISES = {
     "Matrix de dispersão": analise_matrix_correlacao,
     "Análise de estabilidade": analise_estabilidade,
     "Análise de limpeza dos dados": analise_limpeza_dados,
-    "Análise de cluster": analise_cluster_kmeans
+    "Análise de cluster": analise_cluster_hierarchical
 }
 
 
