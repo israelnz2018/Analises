@@ -292,27 +292,6 @@ def analise_estabilidade(df, coluna_y):
     # Gráfico estilo Minitab
     fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
 
-    # Carta Individual (I)
-    y = dados[nome_coluna_y].values
-    x = dados["Subgrupo"].values
-    axs[0].plot(x, y, color="black", linestyle="-")
-    axs[0].scatter(x, y, color="black")
-    axs[0].axhline(media, color="green", linestyle="-")
-    axs[0].axhline(UCL_I, color="red", linestyle="-")
-    axs[0].axhline(LCL_I, color="red", linestyle="-")
-    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=14)
-    axs[0].set_ylabel("Valor Individual", fontsize=12)
-
-    xlim = axs[0].get_xlim()
-    axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=10, color="green")
-    axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=10, color="red")
-    axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=10, color="red")
-
-    crit1_flag_I = any((y > UCL_I) | (y < LCL_I))
-    for xi, yi in zip(x, y):
-        if yi > UCL_I or yi < LCL_I:
-            axs[0].scatter(xi, yi, color="red")
-
     # Carta MR
     x_mr = dados["Subgrupo"].values[1:]
     y_mr = mr[1:].values
@@ -332,6 +311,32 @@ def analise_estabilidade(df, coluna_y):
     for xi, yi in zip(x_mr, y_mr):
         if yi > UCL_MR:
             axs[1].scatter(xi, yi, color="red")
+
+    # Carta Individual (I)
+    y = dados[nome_coluna_y].values
+    x = dados["Subgrupo"].values
+    axs[0].plot(x, y, color="black", linestyle="-")
+    axs[0].scatter(x, y, color="black")
+    axs[0].axhline(media, color="green", linestyle="-")
+    axs[0].axhline(UCL_I, color="red", linestyle="-")
+    axs[0].axhline(LCL_I, color="red", linestyle="-")
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=14)
+    axs[0].set_ylabel("Valor Individual", fontsize=12)
+
+    # 🔷 ajuste o eixo X igual ao MR
+    axs[0].set_xlim(axs[1].get_xlim())
+    axs[0].set_xticks(axs[1].get_xticks())
+    axs[0].set_xticklabels(axs[1].get_xticklabels())
+
+    xlim = axs[0].get_xlim()
+    axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=10, color="green")
+    axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=10, color="red")
+    axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=10, color="red")
+
+    crit1_flag_I = any((y > UCL_I) | (y < LCL_I))
+    for xi, yi in zip(x, y):
+        if yi > UCL_I or yi < LCL_I:
+            axs[0].scatter(xi, yi, color="red")
 
     plt.tight_layout()
 
@@ -426,6 +431,7 @@ def analise_estabilidade(df, coluna_y):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
+
 
 
 
