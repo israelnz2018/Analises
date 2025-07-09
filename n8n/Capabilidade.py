@@ -521,7 +521,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
             dados = df[df[subgrupo] == grupo][coluna_y].dropna()
 
         if len(dados) < 30:
-            relatorio += f"\n\n🔹 **Resultado**\n\n⚠️ Mínimo de 30 dados recomendado.\n"
+            relatorio += f"🔹 **Resultado**\n\n⚠️ Mínimo de 30 dados recomendado.\n\n"
             continue
 
         try:
@@ -550,13 +550,14 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
                 Ppk = "N/A"
 
             # Gráfico (apenas curva da distribuição escolhida)
-            fig, ax = plt.subplots(figsize=(8, 5))
-            ax.hist(dados, bins=15, density=False, alpha=0.6, color='gray', edgecolor='black')
-            ax2 = ax.twinx()
-            ax2.plot(x, y, 'b-', label=f'Curva {dist_nome}')
-            ax2.set_ylabel('Densidade da Curva')
             x = np.linspace(min(dados), max(dados), 100)
-            y = dist.pdf(x, *params)
+            try:
+                y = dist.pdf(x, *params)
+            except Exception as e:
+                return f"❌ Erro ao calcular PDF para distribuição '{dist_nome}': {str(e)}", None
+
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
             ax.plot(x, y, 'b-', label=f'Curva {dist_nome}')
             if LIE is not None:
                 ax.axvline(LIE, color='red', linestyle='--', label='LIE (Limite Inf. Eng.)')
@@ -590,7 +591,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
                 recomendacoes.append("- Nível sigma adequado. Buscar oportunidades de melhoria contínua.")
 
             relatorio += f"""
-\n\n
+🔹 **Resultado**
 
 - {ajuste}
 - Porcentagem de defeitos estimada: {perc_defeitos:.2f}%
@@ -603,7 +604,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
 """.strip()
 
         except Exception as e:
-            relatorio += f"\n\n🔹 **Resultado**\n\n❌ Erro: {str(e)}\n"
+            relatorio += f"\n🔹 **Resultado**\n\n❌ Erro: {str(e)}\n\n"
 
     if not imagens:
         return relatorio.strip(), None
@@ -621,8 +622,6 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
         imagem_final.save(buffer, format="PNG")
         grafico_final_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
         return relatorio.strip(), grafico_final_base64
-
-
 
 
 
