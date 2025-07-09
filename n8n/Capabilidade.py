@@ -662,6 +662,7 @@ def analise_capabilidade_transformado(df, coluna_y, subgrupo=None, field_LIE=Non
         'Loglogística': stats.fisk
     }
 
+    # 📝 Verificar melhor distribuição antes da transformação
     resultados = []
     for nome, dist in distribs.items():
         try:
@@ -674,17 +675,11 @@ def analise_capabilidade_transformado(df, coluna_y, subgrupo=None, field_LIE=Non
     melhor_dist = max(resultados, key=lambda x: x[1])
     nome_melhor, p_melhor, params_melhor = melhor_dist
 
-    if p_melhor >= 0.05:
-        texto = f"""
-**Capabilidade - dados transformados**
-✅ A distribuição {nome_melhor} apresentou bom ajuste (p-valor={p_melhor:.4f}).
-Recomenda-se usar a capabilidade para essa distribuição ao invés de transformação.
-"""
-        return texto.strip(), None
-
+    # ✅ Proceder com a transformação Johnson sempre
     try:
         pt = PowerTransformer(method='yeo-johnson')
         dados_t = pt.fit_transform(dados.values.reshape(-1, 1)).flatten()
+
         ad_res = stats.anderson(dados_t)
         ad_sig = list(ad_res.significance_level)
         if 5 in ad_sig:
@@ -695,14 +690,7 @@ Recomenda-se usar a capabilidade para essa distribuição ao invés de transform
     except Exception as e:
         return f"❌ Erro na transformação Johnson: {str(e)}", None
 
-    if not ad_normal:
-        texto = f"""
-**Capabilidade - dados transformados**
-⚠ Nenhuma distribuição apresentou bom ajuste. Nenhuma transformação Johnson obteve normalidade (Anderson-Darling estat={ad_res.statistic:.4f}).
-Recomenda-se realizar capabilidade para dados discretizados ou usar métodos não paramétricos.
-"""
-        return texto.strip(), None
-
+    # Estatísticas após transformação
     mean = np.mean(dados_t)
     std = np.std(dados_t, ddof=1)
     Cp = (USL - LSL) / (6 * std)
@@ -713,6 +701,7 @@ Recomenda-se realizar capabilidade para dados discretizados ou usar métodos nã
     ppm_usl = 1e6 * (1 - stats.norm.cdf(USL, loc=mean, scale=std))
     ppm_total = ppm_lsl + ppm_usl
 
+    # Gráfico
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.hist(dados_t, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
     x = np.linspace(min(dados_t), max(dados_t), 100)
@@ -723,8 +712,12 @@ Recomenda-se realizar capabilidade para dados discretizados ou usar métodos nã
     if USL != float('inf'):
         ax.axvline(USL, color='red', linestyle='--', label='LSE')
     ax.axvline(mean, color='green', linestyle='--', label='Média')
-    ax.set_title('Capabilidade - Johnson Transformado')
+    ax.set_title(f'Capabilidade - {coluna_y} (Transformação Johnson)')
     ax.legend()
+    ax.set_facecolor('white')
+    ax.grid(True, linestyle=':', color='gray')
+    for spine in ax.spines.values():
+        spine.set_visible(False)
     plt.tight_layout()
 
     buf = BytesIO()
@@ -732,23 +725,33 @@ Recomenda-se realizar capabilidade para dados discretizados ou usar métodos nã
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # ✅ Relatório final no padrão bonito
     texto = f"""
-**Capabilidade - dados transformados**
-⚠ Nenhuma distribuição apresentou bom ajuste. Procedeu-se com transformação Johnson.
-- Anderson-Darling no transformado: estat={ad_res.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+📊 **Análise de Capabilidade com Transformação Johnson**
 
-**Resultados**
-- Cp = {Cp:.2f}
-- Cpk = {Cpk:.2f}
-- Z.bench = {z_bench:.2f}
+🔹 **Resultado**
+
+- Melhor distribuição antes da transformação: {nome_melhor} (p-valor={p_melhor:.4f})
+- ✅ Transformação Johnson aplicada para normalizar os dados
+- Anderson-Darling após transformação: estat={ad_res.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+
+✔️ **Resultados**
+
+- Cp: {Cp:.2f}
+- Cpk: {Cpk:.2f}
+- Z.bench: {z_bench:.2f}
 - PPM < LIE: {ppm_lsl:.2f}
 - PPM > LSE: {ppm_usl:.2f}
 - PPM Total: {ppm_total:.2f}
 
-✅ Transformação Johnson bem-sucedida. Capabilidade calculada no transformado.
-"""
+✔️ **Recomendações**
 
-    return texto.strip(), grafico_base64
+- Validar a adequação do modelo transformado antes de usá-lo em decisões críticas.
+- Se a normalidade não for alcançada, considerar métodos não paramétricos ou análise de capabilidade para dados não normais.
+""".strip()
+
+    return texto, grafico_base64
+
 
 
 def analise_capabilidade_discretizado(df, coluna_y, field_LIE=None, field_LSE=None):
