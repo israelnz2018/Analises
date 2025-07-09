@@ -516,86 +516,89 @@ def analise_limpeza_dados(df):
     texto_final = "<br>".join(resultado)
     return texto_final, None
 
-def analise_cluster_kmeans(df, colunas_x, n_clusters=3):
+
+def analise_cluster_kmeans(df, lista_x, n_clusters=3):
+    """
+    Análise de Cluster KMeans com múltiplas variáveis (lista_x).
+    """
+
+    # ⚠️ Verificar se lista_x foi fornecida
+    if not lista_x or any(col not in df.columns for col in lista_x):
+        return "❌ É necessário informar uma lista de colunas X válidas.", None
+
     import numpy as np
     import pandas as pd
     import matplotlib.pyplot as plt
+    from sklearn.cluster import KMeans
+    from sklearn.preprocessing import StandardScaler
     from io import BytesIO
     import base64
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.decomposition import PCA
-    from sklearn.cluster import KMeans
 
-    # Validação de entrada
-    if not colunas_x or len(colunas_x) < 2:
-        return "❌ Análise de cluster requer pelo menos 2 colunas numéricas.", None
+    # 🔹 Selecionar os dados e remover NA
+    dados = df[lista_x].dropna()
 
-    for col in colunas_x:
-        if not np.issubdtype(df[col].dtype, np.number):
-            return f"❌ Coluna '{col}' não é numérica. Apenas variáveis contínuas são permitidas.", None
+    # ⚠️ Verificar se há dados suficientes
+    if len(dados) < n_clusters:
+        return f"❌ Dados insuficientes para formar {n_clusters} clusters.", None
 
-    # Dados
-    dados = df[colunas_x].dropna()
-
-    # Padronização
+    # 🔹 Padronizar os dados
     scaler = StandardScaler()
     dados_scaled = scaler.fit_transform(dados)
 
-    # K-Means
-    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    # 🔹 Aplicar KMeans
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
     clusters = kmeans.fit_predict(dados_scaled)
 
-    # PCA para redução de dimensão
-    pca = PCA(n_components=2)
-    componentes = pca.fit_transform(dados_scaled)
+    # 🔹 Adicionar cluster ao dataframe original
+    df_resultado = dados.copy()
+    df_resultado['Cluster'] = clusters
 
-    # Gráfico
+    # 🔹 Gráfico (primeiras duas variáveis)
     fig, ax = plt.subplots(figsize=(8, 5))
-    for i in range(n_clusters):
-        pontos = componentes[clusters == i]
-        ax.scatter(pontos[:, 0], pontos[:, 1], label=f'Cluster {i+1}')
-    ax.set_title('📊 Clusterização (K-Means + PCA)')
-    ax.set_xlabel('Componente Principal 1')
-    ax.set_ylabel('Componente Principal 2')
-    ax.legend()
-    plt.tight_layout()
+    scatter = ax.scatter(
+        dados_scaled[:, 0],
+        dados_scaled[:, 1] if dados_scaled.shape[1] > 1 else np.zeros_like(dados_scaled[:, 0]),
+        c=clusters,
+        cmap='viridis',
+        edgecolor='k'
+    )
+    ax.set_xlabel(lista_x[0])
+    if len(lista_x) > 1:
+        ax.set_ylabel(lista_x[1])
+    else:
+        ax.set_ylabel('')
 
+    ax.set_title('📊 Cluster KMeans')
+    legend1 = ax.legend(*scatter.legend_elements(), title="Clusters")
+    ax.add_artist(legend1)
+
+    plt.tight_layout()
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Reporte
-    sizes = pd.Series(clusters).value_counts().sort_index()
-    centros = pd.DataFrame(scaler.inverse_transform(kmeans.cluster_centers_), columns=colunas_x)
-
+    # 🔹 Reporte
     texto = f"""
-📊 **Análise de Cluster K-Means**
+📊 **Análise de Cluster KMeans**
 
 🔹 **Resultado**
 
-- Número de clusters definidos: {n_clusters}
-- Distribuição de dados por cluster:
-"""
+- Número de clusters: {n_clusters}
+- Variáveis utilizadas: {', '.join(lista_x)}
 
-    for idx, size in sizes.items():
-        texto += f"  - Cluster {idx+1}: {size} itens\n"
+✔️ **Centroides**
 
-    texto += "\n✔️ **Centroides (médias por cluster)**\n"
+{pd.DataFrame(scaler.inverse_transform(kmeans.cluster_centers_), columns=lista_x).round(4).to_string(index=False)}
 
-    for i, row in centros.iterrows():
-        centroid_str = ', '.join([f"{col}: {row[col]:.2f}" for col in colunas_x])
-        texto += f"- Cluster {i+1}: {centroid_str}\n"
+✔️ **Recomendações**
 
-    texto += """
-✔️ **Interpretação**
+- Avaliar se o número de clusters escolhido faz sentido prático.
+- Verificar a separação visual e estatística entre os clusters para interpretar os grupos formados.
+    """.strip()
 
-- Clusters indicam grupos com padrões semelhantes nos dados.
-- Clusters pequenos podem indicar outliers.
-- Utilize essas informações para segmentação de causas, clientes ou produtos.
-"""
+    return texto, grafico_base64
 
-    return texto.strip(), grafico_base64
 
 
 
