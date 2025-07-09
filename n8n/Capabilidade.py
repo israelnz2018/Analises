@@ -478,14 +478,14 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
         return "❌ Pelo menos um dos limites (LIE ou LSE) deve ser informado.", None
 
     try:
-        LSL = float(field_LIE) if field_LIE else float('-inf')
+        LIE = float(field_LIE) if field_LIE else None
     except:
-        LSL = float('-inf')
+        LIE = None
 
     try:
-        USL = float(field_LSE) if field_LSE else float('inf')
+        LSE = float(field_LSE) if field_LSE else None
     except:
-        USL = float('inf')
+        LSE = None
 
     dist_nome = field_dist.strip()
     from scipy import stats
@@ -494,18 +494,14 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
     from io import BytesIO
     import base64
 
+    # Distribuições suportadas
     distros = {
         "Normal": stats.norm,
         "Lognormal": stats.lognorm,
         "Exponencial": stats.expon,
         "Weibull": stats.weibull_min,
         "Gamma": stats.gamma,
-        "Beta": stats.beta,
-        "Gumbel": stats.gumbel_r,
-        "Loglogística": stats.fisk,
-        "Uniforme": stats.uniform,
-        "Triangular": stats.triang,
-        "Johnson SU": stats.johnsonsu
+        "Logistica": stats.logistic
     }
 
     if dist_nome not in distros:
@@ -513,7 +509,10 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
 
     dist = distros[dist_nome]
 
-    texto_final = f"**Capabilidade - outras distribuições**\n- Distribuição escolhida: {dist_nome}\n\n"
+    relatorio = f"""
+📊 **Análise de Capabilidade com Distribuição {dist_nome}**
+
+""".strip()
     imagens = []
 
     if subgrupo and subgrupo in df.columns:
@@ -530,79 +529,83 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
             grupo_nome = f"Subgrupo: {grupo}"
 
         if len(dados) < 30:
-            texto_final += f"\n🔸 **{grupo_nome}**: mínimo de 30 dados recomendado.\n"
+            relatorio += f"\n⚠️ **{grupo_nome}**: mínimo de 30 dados recomendado.\n"
             continue
 
         try:
             params = dist.fit(dados)
             ks_stat, ks_p = stats.kstest(dados, dist.cdf, args=params)
-            ppm_lsl = 1e6 * dist.cdf(LSL, *params)
-            ppm_usl = 1e6 * (1 - dist.cdf(USL, *params))
-            ppm_total = ppm_lsl + ppm_usl
+            ppm_lie = dist.cdf(LIE, *params) * 1e6 if LIE is not None else 0
+            ppm_lse = (1 - dist.cdf(LSE, *params)) * 1e6 if LSE is not None else 0
+            ppm_total = ppm_lie + ppm_lse
             perc_defeitos = ppm_total / 10000
+
+            # Estimativa de nível sigma (simplificada, interpretação qualitativa)
             nivel_sigma = round(6 - stats.norm.ppf(ppm_total / 1e6 / 2) * 2, 2)
 
+            # Gráfico
             fig, ax = plt.subplots(figsize=(8, 5))
             ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
             x = np.linspace(min(dados), max(dados), 100)
             y = dist.pdf(x, *params)
             ax.plot(x, y, 'b-', label=f'Curva {dist_nome}')
-            if LSL != float('-inf'):
-                ax.axvline(LSL, color='red', linestyle='--', label='LIE')
-            if USL != float('inf'):
-                ax.axvline(USL, color='red', linestyle='--', label='LSE')
+            if LIE is not None:
+                ax.axvline(LIE, color='red', linestyle='--', label='LIE (Limite Inf. Eng.)')
+            if LSE is not None:
+                ax.axvline(LSE, color='red', linestyle='--', label='LSE (Limite Sup. Eng.)')
             ax.axvline(np.mean(dados), color='green', linestyle='--', label='Média')
-            ax.set_title(f'{grupo_nome} - {dist_nome}')
+            ax.set_title(f'Capabilidade - {grupo_nome} - {dist_nome}')
             ax.legend()
+            ax.set_facecolor('white')
+            ax.grid(True, linestyle=':', color='gray')
+            for spine in ax.spines.values():
+                spine.set_visible(False)
             plt.tight_layout()
             buf = BytesIO()
             plt.savefig(buf, format='png')
             plt.close(fig)
             imagens.append(base64.b64encode(buf.getvalue()).decode('utf-8'))
 
-            alerta = (
-                "⚠ A distribuição não se ajusta bem aos dados. Considere testar outra distribuição."
-                if ks_p < 0.05 else
-                "✅ A distribuição se ajusta bem aos dados."
-            )
+            # Interpretação
+            ajuste = "✅ A distribuição se ajusta bem aos dados." if ks_p >= 0.05 else "⚠️ A distribuição não se ajusta bem aos dados. Considere testar outra."
 
-            recomendacao = ""
+            recomendacoes = []
             if perc_defeitos > 1.0:
-                recomendacao += "- Alta taxa de defeitos. Recomenda-se ação corretiva.\n"
+                recomendacoes.append("- Alta taxa de defeitos. Recomenda-se ação corretiva.")
             if nivel_sigma < 3:
-                recomendacao += "- Nível sigma abaixo de 3. Processo precisa ser melhorado.\n"
+                recomendacoes.append("- Nível sigma abaixo de 3. Processo precisa ser melhorado.")
 
-            texto_final += f"""
+            relatorio += f"""
 🔹 **{grupo_nome}**
 - Parâmetros estimados: {', '.join([f'{p:.4f}' for p in params])}
-- {alerta}
+- {ajuste}
 - Porcentagem de defeitos estimada: {perc_defeitos:.2f}%
-- Nível sigma estimado: {nivel_sigma}
-{recomendacao}"""
+- Nível Sigma estimado: {nivel_sigma}
+""".strip()
+
+            if recomendacoes:
+                relatorio += "\n✔️ **Recomendações**\n" + "\n".join(recomendacoes)
+
         except Exception as e:
-            texto_final += f"\n❌ Erro no grupo {grupo_nome}: {str(e)}\n"
+            relatorio += f"\n❌ Erro no grupo {grupo_nome}: {str(e)}\n"
 
     if not imagens:
-        return texto_final.strip(), None
+        return relatorio.strip(), None
     else:
         from PIL import Image
-        from io import BytesIO
-
         imgs = [Image.open(BytesIO(base64.b64decode(img))) for img in imagens]
         largura_max = max(img.width for img in imgs)
         altura_total = sum(img.height for img in imgs)
         imagem_final = Image.new("RGB", (largura_max, altura_total), (255, 255, 255))
-
         y_offset = 0
         for img in imgs:
             imagem_final.paste(img, (0, y_offset))
             y_offset += img.height
-
         buffer = BytesIO()
         imagem_final.save(buffer, format="PNG")
         grafico_final_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return relatorio.strip(), grafico_final_base64
 
-        return texto_final.strip(), grafico_final_base64
 
 
 
