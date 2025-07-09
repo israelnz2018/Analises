@@ -465,7 +465,6 @@ Total: {percent_total:.2f}%
 
 
 
-
 def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
@@ -510,6 +509,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
     relatorio = f"""
 📊 **Análise de Capabilidade com Distribuição {dist_nome}**
 
+🔹 **Resultado**
 """.strip()
     imagens = []
 
@@ -521,7 +521,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
     for grupo in grupos:
         if grupo is None:
             dados = df[coluna_y].dropna()
-            grupo_nome = "Geral"
+            grupo_nome = "Resultado"  # Subtítulo atualizado
         else:
             dados = df[df[subgrupo] == grupo][coluna_y].dropna()
             grupo_nome = f"Subgrupo: {grupo}"
@@ -556,7 +556,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
             if LSE is not None:
                 ax.axvline(LSE, color='red', linestyle='--', label='LSE (Limite Sup. Eng.)')
             ax.axvline(np.mean(dados), color='green', linestyle='--', label='Média')
-            ax.set_title(f'Capabilidade - {grupo_nome} - {dist_nome}')
+            ax.set_title(f'Capabilidade - {dist_nome}')
             ax.legend()
             ax.set_facecolor('white')
             ax.grid(True, linestyle=':', color='gray')
@@ -583,7 +583,6 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
                 recomendacoes.append("- Nível sigma adequado. Buscar oportunidades de melhoria contínua.")
 
             relatorio += f"""
-🔹 **{grupo_nome}**
 - Parâmetros estimados: {', '.join([f'{p:.4f}' for p in params])}
 - {ajuste}
 - Porcentagem de defeitos estimada: {perc_defeitos:.2f}%
@@ -611,6 +610,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
         imagem_final.save(buffer, format="PNG")
         grafico_final_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
         return relatorio.strip(), grafico_final_base64
+
 
 
 
