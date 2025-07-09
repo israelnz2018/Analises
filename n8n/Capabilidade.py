@@ -756,25 +756,50 @@ def analise_capabilidade_discretizado(df, coluna_y, field_LIE=None, field_LSE=No
 
     import matplotlib.pyplot as plt
     import numpy as np
+    from scipy import stats
     from io import BytesIO
     import base64
 
-    ppm_lsl = 1e6 * np.sum(dados < LSL) / len(dados)
-    ppm_usl = 1e6 * np.sum(dados > USL) / len(dados)
-    ppm_total = ppm_lsl + ppm_usl
+    total = len(dados)
+    abaixo = np.sum(dados < LSL)
+    dentro = np.sum((dados >= LSL) & (dados <= USL))
+    acima = np.sum(dados > USL)
 
+    perc_abaixo = abaixo / total * 100
+    perc_dentro = dentro / total * 100
+    perc_acima = acima / total * 100
+
+    # Nível Sigma (estimado com base nos limites e desvio padrão global)
+    mean = np.mean(dados)
+    std = np.std(dados, ddof=1)
+    if std == 0:
+        nivel_sigma = 0
+    else:
+        nivel_sigma = min((USL - mean), (mean - LSL)) / std
+
+    # Histograma com cores diferenciadas
     fig, ax = plt.subplots(figsize=(8, 5))
-    valores, contagens = np.unique(dados, return_counts=True)
-    ax.bar(valores, contagens / len(dados), width=0.8, color='gray', edgecolor='black', alpha=0.7)
-    if LSL != float('-inf'):
-        ax.axvline(LSL, color='red', linestyle='--', label='LIE')
-    if USL != float('inf'):
-        ax.axvline(USL, color='red', linestyle='--', label='LSE')
-    ax.axvline(np.mean(dados), color='green', linestyle='--', label='Média')
-    ax.set_title('Capabilidade - Dados Discretizados')
+    counts, bins, patches = ax.hist(dados, bins=15, edgecolor='black', alpha=0.7)
+
+    for patch, left in zip(patches, bins):
+        if left < LSL or left > USL:
+            patch.set_facecolor('red')
+        else:
+            patch.set_facecolor('green')
+
+    ax.axvline(LSL, color='red', linestyle='--', label='LIE')
+    ax.axvline(USL, color='red', linestyle='--', label='LSE')
+    ax.axvline(mean, color='blue', linestyle='--', label='Média')
+
+    ax.set_title(f'Capabilidade - Dados Discretizados ({coluna_y})')
     ax.set_xlabel(coluna_y)
-    ax.set_ylabel('Frequência relativa')
+    ax.set_ylabel('Frequência')
     ax.legend()
+    ax.set_facecolor('white')
+    ax.grid(True, linestyle=':', color='gray')
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
     plt.tight_layout()
 
     buf = BytesIO()
@@ -782,17 +807,38 @@ def analise_capabilidade_discretizado(df, coluna_y, field_LIE=None, field_LSE=No
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    texto = f"""
-**Capabilidade - com dados discretizados**
-- PPM observado < LIE: {ppm_lsl:.2f}
-- PPM observado > LSE: {ppm_usl:.2f}
-- PPM total: {ppm_total:.2f}
+    # Relatório formatado
+    relatorio = f"""
+📊 **Análise de Capabilidade com Dados Discretizados**
 
-⚠ Cp, Cpk, Pp e Ppk não são aplicáveis a dados discretizados.
-✅ Capabilidade calculada com base na frequência real dos dados. Avalie o gráfico para verificar a distribuição dos níveis em relação aos limites.
-"""
+🔹 **Resultado**
 
-    return texto.strip(), grafico_base64
+- Método: Discretização por limites de especificação
+- Classes definidas:
+  - **Classe 1**: Abaixo do LIE
+  - **Classe 2**: Dentro dos limites (LIE–LSE)
+  - **Classe 3**: Acima do LSE
+- Total de peças analisadas: **{total}**
+
+✔️ **Análises**
+
+- % Defeituoso abaixo LIE: **{perc_abaixo:.2f}%**
+- % Conforme dentro dos limites: **{perc_dentro:.2f}%**
+- % Defeituoso acima LSE: **{perc_acima:.2f}%**
+- % Total de defeitos: **{(perc_abaixo + perc_acima):.2f}%**
+- Nível Sigma (estimado): **{nivel_sigma:.2f} sigma**
+
+✔️ **Recomendações**
+
+- Processo com taxa de defeitos de {(perc_abaixo + perc_acima):.2f}%, acima do ideal (≤1%).
+- Recomenda-se:
+  - Ajustar centro do processo para reduzir rejeições.
+  - Investigar causas especiais de variação.
+  - Implementar controles adicionais ou revisitar especificações.
+""".strip()
+
+    return relatorio, grafico_base64
+
 
 
 ANALISES = {
