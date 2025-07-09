@@ -452,6 +452,7 @@ def analise_estabilidade(df, coluna_y):
 
 
 
+
 def analise_limpeza_dados(df):
     import numpy as np
     import pandas as pd
