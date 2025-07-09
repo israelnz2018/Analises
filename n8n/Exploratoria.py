@@ -516,6 +516,86 @@ def analise_limpeza_dados(df):
     texto_final = "<br>".join(resultado)
     return texto_final, None
 
+def analise_cluster_kmeans(df, colunas_x, n_clusters=3):
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.decomposition import PCA
+    from sklearn.cluster import KMeans
+
+    # Validação de entrada
+    if not colunas_x or len(colunas_x) < 2:
+        return "❌ Análise de cluster requer pelo menos 2 colunas numéricas.", None
+
+    for col in colunas_x:
+        if not np.issubdtype(df[col].dtype, np.number):
+            return f"❌ Coluna '{col}' não é numérica. Apenas variáveis contínuas são permitidas.", None
+
+    # Dados
+    dados = df[colunas_x].dropna()
+
+    # Padronização
+    scaler = StandardScaler()
+    dados_scaled = scaler.fit_transform(dados)
+
+    # K-Means
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    clusters = kmeans.fit_predict(dados_scaled)
+
+    # PCA para redução de dimensão
+    pca = PCA(n_components=2)
+    componentes = pca.fit_transform(dados_scaled)
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(8, 5))
+    for i in range(n_clusters):
+        pontos = componentes[clusters == i]
+        ax.scatter(pontos[:, 0], pontos[:, 1], label=f'Cluster {i+1}')
+    ax.set_title('📊 Clusterização (K-Means + PCA)')
+    ax.set_xlabel('Componente Principal 1')
+    ax.set_ylabel('Componente Principal 2')
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    # Reporte
+    sizes = pd.Series(clusters).value_counts().sort_index()
+    centros = pd.DataFrame(scaler.inverse_transform(kmeans.cluster_centers_), columns=colunas_x)
+
+    texto = f"""
+📊 **Análise de Cluster K-Means**
+
+🔹 **Resultado**
+
+- Número de clusters definidos: {n_clusters}
+- Distribuição de dados por cluster:
+"""
+
+    for idx, size in sizes.items():
+        texto += f"  - Cluster {idx+1}: {size} itens\n"
+
+    texto += "\n✔️ **Centroides (médias por cluster)**\n"
+
+    for i, row in centros.iterrows():
+        centroid_str = ', '.join([f"{col}: {row[col]:.2f}" for col in colunas_x])
+        texto += f"- Cluster {i+1}: {centroid_str}\n"
+
+    texto += """
+✔️ **Interpretação**
+
+- Clusters indicam grupos com padrões semelhantes nos dados.
+- Clusters pequenos podem indicar outliers.
+- Utilize essas informações para segmentação de causas, clientes ou produtos.
+"""
+
+    return texto.strip(), grafico_base64
 
 
 
@@ -525,7 +605,8 @@ ANALISES = {
     "Correlação de person": analise_correlacao_person,
     "Matrix de dispersão": analise_matrix_correlacao,
     "Análise de estabilidade": analise_estabilidade,
-    "Análise de limpeza dos dados": analise_limpeza_dados
+    "Análise de limpeza dos dados": analise_limpeza_dados,
+    "Análise de cluster": analise_cluster_kmeans
 }
 
 
