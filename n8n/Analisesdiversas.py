@@ -152,86 +152,8 @@ def analise_probabilidade_baixo_X(df, coluna_y, field=None):
 
 
 
-
-
-
-def analise_cluster_mista(df: pd.DataFrame, colunas_usadas: list, field=None):
-    if len(colunas_usadas) < 2:
-        return "❌ A análise de cluster (mista) requer pelo menos 2 variáveis (Xs e/ou Xs_discreto).", None
-
-    dados = df[colunas_usadas].dropna()
-    if dados.shape[0] < 5:
-        return "❌ É necessário pelo menos 5 linhas para formar clusters.", None
-
-    import numpy as np
-    import pandas as pd
-    from sklearn.preprocessing import OneHotEncoder, StandardScaler
-    from sklearn.cluster import AgglomerativeClustering
-    from sklearn.decomposition import PCA
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-
-    # Separa numérico e categórico
-    numericos = dados.select_dtypes(include=np.number)
-    categoricos = dados.select_dtypes(exclude=np.number)
-
-    # Normaliza numéricos
-    if not numericos.empty:
-        scaler = StandardScaler()
-        numericos_scaled = scaler.fit_transform(numericos)
-    else:
-        numericos_scaled = np.empty((len(dados), 0))
-
-    # One-hot para categóricos
-    if not categoricos.empty:
-        encoder = OneHotEncoder(sparse=False, handle_unknown='ignore')
-        categoricos_encoded = encoder.fit_transform(categoricos)
-    else:
-        categoricos_encoded = np.empty((len(dados), 0))
-
-    # Junta
-    matriz = np.hstack([numericos_scaled, categoricos_encoded])
-
-    # Cluster
-    cluster = AgglomerativeClustering(n_clusters=None, distance_threshold=0.5)
-    labels = cluster.fit_predict(matriz)
-
-    # Relatório
-    dados_cluster = dados.copy()
-    dados_cluster['Cluster'] = labels
-    resumo = []
-    for c in np.unique(labels):
-        grupo = dados_cluster[dados_cluster['Cluster'] == c]
-        resumo.append(f"- Cluster {c}: {len(grupo)} amostras")
-    texto = "**Análise de Cluster (mista)**\n" + "\n".join(resumo)
-
-    # Gráfico 2D
-    if matriz.shape[1] > 2:
-        pca = PCA(n_components=2)
-        matriz_plot = pca.fit_transform(matriz)
-    else:
-        matriz_plot = matriz
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    for c in np.unique(labels):
-        pontos = matriz_plot[labels == c]
-        ax.scatter(pontos[:, 0], pontos[:, 1], label=f'Cluster {c}', alpha=0.6)
-    ax.set_title("Clusters (mista) - Redução PCA")
-    ax.legend()
-
-    plt.tight_layout()
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-
-    return texto.strip(), grafico_base64
-
-
 ANALISES = {
     "Cálculo de probabilidade": analise_probabilidade_baixo_X,
-    "Análise de Cluster (mista)": analise_cluster_mista
 
 }
 
