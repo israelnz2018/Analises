@@ -307,7 +307,7 @@ def analise_estabilidade(df, coluna_y):
     axs[0].axhline(LCL_I, color="red", linestyle="-")
     axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=22)
     axs[0].set_ylabel("Valor Individual", fontsize=18)
-    axs[0].set_xlabel("Subgrupo", fontsize=18)
+    axs[0].set_xlabel("Dados individuais", fontsize=18)
 
     axs[0].set_xlim(left=x_min - 0.5, right=x_max)
     axs[0].set_xticks(ticks)
