@@ -732,7 +732,6 @@ def analise_capabilidade_johnson(df, coluna_y, subgrupo=None, field_LIE=None, fi
 
 
 
-
 def analise_capabilidade_discretizado(df, coluna_y, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
@@ -756,88 +755,79 @@ def analise_capabilidade_discretizado(df, coluna_y, field_LIE=None, field_LSE=No
 
     import matplotlib.pyplot as plt
     import numpy as np
-    from scipy import stats
     from io import BytesIO
     import base64
 
-    total = len(dados)
-    abaixo = np.sum(dados < LSL)
-    dentro = np.sum((dados >= LSL) & (dados <= USL))
-    acima = np.sum(dados > USL)
+    # Cálculo de defeitos
+    ppm_lsl = 1e6 * np.sum(dados < LSL) / len(dados)
+    ppm_usl = 1e6 * np.sum(dados > USL) / len(dados)
+    ppm_total = ppm_lsl + ppm_usl
 
-    perc_abaixo = abaixo / total * 100
-    perc_dentro = dentro / total * 100
-    perc_acima = acima / total * 100
+    percent_below = ppm_lsl / 10000
+    percent_above = ppm_usl / 10000
+    percent_total = ppm_total / 10000
 
-    # Nível Sigma (estimado com base nos limites e desvio padrão global)
-    mean = np.mean(dados)
-    std = np.std(dados, ddof=1)
-    if std == 0:
-        nivel_sigma = 0
+    # Nível sigma aproximado (Z.bench)
+    from scipy import stats
+    if LSL != float('-inf') and USL != float('inf'):
+        nivel_sigma = min((np.mean(dados) - LSL), (USL - np.mean(dados))) / np.std(dados, ddof=1)
     else:
-        nivel_sigma = min((USL - mean), (mean - LSL)) / std
+        nivel_sigma = (np.mean(dados) - LSL) / np.std(dados, ddof=1) if LSL != float('-inf') else (USL - np.mean(dados)) / np.std(dados, ddof=1)
 
-    # Histograma com cores diferenciadas
+    # Plot
     fig, ax = plt.subplots(figsize=(8, 5))
-    counts, bins, patches = ax.hist(dados, bins=15, edgecolor='black', alpha=0.7)
 
-    for patch, left in zip(patches, bins):
-        if left < LSL or left > USL:
+    # Bins 3x mais finos
+    n_bins = 15 * 3
+    n, bins, patches = ax.hist(dados, bins=n_bins, density=False, alpha=0.7, edgecolor='black')
+
+    # Colorir barras
+    for patch, left, right in zip(patches, bins[:-1], bins[1:]):
+        if right < LSL or left > USL:
             patch.set_facecolor('red')
-        else:
+        elif left >= LSL and right <= USL:
             patch.set_facecolor('green')
+        else:
+            patch.set_facecolor('orange')  # cruza o limite
 
-    ax.axvline(LSL, color='red', linestyle='--', label='LIE')
-    ax.axvline(USL, color='red', linestyle='--', label='LSE')
-    ax.axvline(mean, color='blue', linestyle='--', label='Média')
+    # Linhas de limites e média
+    if LSL != float('-inf'):
+        ax.axvline(LSL, color='red', linestyle='--', label='LIE')
+    if USL != float('inf'):
+        ax.axvline(USL, color='red', linestyle='--', label='LSE')
+    ax.axvline(np.mean(dados), color='green', linestyle='--', label='Média')
 
     ax.set_title(f'Capabilidade - Dados Discretizados ({coluna_y})')
     ax.set_xlabel(coluna_y)
     ax.set_ylabel('Frequência')
     ax.legend()
-    ax.set_facecolor('white')
-    ax.grid(True, linestyle=':', color='gray')
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-
     plt.tight_layout()
 
+    # Salvar gráfico em base64
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Relatório formatado
-    relatorio = f"""
+    # Reporte
+    texto = f"""
 📊 **Análise de Capabilidade com Dados Discretizados**
 
 🔹 **Resultado**
 
-- Método: Discretização por limites de especificação
-- Classes definidas:
-  - **Classe 1**: Abaixo do LIE
-  - **Classe 2**: Dentro dos limites (LIE–LSE)
-  - **Classe 3**: Acima do LSE
-- Total de peças analisadas: **{total}**
-
-✔️ **Análises**
-
-- % Defeituoso abaixo LIE: **{perc_abaixo:.2f}%**
-- % Conforme dentro dos limites: **{perc_dentro:.2f}%**
-- % Defeituoso acima LSE: **{perc_acima:.2f}%**
-- % Total de defeitos: **{(perc_abaixo + perc_acima):.2f}%**
-- Nível Sigma (estimado): **{nivel_sigma:.2f} sigma**
+- % Defeito abaixo LIE: {percent_below:.2f}%
+- % Defeito acima LSE: {percent_above:.2f}%
+- % Defeito Total: {percent_total:.2f}%
+- Nível Sigma estimado: {nivel_sigma:.2f}
 
 ✔️ **Recomendações**
 
-- Processo com taxa de defeitos de {(perc_abaixo + perc_acima):.2f}%, acima do ideal (≤1%).
-- Recomenda-se:
-  - Ajustar centro do processo para reduzir rejeições.
-  - Investigar causas especiais de variação.
-  - Implementar controles adicionais ou revisitar especificações.
-""".strip()
+- Avalie se a distribuição dos dados está coerente com a realidade do processo.
+- Se necessário, aumente a amostra ou considere análise não paramétrica.
+"""
 
-    return relatorio, grafico_base64
+    return texto.strip(), grafico_base64
+
 
 
 
