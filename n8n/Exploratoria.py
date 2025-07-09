@@ -290,7 +290,7 @@ def analise_estabilidade(df, coluna_y):
     UCL_MR = mr_mean * 3.267
 
     # Gráfico estilo Minitab
-    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(14, 12), sharex=True)
 
     # Carta MR
     x_mr = dados["Subgrupo"].values[1:]
@@ -299,8 +299,14 @@ def analise_estabilidade(df, coluna_y):
     axs[1].scatter(x_mr, y_mr, color="black")
     axs[1].axhline(mr_mean, color="green", linestyle="-")
     axs[1].axhline(UCL_MR, color="red", linestyle="-")
-    axs[1].set_title("Carta MR", fontsize=14)
-    axs[1].set_ylabel("Amplitude Móvel", fontsize=12)
+    axs[1].set_title("Carta MR", fontsize=18)  # 🔷 título maior
+    axs[1].set_ylabel("Amplitude Móvel", fontsize=14)  # 🔷 y label maior
+    axs[1].set_xlabel("Subgrupo", fontsize=14)  # 🔷 x label maior
+
+    # ➡️ começar em zero com margem (ex: -0.5) sem alterar demais limites
+    x_min_mr = 0
+    x_max_mr = max(x_mr) + 1
+    axs[1].set_xlim(left=x_min_mr - 0.5, right=x_max_mr)
 
     xlim_mr = axs[1].get_xlim()
     axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=10, color="green")
@@ -320,13 +326,13 @@ def analise_estabilidade(df, coluna_y):
     axs[0].axhline(media, color="green", linestyle="-")
     axs[0].axhline(UCL_I, color="red", linestyle="-")
     axs[0].axhline(LCL_I, color="red", linestyle="-")
-    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=14)
-    axs[0].set_ylabel("Valor Individual", fontsize=12)
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18)  # 🔷 título maior
+    axs[0].set_ylabel("Valor Individual", fontsize=14)  # 🔷 y label maior
 
-    # 🔷 ajuste o eixo X igual ao MR
+    # 🔷 Ajuste do eixo X igual ao MR, mas garantindo exibição dos valores
     axs[0].set_xlim(axs[1].get_xlim())
     axs[0].set_xticks(axs[1].get_xticks())
-    axs[0].set_xticklabels(axs[1].get_xticklabels())
+    axs[0].set_xticklabels([int(tick) for tick in axs[1].get_xticks()], fontsize=12)
 
     xlim = axs[0].get_xlim()
     axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=10, color="green")
@@ -431,6 +437,7 @@ def analise_estabilidade(df, coluna_y):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
+
 
 
 
