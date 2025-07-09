@@ -505,9 +505,8 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
 
     dist = distros[dist_nome]
 
-    relatorio = f"""
-📊 **Análise de Capabilidade com Distribuição {dist_nome}**
-""".strip()
+    relatorio = f"📊 **Análise de Capabilidade com Distribuição {dist_nome}**"
+
     imagens = []
 
     if subgrupo and subgrupo in df.columns:
@@ -522,7 +521,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
             dados = df[df[subgrupo] == grupo][coluna_y].dropna()
 
         if len(dados) < 30:
-            relatorio += f"\n⚠️ **Resultado**: mínimo de 30 dados recomendado.\n"
+            relatorio += f"\n\n🔹 **Resultado**\n\n⚠️ Mínimo de 30 dados recomendado.\n"
             continue
 
         try:
@@ -539,6 +538,16 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
             else:
                 p_defeito = ppm_total / 1e6
                 nivel_sigma = round(stats.norm.ppf(1 - p_defeito / 2), 2)
+
+            # Calcular Pp e Ppk
+            if LIE is not None and LSE is not None:
+                amplitude = LSE - LIE
+                std_global = np.std(dados, ddof=1)
+                Pp = amplitude / (6 * std_global)
+                Ppk = min((LSE - np.mean(dados)), (np.mean(dados) - LIE)) / (3 * std_global)
+            else:
+                Pp = "N/A"
+                Ppk = "N/A"
 
             # Gráfico (apenas curva da distribuição escolhida)
             fig, ax = plt.subplots(figsize=(8, 5))
@@ -578,17 +587,20 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
                 recomendacoes.append("- Nível sigma adequado. Buscar oportunidades de melhoria contínua.")
 
             relatorio += f"""
-\n🔹 **Resultado**
-- Parâmetros estimados: {', '.join([f'{p:.4f}' for p in params])}
+\n\n🔹 **Resultado**
+
 - {ajuste}
 - Porcentagem de defeitos estimada: {perc_defeitos:.2f}%
 - Nível Sigma estimado: {nivel_sigma}
+- Pp: {Pp if isinstance(Pp,str) else f"{Pp:.2f}"}
+- Ppk: {Ppk if isinstance(Ppk,str) else f"{Ppk:.2f}"}
+
 ✔️ **Recomendações**
 {chr(10).join(recomendacoes)}
 """.strip()
 
         except Exception as e:
-            relatorio += f"\n❌ Erro em Resultado: {str(e)}\n"
+            relatorio += f"\n\n🔹 **Resultado**\n\n❌ Erro: {str(e)}\n"
 
     if not imagens:
         return relatorio.strip(), None
@@ -606,6 +618,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
         imagem_final.save(buffer, format="PNG")
         grafico_final_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
         return relatorio.strip(), grafico_final_base64
+
 
 
 
