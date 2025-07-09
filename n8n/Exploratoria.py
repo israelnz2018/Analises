@@ -305,18 +305,18 @@ def analise_estabilidade(df, coluna_y):
     axs[0].axhline(media, color="green", linestyle="-")
     axs[0].axhline(UCL_I, color="red", linestyle="-")
     axs[0].axhline(LCL_I, color="red", linestyle="-")
-    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18)
-    axs[0].set_ylabel("Valor Individual", fontsize=14)
-    axs[0].set_xlabel("Subgrupo", fontsize=14)
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=22)
+    axs[0].set_ylabel("Valor Individual", fontsize=18)
+    axs[0].set_xlabel("Subgrupo", fontsize=18)
 
     axs[0].set_xlim(left=x_min - 0.5, right=x_max)
     axs[0].set_xticks(ticks)
     axs[0].tick_params(axis='x', labelsize=12)
 
     xlim = axs[0].get_xlim()
-    axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=10, color="green")
-    axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=10, color="red")
-    axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=10, color="red")
+    axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=14, color="green")
+    axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=14, color="red")
+    axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=14, color="red")
 
     crit1_flag_I = any((y > UCL_I) | (y < LCL_I))
     for xi, yi in zip(x, y):
@@ -329,18 +329,19 @@ def analise_estabilidade(df, coluna_y):
     axs[1].scatter(x_mr, y_mr, color="black")
     axs[1].axhline(mr_mean, color="green", linestyle="-")
     axs[1].axhline(UCL_MR, color="red", linestyle="-")
-    axs[1].set_title("Carta MR", fontsize=18)
-    axs[1].set_ylabel("Amplitude Móvel", fontsize=14)
-    axs[1].set_xlabel("Subgrupo", fontsize=14)
+    axs[1].axhline(0, color="red", linestyle="-")
+    axs[1].set_title("Carta MR", fontsize=22)
+    axs[1].set_ylabel("Amplitude Móvel", fontsize=18)
+    axs[1].set_xlabel("Subgrupo", fontsize=18)
 
     axs[1].set_xlim(left=x_min - 0.5, right=x_max)
     axs[1].set_xticks(ticks)
     axs[1].tick_params(axis='x', labelsize=12)
 
     xlim_mr = axs[1].get_xlim()
-    axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=10, color="green")
-    axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=10, color="red")
-    axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=10, color="red")
+    axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=14, color="green")
+    axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=14, color="red")
+    axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=14, color="red")
 
     crit1_flag_MR = any(y_mr > UCL_MR)
     for xi, yi in zip(x_mr, y_mr):
