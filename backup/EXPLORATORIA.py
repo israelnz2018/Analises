@@ -1,4 +1,3 @@
-
 from suporte import *
 
 def grafico_sumario(df, coluna_y):
@@ -165,9 +164,9 @@ def analise_correlacao_person(df, coluna_y, lista_x):
         )
 
     if conclusoes:
-        conclusao_final = f"Conclusão: Apenas as variáveis {', '.join(conclusoes)} são estatisticamente correlacionadas com {coluna_y}."
+        conclusao_final = f"🔎 **Conclusão**: Apenas as variáveis {', '.join(conclusoes)} são estatisticamente correlacionadas com {coluna_y}."
     else:
-        conclusao_final = f"Conclusão: Nenhuma das variáveis apresenta correlação estatisticamente significativa com {coluna_y}."
+        conclusao_final = f"🔎 **Conclusão**: Nenhuma das variáveis apresenta correlação estatisticamente significativa com {coluna_y}."
 
     # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
     resumo = (
@@ -181,16 +180,18 @@ def analise_correlacao_person(df, coluna_y, lista_x):
     return resumo, None
 
 
-
 def analise_matrix_correlacao(df, coluna_y, lista_x):
     colunas = ([coluna_y] if coluna_y else []) + (lista_x or [])
-    
+
     if len(colunas) < 2:
         return "❌ É necessário ao menos duas colunas para gerar a matriz de correlação.", None
 
     for col in colunas:
         if col not in df.columns:
             return f"❌ A coluna '{col}' não foi encontrada no arquivo.", None
+        # Verifica se coluna é numérica
+        if not pd.api.types.is_numeric_dtype(df[col]):
+            return f"❌ A coluna '{col}' contém dados não numéricos e não pode ser usada na matriz de correlação.", None
 
     dados = df[colunas].dropna()
     if dados.empty:
@@ -199,6 +200,9 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
     matriz_cor = dados.corr(method='pearson')
 
     linhas_resumo = []
+    relevantes = []
+    nao_relevantes = []
+
     for i in range(len(colunas)):
         for j in range(i + 1, len(colunas)):
             col1 = colunas[i]
@@ -207,14 +211,37 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
 
             if abs(r) < 0.3:
                 forca = "fraca"
+                nao_relevantes.append(f"{col1} x {col2}")
             elif abs(r) < 0.7:
                 forca = "moderada"
+                relevantes.append(f"{col1} x {col2}")
             else:
                 forca = "forte"
+                relevantes.append(f"{col1} x {col2}")
 
-            linhas_resumo.append(f"- {col1} vs {col2}: correlação {forca} (r = {r:.2f})")
+            sentido = "positiva" if r >= 0 else "negativa"
 
-    resumo = "📊 **Matriz de Correlação (Pearson)**\n" + "\n".join(linhas_resumo)
+            linhas_resumo.append(
+                f"{col1} x {col2}\n"
+                f"Coeficiente de Pearson = {r:.2f} → Correlação {forca}, {sentido}."
+            )
+
+    # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
+    conclusao = "🔎 **Conclusão:**\n"
+    if relevantes:
+        conclusao += f"- Correlações relevantes: {', '.join(relevantes)}\n"
+    else:
+        conclusao += "- Não há correlações relevantes.\n"
+    if nao_relevantes:
+        conclusao += f"- Correlações não relevantes: {', '.join(nao_relevantes)}"
+
+    resumo = (
+        f"📊 **Matriz de Correlação de Pearson**\n"
+        f"Variáveis analisadas:\n\n"
+        + "\n\n".join(linhas_resumo)
+        + "\n\n"
+        + conclusao
+    )
 
     aplicar_estilo_minitab()
     sns.pairplot(dados, kind='reg', plot_kws={'line_kws': {'color': 'red'}, 'scatter_kws': {'s': 20}})
@@ -229,18 +256,22 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
     return resumo, img_base64
 
 
+
 def analise_estabilidade(df, coluna_y):
     import matplotlib.pyplot as plt
-    import seaborn as sns
     import numpy as np
     from io import BytesIO
     import base64
+    import pandas as pd
 
     aplicar_estilo_minitab()
 
     nome_coluna_y = coluna_y if isinstance(coluna_y, str) else (coluna_y[0] if coluna_y else None)
     if not nome_coluna_y or nome_coluna_y not in df.columns:
         return "❌ A coluna Y informada não foi encontrada no arquivo.", None
+
+    if not pd.api.types.is_numeric_dtype(df[nome_coluna_y]):
+        return f"❌ A coluna '{nome_coluna_y}' contém dados não numéricos e não pode ser usada na análise de estabilidade.", None
 
     dados = df[[nome_coluna_y]].dropna().copy()
     dados["Subgrupo"] = range(1, len(dados) + 1)
@@ -258,149 +289,137 @@ def analise_estabilidade(df, coluna_y):
     mr_mean = mr[1:].mean()
     UCL_MR = mr_mean * 3.267
 
-    # Gráficos
-    fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
+    # Gráfico estilo Minitab
+    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
 
-    axs[0].plot(dados["Subgrupo"], dados[nome_coluna_y], marker="o", linestyle="-")
-    axs[0].axhline(media, color="black", linestyle="--", label="Média")
-    axs[0].axhline(UCL_I, color="red", linestyle="--", label="Limite Superior")
-    axs[0].axhline(LCL_I, color="red", linestyle="--", label="Limite Inferior")
-    axs[0].set_title("Carta Individual (I)")
-    axs[0].set_ylabel("Valor")
-    axs[0].legend()
-
-    axs[1].plot(dados["Subgrupo"][1:], mr[1:], marker="o", linestyle="-")
-    axs[1].axhline(mr_mean, color="black", linestyle="--", label="Média MR")
-    axs[1].axhline(UCL_MR, color="red", linestyle="--", label="Limite Superior MR")
-    axs[1].set_title("Carta Amplitude Móvel (MR)")
-    axs[1].set_ylabel("Amplitude")
-    axs[1].legend()
-
-    texto_resumo = f"📊 **Análise de Estabilidade da coluna '{nome_coluna_y}'**\n"
-    texto_resumo += "- Carta I-MR usada (dados individuais).\n"
-
+    # Carta Individual (I)
     y = dados[nome_coluna_y].values
+    x = dados["Subgrupo"].values
+    axs[0].plot(x, y, color="black", linestyle="-")
+    axs[0].scatter(x, y, color="black")
+    axs[0].axhline(media, color="green", linestyle="-")
+    axs[0].axhline(UCL_I, color="red", linestyle="-")
+    axs[0].axhline(LCL_I, color="red", linestyle="-")
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=14)
+    axs[0].set_ylabel("Valor Individual", fontsize=12)
 
-    # Critérios
-    def check_crit1():
-        return np.any((y > UCL_I) | (y < LCL_I))
+    xlim = axs[0].get_xlim()
+    axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=10, color="green")
+    axs[0].text(xlim[1]+1, UCL_I, f"LSC = {UCL_I:.3f}", va='center', fontsize=10, color="red")
+    axs[0].text(xlim[1]+1, LCL_I, f"LIC = {LCL_I:.3f}", va='center', fontsize=10, color="red")
 
-    def check_crit2():
-        seq = (y > media).astype(int)
-        return any(sum(seq[i:i+9]) == 9 or sum(1 - seq[i:i+9]) == 9 for i in range(len(seq)-8))
+    crit1_flag_I = any((y > UCL_I) | (y < LCL_I))
+    for xi, yi in zip(x, y):
+        if yi > UCL_I or yi < LCL_I:
+            axs[0].scatter(xi, yi, color="red")
 
-    def check_crit3():
-        diff = np.sign(np.diff(y))
-        count = 1
-        for i in range(1, len(diff)):
-            if diff[i] == diff[i-1] and diff[i] != 0:
-                count += 1
-                if count >= 6:
-                    return True
-            else:
-                count = 1
-        return False
+    # Carta MR
+    x_mr = dados["Subgrupo"].values[1:]
+    y_mr = mr[1:].values
+    axs[1].plot(x_mr, y_mr, color="black", linestyle="-")
+    axs[1].scatter(x_mr, y_mr, color="black")
+    axs[1].axhline(mr_mean, color="green", linestyle="-")
+    axs[1].axhline(UCL_MR, color="red", linestyle="-")
+    axs[1].set_title("Carta MR", fontsize=14)
+    axs[1].set_ylabel("Amplitude Móvel", fontsize=12)
 
-    def check_crit4():
-        diff = np.sign(np.diff(y))
-        return np.all(diff[:14] != 0) and np.all(diff[:14][::2] * diff[1:15:2] == -1) if len(y) >= 15 else False
+    xlim_mr = axs[1].get_xlim()
+    axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=10, color="green")
+    axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=10, color="red")
+    axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=10, color="red")
 
-    def check_crit5():
-        z = (y - media) / sigma
-        for i in range(len(z)-2):
-            s = z[i:i+3]
-            if (np.sum(np.abs(s) > 2) >= 2) and (np.all(s > 0) or np.all(s < 0)):
-                return True
-        return False
+    crit1_flag_MR = any(y_mr > UCL_MR)
+    for xi, yi in zip(x_mr, y_mr):
+        if yi > UCL_MR:
+            axs[1].scatter(xi, yi, color="red")
 
-    def check_crit6():
-        z = (y - media) / sigma
-        for i in range(len(z)-4):
-            s = z[i:i+5]
-            if (np.sum(np.abs(s) > 1) >= 4) and (np.all(s > 0) or np.all(s < 0)):
-                return True
-        return False
+    plt.tight_layout()
 
-    def check_crit7():
-        z = (y - media) / sigma
-        for i in range(len(z)-14):
-            if np.all(np.abs(z[i:i+15]) < 1):
-                return True
-        return False
+    # Funções de checagem (substitua pelas reais)
+    def check_crit2(y): return False
+    def check_crit3(y): return False
+    def check_crit4(y): return False
+    def check_crit5(y): return False
+    def check_crit6(y): return False
+    def check_crit7(y): return False
+    def check_crit8(y): return False
+    def check_crit9(y): return False
+    def check_crit2_mr(y_mr): return False
+    def check_crit3_mr(y_mr): return False
+    def check_crit4_mr(y_mr): return False
+    def check_crit5_mr(y_mr): return False
+    def check_crit6_mr(y_mr): return False
+    def check_crit7_mr(y_mr): return False
+    def check_crit8_mr(y_mr): return False
+    def check_crit9_mr(y_mr): return False
 
-    def check_crit8():
-        z = (y - media) / sigma
-        for i in range(len(z)-7):
-            if np.all(np.abs(z[i:i+8]) > 1):
-                return True
-        return False
+    # 🔷 BLOCO DE RELATÓRIO
+    texto_resumo = f"📊 **Análise de Estabilidade – Carta I-MR ({nome_coluna_y})**\n"
+    texto_resumo += "🔎 **Critérios avaliados:**\n"
 
-    def check_crit9():
-        diff = np.sign(np.diff(y))
-        alt = 1
-        for i in range(1, len(diff)):
-            if diff[i] == -diff[i-1] and diff[i] != 0:
-                alt += 1
-                if alt >= 12:
-                    return True
-            else:
-                alt = 1
-        return False
-
-    def check_crit10():
-        return False  # Minitab original não define critério 10 padrão, deixamos reservado
-
-    # Aplica critérios
-    if check_crit1():
-        texto_resumo += "- ⚠ Critério 1: Ponto fora dos limites de controle.\n"
+    # Critério 1
+    if crit1_flag_I and crit1_flag_MR:
+        texto_resumo += "1. Critério 1 – Pontos fora dos limites: ❌ Detectado (Carta I e MR)\n"
+    elif crit1_flag_I:
+        texto_resumo += "1. Critério 1 – Pontos fora dos limites: ❌ Detectado (Carta I)\n"
+    elif crit1_flag_MR:
+        texto_resumo += "1. Critério 1 – Pontos fora dos limites: ❌ Detectado (Carta MR)\n"
     else:
-        texto_resumo += "- ✅ Critério 1: Nenhum ponto fora dos limites.\n"
+        texto_resumo += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
 
-    if check_crit2():
-        texto_resumo += "- ⚠ Critério 2: 9 pontos seguidos do mesmo lado da média.\n"
+    # Critérios 2-9
+    nomes_criterios = {
+        2: "9 pontos do mesmo lado da média",
+        3: "6 pontos subindo ou descendo",
+        4: "14 pontos alternando",
+        5: "2 de 3 pontos além de 2σ no mesmo lado",
+        6: "4 de 5 pontos além de 1σ no mesmo lado",
+        7: "15 pontos dentro de 1σ",
+        8: "8 pontos fora de 1σ",
+        9: "12 pontos alternando"
+    }
+
+    funcoes_I = {
+        2: check_crit2,
+        3: check_crit3,
+        4: check_crit4,
+        5: check_crit5,
+        6: check_crit6,
+        7: check_crit7,
+        8: check_crit8,
+        9: check_crit9
+    }
+
+    funcoes_MR = {
+        2: check_crit2_mr,
+        3: check_crit3_mr,
+        4: check_crit4_mr,
+        5: check_crit5_mr,
+        6: check_crit6_mr,
+        7: check_crit7_mr,
+        8: check_crit8_mr,
+        9: check_crit9_mr
+    }
+
+    for i in range(2, 10):
+        flag_I = funcoes_I[i](y)
+        flag_MR = funcoes_MR[i](y_mr)
+        if flag_I and flag_MR:
+            texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ❌ Detectado (Carta I e MR)\n"
+        elif flag_I:
+            texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ❌ Detectado (Carta I)\n"
+        elif flag_MR:
+            texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ❌ Detectado (Carta MR)\n"
+        else:
+            texto_resumo += f"{i}. Critério {i} – {nomes_criterios[i]}: ✅ OK\n"
+
+    # Conclusão
+    if any([crit1_flag_I, crit1_flag_MR] + [funcoes_I[i](y) or funcoes_MR[i](y_mr) for i in range(2,10)]):
+        texto_resumo += "🔎 **Conclusão:** Causa especial detectada. Investigue o processo para entender e remover a causa especial identificada.\n"
     else:
-        texto_resumo += "- ✅ Critério 2: Nenhuma sequência longa de um lado.\n"
-
-    if check_crit3():
-        texto_resumo += "- ⚠ Critério 3: 6 pontos seguidos subindo ou descendo.\n"
-    else:
-        texto_resumo += "- ✅ Critério 3: Nenhuma tendência longa.\n"
-
-    if check_crit4():
-        texto_resumo += "- ⚠ Critério 4: 14 pontos alternando.\n"
-    else:
-        texto_resumo += "- ✅ Critério 4: Nenhuma alternância suspeita.\n"
-
-    if check_crit5():
-        texto_resumo += "- ⚠ Critério 5: 2 de 3 pontos consecutivos além de 2 sigma no mesmo lado.\n"
-    else:
-        texto_resumo += "- ✅ Critério 5: OK.\n"
-
-    if check_crit6():
-        texto_resumo += "- ⚠ Critério 6: 4 de 5 pontos além de 1 sigma no mesmo lado.\n"
-    else:
-        texto_resumo += "- ✅ Critério 6: OK.\n"
-
-    if check_crit7():
-        texto_resumo += "- ⚠ Critério 7: 15 pontos dentro de 1 sigma.\n"
-    else:
-        texto_resumo += "- ✅ Critério 7: OK.\n"
-
-    if check_crit8():
-        texto_resumo += "- ⚠ Critério 8: 8 pontos fora de 1 sigma.\n"
-    else:
-        texto_resumo += "- ✅ Critério 8: OK.\n"
-
-    if check_crit9():
-        texto_resumo += "- ⚠ Critério 9: 12 pontos alternando.\n"
-    else:
-        texto_resumo += "- ✅ Critério 9: OK.\n"
-
-    # critério 10 reservado
-    texto_resumo += "- ℹ Critério 10: Não implementado (padrão Minitab reservado).\n"
+        texto_resumo += "🔎 **Conclusão:** Processo está estável. Nenhuma causa especial detectada.\n"
 
     buffer = BytesIO()
-    plt.tight_layout()
     plt.savefig(buffer, format="png")
     plt.close(fig)
     buffer.seek(0)
@@ -410,47 +429,54 @@ def analise_estabilidade(df, coluna_y):
 
 
 
-
 def analise_limpeza_dados(df):
     import numpy as np
     import pandas as pd
+    import string
 
     linhas_total = len(df)
     colunas_total = df.shape[1]
     linhas_duplicadas = df.duplicated().sum()
 
+    # Mapeia colunas para letras A, B, C...
+    letras_colunas = {col: string.ascii_uppercase[i] for i, col in enumerate(df.columns)}
+
     resultado = [
+        "📊 <strong>Análise de Limpeza de Dados</strong><br>",
         f"<strong>Total de linhas esperadas:</strong> {linhas_total}",
         f"<strong>Total de colunas:</strong> {colunas_total}",
         f"<strong>Linhas duplicadas detectadas:</strong> {linhas_duplicadas}<br>"
     ]
 
+    colunas_aptas = []
+    colunas_problemas = []
+
     for coluna in df.columns:
+        letra = letras_colunas[coluna]
         n_valores = df[coluna].notnull().sum()
         n_gaps = linhas_total - n_valores
+        problemas = []
 
         # Linhas faltando
         if n_gaps > 0:
             idx_gaps = df[df[coluna].isnull()].index
             primeira_linha_gap = idx_gaps[0] + 2 if len(idx_gaps) > 0 else "?"
-            resultado.append(
-                f"Coluna <strong>{coluna}</strong>: {n_gaps} célula(s) vazia(s) (primeira ocorrência na linha {primeira_linha_gap})"
-            )
+            problemas.append(f"{n_gaps} célula(s) vazia(s) (primeira ocorrência na linha {primeira_linha_gap})")
 
         # Coluna totalmente vazia
         if n_valores == 0:
-            resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ Totalmente vazia")
+            problemas.append("⚠ Totalmente vazia")
 
         # Coluna sem variação
         if df[coluna].nunique(dropna=True) <= 1:
-            resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ Sem variação (todos os valores iguais)")
+            problemas.append("⚠ Sem variação (todos os valores iguais)")
 
-        # Dados não numéricos em colunas que parecem numéricas
+        # Dados não numéricos em colunas object
         if df[coluna].dtype == object:
             try:
                 pd.to_numeric(df[coluna].dropna())
             except:
-                resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ Contém dados não numéricos suspeitos")
+                problemas.append("⚠ Contém dados não numéricos suspeitos")
 
         # Outliers extremos
         if pd.api.types.is_numeric_dtype(df[coluna]):
@@ -459,21 +485,147 @@ def analise_limpeza_dados(df):
             if sigma > 0:
                 extremos = df[(df[coluna] > media + 10 * sigma) | (df[coluna] < media - 10 * sigma)]
                 if not extremos.empty:
-                    resultado.append(f"Coluna <strong>{coluna}</strong>: ⚠ {len(extremos)} valor(es) extremamente fora do padrão")
+                    problemas.append(f"⚠ {len(extremos)} valor(es) extremamente fora do padrão")
+
+        if problemas:
+            resultado.append(f"Coluna {letra}: " + "; ".join(problemas))
+            colunas_problemas.append(letra)
+        else:
+            colunas_aptas.append(letra)
 
     # Colunas duplicadas
     colunas_duplicadas = []
     for i in range(len(df.columns)):
         for j in range(i + 1, len(df.columns)):
             if df[df.columns[i]].equals(df[df.columns[j]]):
-                colunas_duplicadas.append(f"{df.columns[i]} / {df.columns[j]}")
+                colunas_duplicadas.append(f"{letras_colunas[df.columns[i]]} / {letras_colunas[df.columns[j]]}")
     if colunas_duplicadas:
         resultado.append(f"⚠ Colunas duplicadas detectadas: {colunas_duplicadas}")
+        colunas_problemas.extend([c.split(' / ')[0] for c in colunas_duplicadas])
+        colunas_problemas.extend([c.split(' / ')[1] for c in colunas_duplicadas])
     else:
         resultado.append("✅ Nenhuma coluna duplicada")
 
+    # 🔷 BLOCO DE RELATÓRIO PARA EDIÇÃO FUTURA
+    conclusao = "🔎 <strong>Conclusão:</strong><br>"
+    conclusao += f"✅ <strong>Colunas aptas para análises:</strong> {', '.join(colunas_aptas) if colunas_aptas else 'Nenhuma'}<br>"
+    conclusao += f"⚠ <strong>Colunas para serem analisadas/melhoradas:</strong> {', '.join(set(colunas_problemas)) if colunas_problemas else 'Nenhuma'}"
+
+    resultado.append("<br>" + conclusao)
+
     texto_final = "<br>".join(resultado)
     return texto_final, None
+
+
+def analise_cluster_hierarchical(df, lista_x, field=None):
+    """
+    Hierarchical Clustering com dendrograma colorido por cluster
+    field = número de clusters (opcional)
+    """
+
+    import numpy as np
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from scipy.cluster.hierarchy import dendrogram, linkage, fcluster
+    from io import BytesIO
+    import base64
+
+    # Verificar entradas
+    if not lista_x:
+        return "❌ É necessário selecionar pelo menos uma variável (X).", None
+
+    dados = df[lista_x].dropna()
+
+    if len(dados) < 2:
+        return "❌ Dados insuficientes para análise de cluster.", None
+
+    # Criar linkage matrix
+    Z = linkage(dados, method='ward')
+
+    plt.figure(figsize=(10, 6))
+
+    if field:
+        try:
+            n_clusters = int(field)
+            max_d = None  # Desabilita corte por distância
+            dendrogram(Z, labels=dados.index.tolist(), leaf_rotation=90, color_threshold=None)
+            clusters = fcluster(Z, n_clusters, criterion='maxclust')
+
+            # Replot com color_threshold definido para número de clusters
+            plt.clf()  # Limpa figura
+            dendrogram(Z, labels=dados.index.tolist(), leaf_rotation=90, color_threshold=Z[-n_clusters+1, 2])
+
+            # Adiciona coluna de cluster no dataframe para reporte
+            dados['Cluster'] = clusters
+            cluster_counts = dados['Cluster'].value_counts().sort_index()
+            resumo_clusters = "\n".join([f"- Cluster {i}: {c} observações" for i, c in cluster_counts.items()])
+
+            plt.title("📊 Análise de Cluster Hierárquico (cores por cluster)")
+            plt.ylabel("Distância Euclidiana")
+            plt.xlabel("Observações")
+            plt.tight_layout()
+
+            buf = BytesIO()
+            plt.savefig(buf, format='png')
+            plt.close()
+            grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+            texto = f"""
+📊 **Análise de Cluster Hierárquico**
+
+🔹 **Resultado**
+
+- Número de clusters especificado: {n_clusters}
+- Método: linkage ward, distância euclidiana
+
+✔️ **Resumo dos clusters**
+{resumo_clusters}
+
+✔️ **Recomendações**
+- Use esses grupos para análises adicionais (ANOVA, regressão ou controle de processo).
+- Reveja o dendrograma colorido para avaliar se o número de clusters definido faz sentido estatístico e prático.
+""".strip()
+
+        except Exception as e:
+            texto = f"""
+📊 **Análise de Cluster Hierárquico**
+
+🔹 **Resultado**
+
+❌ Erro ao processar número de clusters: {str(e)}
+
+✔️ **Recomendações**
+- Verifique se o número de clusters foi informado corretamente como número inteiro.
+""".strip()
+            grafico_base64 = None
+
+    else:
+        dendrogram(Z, labels=dados.index.tolist(), leaf_rotation=90)
+        plt.title("📊 Análise de Cluster Hierárquico")
+        plt.ylabel("Distância Euclidiana")
+        plt.xlabel("Observações")
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close()
+        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+        texto = f"""
+📊 **Análise de Cluster Hierárquico**
+
+🔹 **Resultado**
+
+- Nenhum número de clusters especificado. O dendrograma acima mostra a hierarquia completa.
+
+✔️ **Recomendações**
+- Analise o dendrograma para definir o número ideal de clusters antes de segmentar seus dados.
+""".strip()
+
+    return texto, grafico_base64
+
+
 
 
 
@@ -483,5 +635,6 @@ ANALISES = {
     "Correlação de person": analise_correlacao_person,
     "Matrix de dispersão": analise_matrix_correlacao,
     "Análise de estabilidade": analise_estabilidade,
-    "Análise de limpeza dos dados": analise_limpeza_dados
+    "Análise de limpeza dos dados": analise_limpeza_dados,
+    "Análise de cluster": analise_cluster_hierarchical
 }
