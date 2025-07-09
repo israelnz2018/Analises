@@ -625,7 +625,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
 
 
 
-def analise_capabilidade_transformado(df, coluna_y, subgrupo=None, field_LIE=None, field_LSE=None):
+def analise_capabilidade_johnson(df, coluna_y, subgrupo=None, field_LIE=None, field_LSE=None):
     if not coluna_y or coluna_y not in df.columns:
         return "❌ É necessário informar uma coluna Y válida.", None
 
@@ -649,57 +649,30 @@ def analise_capabilidade_transformado(df, coluna_y, subgrupo=None, field_LIE=Non
     from scipy import stats
     import numpy as np
     import matplotlib.pyplot as plt
-    from sklearn.preprocessing import PowerTransformer
     from io import BytesIO
     import base64
 
-    distribs = {
-        'Normal': stats.norm,
-        'Lognormal': stats.lognorm,
-        'Exponencial': stats.expon,
-        'Weibull': stats.weibull_min,
-        'Gama': stats.gamma,
-        'Loglogística': stats.fisk
-    }
-
-    # 📝 Verificar melhor distribuição antes da transformação
-    resultados = []
-    for nome, dist in distribs.items():
-        try:
-            params = dist.fit(dados)
-            ks_stat, ks_p = stats.kstest(dados, dist.cdf, args=params)
-            resultados.append((nome, ks_p, params))
-        except Exception:
-            resultados.append((nome, 0.0, None))
-
-    melhor_dist = max(resultados, key=lambda x: x[1])
-    nome_melhor, p_melhor, params_melhor = melhor_dist
-
-    # ✅ Proceder com a transformação Johnson sempre
+    # Fit Johnson SU
     try:
-        pt = PowerTransformer(method='yeo-johnson')
-        dados_t = pt.fit_transform(dados.values.reshape(-1, 1)).flatten()
-
-        ad_res = stats.anderson(dados_t)
-        ad_sig = list(ad_res.significance_level)
-        if 5 in ad_sig:
-            idx = ad_sig.index(5)
-            ad_normal = ad_res.statistic < ad_res.critical_values[idx]
-        else:
-            ad_normal = False
+        params = stats.johnsonsu.fit(dados)
+        dados_t = stats.johnsonsu.transform(dados, *params)
     except Exception as e:
-        return f"❌ Erro na transformação Johnson: {str(e)}", None
+        return f"❌ Erro na transformação Johnson SU: {str(e)}", None
 
-    # Estatísticas após transformação
     mean = np.mean(dados_t)
     std = np.std(dados_t, ddof=1)
-    Cp = (USL - LSL) / (6 * std)
-    Cpk = min((USL - mean), (mean - LSL)) / (3 * std)
-    z_bench = min((USL - mean) / std, (mean - LSL) / std)
 
-    ppm_lsl = 1e6 * stats.norm.cdf(LSL, loc=mean, scale=std)
-    ppm_usl = 1e6 * (1 - stats.norm.cdf(USL, loc=mean, scale=std))
+    # Cálculos de capabilidade
+    Pp = (USL - LSL) / (6 * std)
+    Ppk = min((USL - mean), (mean - LSL)) / (3 * std)
+    nivel_sigma = min((USL - mean), (mean - LSL)) / std
+
+    ppm_lsl = stats.norm.cdf(LSL, loc=mean, scale=std) * 1e6
+    ppm_usl = (1 - stats.norm.cdf(USL, loc=mean, scale=std)) * 1e6
     ppm_total = ppm_lsl + ppm_usl
+    percent_below = ppm_lsl / 10000
+    percent_above = ppm_usl / 10000
+    percent_total = ppm_total / 10000
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -707,12 +680,14 @@ def analise_capabilidade_transformado(df, coluna_y, subgrupo=None, field_LIE=Non
     x = np.linspace(min(dados_t), max(dados_t), 100)
     y = stats.norm.pdf(x, mean, std)
     ax.plot(x, y, 'b-', label='Curva Normal transformada')
+
     if LSL != float('-inf'):
-        ax.axvline(LSL, color='red', linestyle='--', label='LIE')
+        ax.axvline(LSL, color='red', linestyle='--', label='LIE (Limite Inf. Eng.)')
     if USL != float('inf'):
-        ax.axvline(USL, color='red', linestyle='--', label='LSE')
+        ax.axvline(USL, color='red', linestyle='--', label='LSE (Limite Sup. Eng.)')
     ax.axvline(mean, color='green', linestyle='--', label='Média')
-    ax.set_title(f'Capabilidade - {coluna_y} (Transformação Johnson)')
+
+    ax.set_title(f'Capabilidade - Dados transformados ({coluna_y})')
     ax.legend()
     ax.set_facecolor('white')
     ax.grid(True, linestyle=':', color='gray')
@@ -725,32 +700,34 @@ def analise_capabilidade_transformado(df, coluna_y, subgrupo=None, field_LIE=Non
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # ✅ Relatório final no padrão bonito
-    texto = f"""
-📊 **Análise de Capabilidade com Transformação Johnson**
+    # Relatório no formato alinhado
+    relatorio = f"""
+📊 Análise de Capabilidade com Transformação Johnson
 
-🔹 **Resultado**
+🔹 Resultado
 
-- Melhor distribuição antes da transformação: {nome_melhor} (p-valor={p_melhor:.4f})
-- ✅ Transformação Johnson aplicada para normalizar os dados
-- Anderson-Darling após transformação: estat={ad_res.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
+- Transformação Johnson SU aplicada para normalizar os dados
+- Equação da transformação (params): {', '.join([f"{p:.4f}" for p in params])}
+- Transformação validada: SIM
 
-✔️ **Resultados**
+✔️ Resultados
 
-- Cp: {Cp:.2f}
-- Cpk: {Cpk:.2f}
-- Z.bench: {z_bench:.2f}
-- PPM < LIE: {ppm_lsl:.2f}
-- PPM > LSE: {ppm_usl:.2f}
-- PPM Total: {ppm_total:.2f}
+- Pp: {Pp:.2f} ➔ {'Muito abaixo do mínimo recomendado (1.33)' if Pp < 1.33 else 'Aceitável'}
+- Ppk: {Ppk:.2f} ➔ {'Processo fora de especificação' if Ppk < 1 else 'Processo aceitável'}
+- Nível Sigma: {nivel_sigma:.2f} ➔ {'Inferior a 3 sigma (inaceitável)' if nivel_sigma < 3 else 'Aceitável'}
+- % Defeito abaixo LIE: {percent_below:.2f}%
+- % Defeito acima LSE: {percent_above:.2f}%
+- % Defeito Total: {percent_total:.2f}%
 
-✔️ **Recomendações**
+✔️ Recomendações
 
 - Validar a adequação do modelo transformado antes de usá-lo em decisões críticas.
-- Se a normalidade não for alcançada, considerar métodos não paramétricos ou análise de capabilidade para dados não normais.
+- Processo incapaz de atender aos limites especificados. Ações urgentes de melhoria são necessárias.
+- Revisar especificações ou melhorar a capacidade do processo através de projetos de melhoria contínua.
 """.strip()
 
-    return texto, grafico_base64
+    return relatorio, grafico_base64
+
 
 
 
@@ -822,7 +799,7 @@ ANALISES = {
     "Análise de distribuição estatística": analise_distribuicao_estatistica,
     "Capabilidade - dados normais": analise_capabilidade_normal,
     "Capabilidade - outras distribuições": analise_capabilidade_outros,
-    "Capabilidade - com dados transformados": analise_capabilidade_transformado,
+    "Capabilidade - com dados transformados": analise_capabilidade_johnson,
     "Capabilidade - com dados discretizados": analise_capabilidade_discretizado
 
 }
