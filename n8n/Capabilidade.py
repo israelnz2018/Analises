@@ -505,7 +505,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
 
     dist = distros[dist_nome]
 
-    relatorio = f"📊 **Análise de Capabilidade com Distribuição {dist_nome}**"
+    relatorio = f"📊 **Análise de Capabilidade com Distribuição {dist_nome}**\n\n"
 
     imagens = []
 
