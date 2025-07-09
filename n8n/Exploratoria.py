@@ -292,32 +292,6 @@ def analise_estabilidade(df, coluna_y):
     # Gráfico estilo Minitab
     fig, axs = plt.subplots(2, 1, figsize=(14, 12), sharex=True)
 
-    # Carta MR
-    x_mr = dados["Subgrupo"].values[1:]
-    y_mr = mr[1:].values
-    axs[1].plot(x_mr, y_mr, color="black", linestyle="-")
-    axs[1].scatter(x_mr, y_mr, color="black")
-    axs[1].axhline(mr_mean, color="green", linestyle="-")
-    axs[1].axhline(UCL_MR, color="red", linestyle="-")
-    axs[1].set_title("Carta MR", fontsize=18)  # 🔷 título maior
-    axs[1].set_ylabel("Amplitude Móvel", fontsize=14)  # 🔷 y label maior
-    axs[1].set_xlabel("Subgrupo", fontsize=14)  # 🔷 x label maior
-
-    # ➡️ começar em zero com margem (ex: -0.5) sem alterar demais limites
-    x_min_mr = 0
-    x_max_mr = max(x_mr) + 1
-    axs[1].set_xlim(left=x_min_mr - 0.5, right=x_max_mr)
-
-    xlim_mr = axs[1].get_xlim()
-    axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=10, color="green")
-    axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=10, color="red")
-    axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=10, color="red")
-
-    crit1_flag_MR = any(y_mr > UCL_MR)
-    for xi, yi in zip(x_mr, y_mr):
-        if yi > UCL_MR:
-            axs[1].scatter(xi, yi, color="red")
-
     # Carta Individual (I)
     y = dados[nome_coluna_y].values
     x = dados["Subgrupo"].values
@@ -326,13 +300,17 @@ def analise_estabilidade(df, coluna_y):
     axs[0].axhline(media, color="green", linestyle="-")
     axs[0].axhline(UCL_I, color="red", linestyle="-")
     axs[0].axhline(LCL_I, color="red", linestyle="-")
-    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18)  # 🔷 título maior
-    axs[0].set_ylabel("Valor Individual", fontsize=14)  # 🔷 y label maior
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18)
+    axs[0].set_ylabel("Valor Individual", fontsize=14)
 
-    # 🔷 Ajuste do eixo X igual ao MR, mas garantindo exibição dos valores
-    axs[0].set_xlim(axs[1].get_xlim())
-    axs[0].set_xticks(axs[1].get_xticks())
-    axs[0].set_xticklabels([int(tick) for tick in axs[1].get_xticks()], fontsize=12)
+    # 🔷 Ajuste do eixo X: começa em 0 com margem esquerda
+    x_min_I = 0
+    x_max_I = max(x) + 1
+    axs[0].set_xlim(left=x_min_I - 0.5, right=x_max_I)
+
+    # 🔷 Garantir exibição dos valores do eixo X
+    axs[0].set_xticks(np.arange(0, x_max_I+1, step=10))
+    axs[0].tick_params(axis='x', labelsize=12)
 
     xlim = axs[0].get_xlim()
     axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=10, color="green")
@@ -343,6 +321,37 @@ def analise_estabilidade(df, coluna_y):
     for xi, yi in zip(x, y):
         if yi > UCL_I or yi < LCL_I:
             axs[0].scatter(xi, yi, color="red")
+
+    # Carta MR
+    x_mr = dados["Subgrupo"].values[1:]
+    y_mr = mr[1:].values
+    axs[1].plot(x_mr, y_mr, color="black", linestyle="-")
+    axs[1].scatter(x_mr, y_mr, color="black")
+    axs[1].axhline(mr_mean, color="green", linestyle="-")
+    axs[1].axhline(UCL_MR, color="red", linestyle="-")
+    axs[1].set_title("Carta MR", fontsize=18)
+    axs[1].set_ylabel("Amplitude Móvel", fontsize=14)
+    axs[1].set_xlabel("Subgrupo", fontsize=14)
+
+    # 🔷 Ajuste do eixo X: começa em 0 com margem esquerda
+    x_min_mr = 0
+    x_max_mr = max(x_mr) + 1
+    axs[1].set_xlim(left=x_min_mr - 0.5, right=x_max_mr)
+
+    # 🔷 Garantir exibição dos valores do eixo X
+    axs[1].set_xticks(np.arange(0, x_max_mr+1, step=10))
+    axs[1].tick_params(axis='x', labelsize=12)
+
+    xlim_mr = axs[1].get_xlim()
+    # 🔷 Labels do MR mantidos fora do gráfico
+    axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=10, color="green")
+    axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=10, color="red")
+    axs[1].text(xlim_mr[1]+1, 0, f"LIC = 0.000", va='center', fontsize=10, color="red")
+
+    crit1_flag_MR = any(y_mr > UCL_MR)
+    for xi, yi in zip(x_mr, y_mr):
+        if yi > UCL_MR:
+            axs[1].scatter(xi, yi, color="red")
 
     plt.tight_layout()
 
@@ -437,6 +446,7 @@ def analise_estabilidade(df, coluna_y):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
+
 
 
 
