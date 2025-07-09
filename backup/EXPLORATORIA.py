@@ -256,7 +256,6 @@ def analise_matrix_correlacao(df, coluna_y, lista_x):
     return resumo, img_base64
 
 
-
 def analise_estabilidade(df, coluna_y):
     import matplotlib.pyplot as plt
     import numpy as np
@@ -290,7 +289,7 @@ def analise_estabilidade(df, coluna_y):
     UCL_MR = mr_mean * 3.267
 
     # Gráfico estilo Minitab
-    fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(14, 12), sharex=True)
 
     # Carta Individual (I)
     y = dados[nome_coluna_y].values
@@ -300,8 +299,17 @@ def analise_estabilidade(df, coluna_y):
     axs[0].axhline(media, color="green", linestyle="-")
     axs[0].axhline(UCL_I, color="red", linestyle="-")
     axs[0].axhline(LCL_I, color="red", linestyle="-")
-    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=14)
-    axs[0].set_ylabel("Valor Individual", fontsize=12)
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=22)
+    axs[0].set_ylabel("Valor Individual", fontsize=18)
+
+    # Ajuste do eixo X: começa em 0 com margem esquerda
+    x_min_I = 0
+    x_max_I = max(x) + 1
+    axs[0].set_xlim(left=x_min_I - 0.5, right=x_max_I)
+
+    # Garantir exibição dos valores do eixo X
+    axs[0].set_xticks(np.arange(0, x_max_I+1, step=10))
+    axs[0].tick_params(axis='x', labelsize=12)
 
     xlim = axs[0].get_xlim()
     axs[0].text(xlim[1]+1, media, f"X̄ = {media:.3f}", va='center', fontsize=10, color="green")
@@ -320,9 +328,20 @@ def analise_estabilidade(df, coluna_y):
     axs[1].scatter(x_mr, y_mr, color="black")
     axs[1].axhline(mr_mean, color="green", linestyle="-")
     axs[1].axhline(UCL_MR, color="red", linestyle="-")
-    axs[1].set_title("Carta MR", fontsize=14)
-    axs[1].set_ylabel("Amplitude Móvel", fontsize=12)
+    axs[1].set_title("Carta MR", fontsize=22)
+    axs[1].set_ylabel("Amplitude Móvel", fontsize=18)
+    axs[1].set_xlabel("Subgrupo", fontsize=18)
 
+    # Ajuste do eixo X: começa em 0 com margem esquerda
+    x_min_mr = 0
+    x_max_mr = max(x_mr) + 1
+    axs[1].set_xlim(left=x_min_mr - 0.5, right=x_max_mr)
+
+    # Garantir exibição dos valores do eixo X
+    axs[1].set_xticks(np.arange(0, x_max_mr+1, step=10))
+    axs[1].tick_params(axis='x', labelsize=12)
+
+    # Labels do MR usando mesma lógica do gráfico Individual
     xlim_mr = axs[1].get_xlim()
     axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=10, color="green")
     axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=10, color="red")
@@ -353,7 +372,7 @@ def analise_estabilidade(df, coluna_y):
     def check_crit8_mr(y_mr): return False
     def check_crit9_mr(y_mr): return False
 
-    # 🔷 BLOCO DE RELATÓRIO
+    # BLOCO DE RELATÓRIO
     texto_resumo = f"📊 **Análise de Estabilidade – Carta I-MR ({nome_coluna_y})**\n"
     texto_resumo += "🔎 **Critérios avaliados:**\n"
 
@@ -426,6 +445,11 @@ def analise_estabilidade(df, coluna_y):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
+
+
+
+
+
 
 
 
