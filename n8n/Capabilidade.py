@@ -551,7 +551,10 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
 
             # Gráfico (apenas curva da distribuição escolhida)
             fig, ax = plt.subplots(figsize=(8, 5))
-            ax.hist(dados, bins=15, density=True, alpha=0.6, color='gray', edgecolor='black')
+            ax.hist(dados, bins=15, density=False, alpha=0.6, color='gray', edgecolor='black')
+            ax2 = ax.twinx()
+            ax2.plot(x, y, 'b-', label=f'Curva {dist_nome}')
+            ax2.set_ylabel('Densidade da Curva')
             x = np.linspace(min(dados), max(dados), 100)
             y = dist.pdf(x, *params)
             ax.plot(x, y, 'b-', label=f'Curva {dist_nome}')
