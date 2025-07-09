@@ -655,7 +655,9 @@ def analise_capabilidade_johnson(df, coluna_y, subgrupo=None, field_LIE=None, fi
     # Fit Johnson SU
     try:
         params = stats.johnsonsu.fit(dados)
-        dados_t = stats.johnsonsu.transform(dados, *params)
+        gamma, delta, xi, lam = params
+        dados_t = gamma + delta * np.arcsinh((dados - xi) / lam)
+
     except Exception as e:
         return f"❌ Erro na transformação Johnson SU: {str(e)}", None
 
