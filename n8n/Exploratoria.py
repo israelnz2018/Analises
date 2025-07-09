@@ -300,7 +300,7 @@ def analise_estabilidade(df, coluna_y):
     axs[0].axhline(UCL_I, color="red", linestyle="-")
     axs[0].axhline(LCL_I, color="red", linestyle="-")
     axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=22)
-    axs[0].set_ylabel("Valor Individual", fontsize=14)
+    axs[0].set_ylabel("Valor Individual", fontsize=18)
 
     # Ajuste do eixo X: começa em 0 com margem esquerda
     x_min_I = 0
