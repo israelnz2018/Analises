@@ -288,27 +288,29 @@ def analise_estabilidade(df, coluna_y):
     mr_mean = mr[1:].mean()
     UCL_MR = mr_mean * 3.267
 
-    # Gráfico estilo Minitab
-    fig, axs = plt.subplots(2, 1, figsize=(14, 12), sharex=True)
+    # Gráfico estilo Minitab (removido sharex=True)
+    fig, axs = plt.subplots(2, 1, figsize=(14, 12))
+
+    # Definir limites e ticks do eixo X para ambos
+    x = dados["Subgrupo"].values
+    x_mr = x[1:]
+    x_min = 0
+    x_max = max(x) + 1
+    ticks = np.arange(0, x_max + 1, step=10)
 
     # Carta Individual (I)
     y = dados[nome_coluna_y].values
-    x = dados["Subgrupo"].values
     axs[0].plot(x, y, color="black", linestyle="-")
     axs[0].scatter(x, y, color="black")
     axs[0].axhline(media, color="green", linestyle="-")
     axs[0].axhline(UCL_I, color="red", linestyle="-")
     axs[0].axhline(LCL_I, color="red", linestyle="-")
-    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=22)
-    axs[0].set_ylabel("Valor Individual", fontsize=18)
+    axs[0].set_title(f"Carta I de {nome_coluna_y}", fontsize=18)
+    axs[0].set_ylabel("Valor Individual", fontsize=14)
+    axs[0].set_xlabel("Subgrupo", fontsize=14)
 
-    # Ajuste do eixo X: começa em 0 com margem esquerda
-    x_min_I = 0
-    x_max_I = max(x) + 1
-    axs[0].set_xlim(left=x_min_I - 0.5, right=x_max_I)
-
-    # Garantir exibição dos valores do eixo X
-    axs[0].set_xticks(np.arange(0, x_max_I+1, step=10))
+    axs[0].set_xlim(left=x_min - 0.5, right=x_max)
+    axs[0].set_xticks(ticks)
     axs[0].tick_params(axis='x', labelsize=12)
 
     xlim = axs[0].get_xlim()
@@ -322,26 +324,19 @@ def analise_estabilidade(df, coluna_y):
             axs[0].scatter(xi, yi, color="red")
 
     # Carta MR
-    x_mr = dados["Subgrupo"].values[1:]
     y_mr = mr[1:].values
     axs[1].plot(x_mr, y_mr, color="black", linestyle="-")
     axs[1].scatter(x_mr, y_mr, color="black")
     axs[1].axhline(mr_mean, color="green", linestyle="-")
     axs[1].axhline(UCL_MR, color="red", linestyle="-")
-    axs[1].set_title("Carta MR", fontsize=22)
-    axs[1].set_ylabel("Amplitude Móvel", fontsize=18)
-    axs[1].set_xlabel("Subgrupo", fontsize=18)
+    axs[1].set_title("Carta MR", fontsize=18)
+    axs[1].set_ylabel("Amplitude Móvel", fontsize=14)
+    axs[1].set_xlabel("Subgrupo", fontsize=14)
 
-    # Ajuste do eixo X: começa em 0 com margem esquerda
-    x_min_mr = 0
-    x_max_mr = max(x_mr) + 1
-    axs[1].set_xlim(left=x_min_mr - 0.5, right=x_max_mr)
-
-    # Garantir exibição dos valores do eixo X
-    axs[1].set_xticks(np.arange(0, x_max_mr+1, step=10))
+    axs[1].set_xlim(left=x_min - 0.5, right=x_max)
+    axs[1].set_xticks(ticks)
     axs[1].tick_params(axis='x', labelsize=12)
 
-    # Labels do MR usando mesma lógica do gráfico Individual
     xlim_mr = axs[1].get_xlim()
     axs[1].text(xlim_mr[1]+1, mr_mean, f"MR̄ = {mr_mean:.3f}", va='center', fontsize=10, color="green")
     axs[1].text(xlim_mr[1]+1, UCL_MR, f"LSC = {UCL_MR:.3f}", va='center', fontsize=10, color="red")
@@ -352,7 +347,8 @@ def analise_estabilidade(df, coluna_y):
         if yi > UCL_MR:
             axs[1].scatter(xi, yi, color="red")
 
-    plt.tight_layout()
+    # Ajuste do espaçamento entre os gráficos
+    plt.subplots_adjust(hspace=0.3)
 
     # Funções de checagem (substitua pelas reais)
     def check_crit2(y): return False
@@ -445,6 +441,7 @@ def analise_estabilidade(df, coluna_y):
     img_base64 = base64.b64encode(buffer.read()).decode("utf-8")
 
     return texto_resumo, img_base64
+
 
 
 
