@@ -74,6 +74,7 @@ CONFIG_ANALISES = {
     "Matrix de dispersão": ["df", "coluna_y", "lista_x"],
     "Análise de estabilidade": ["df", "coluna_y"],
     "Análise de limpeza dos dados": ["df"],
+    "Análise de cluster": ["df", "lista_x"],
     "Histograma": ["df", "coluna_y", "subgrupo"],
     "Pareto": ["df", "coluna_x","coluna_y", "subgrupo"],
     "Setores (Pizza)": ["df", "coluna_x","coluna_y", "subgrupo"],
