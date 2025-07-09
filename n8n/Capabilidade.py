@@ -420,14 +420,13 @@ Desvio Padrão Within (σ_within): {std_within:.3f}
     elif Ppk is not None:
         relatorio += f"\n\n**Índice de Desempenho (Performance Real)**\nPpk: {Ppk:.2f}\nNível Sigma (Real): {sigma_real:.2f} sigma"
 
-    # % de Defeitos em bloco separado
     relatorio += f"""
 \n\n**% de Defeitos (Global)**
 Abaixo do LIE: {percent_below:.2f}%
 Acima do LSE: {percent_above:.2f}%
 Total: {percent_total:.2f}%
 """
-
+    
     relatorio += f"""
 \n📝 **Interpretação dos Resultados**
 {chr(10).join(interpretacao)}
