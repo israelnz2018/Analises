@@ -587,7 +587,7 @@ def analise_capabilidade_outros(df, coluna_y, field_dist, subgrupo=None, field_L
                 recomendacoes.append("- Nível sigma adequado. Buscar oportunidades de melhoria contínua.")
 
             relatorio += f"""
-\n\n🔹 **Resultado**
+\n\n
 
 - {ajuste}
 - Porcentagem de defeitos estimada: {perc_defeitos:.2f}%
