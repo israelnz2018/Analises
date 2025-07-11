@@ -1232,16 +1232,14 @@ O IQR indica que os 50% centrais dos dados estão distribuídos em um intervalo 
 
 
 
-
-
+import pandas as pd
+import numpy as np
+from scipy import stats
+import matplotlib.pyplot as plt
+import io
+import base64
 
 def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
-    import matplotlib.pyplot as plt
-    import io
-    import base64
-    import numpy as np
-    from scipy import stats
-
     if len(lista_y) != 2:
         return "❌ O teste 2 Variâncias requer exatamente 2 colunas Y.", None
 
@@ -1290,10 +1288,10 @@ def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
 
     recomendacao = ""
     if not (normal1 and normal2):
-        recomendacao = "⚠️ Como pelo menos um dos conjuntos de dados não é normal, recomenda-se utilizar o teste de Levene ou Brown-Forsythe para confirmação."
+        recomendacao = "⚠️ Como pelo menos um dos conjuntos de dados não é normal, recomenda-se utilizar o teste de Mann-Witney para confirmação."
 
     texto = f"""
-📊 **Análise** – Teste F para Igualdade de Variâncias
+📊 **Análise** – Teste F para Igualdade de Variâncias ({int(confidence)}% confiança)
 
 🔹 Hipóteses:
 - H₀: As variâncias de {col1} e {col2} são iguais
@@ -1309,35 +1307,46 @@ Variância = {var2:.2f}
 
 🔎 **Teste F para Igualdade de Variâncias**:
 Estatística F = {f_stat:.2f}
-p-valor = {p_valor:.2f}
+p-valor = {p_valor:.4f}
 
 🔎 **Testes de Normalidade**:
 {col1}: {"✅ Os dados parecem ser normais." if normal1 else "❌ Os dados não são normais."}
 {col2}: {"✅ Os dados parecem ser normais." if normal2 else "❌ Os dados não são normais."}
 
 🔎 **Conclusão**:
-{"Com " + str(int(confidence)) + "% de confiança, rejeitamos a hipótese conservadora. Logo, há diferença estatisticamente significativa entre as variâncias." if p_valor < alpha else "Com " + str(int(confidence)) + "% de confiança, não rejeitamos H0. Não há diferença significativa entre as variâncias."}
+{"Com " + str(int(confidence)) + "% de confiança, rejeitamos H0. Há diferença significativa entre as variâncias." if p_valor < alpha else "Com " + str(int(confidence)) + "% de confiança, não rejeitamos H0. Não há diferença significativa entre as variâncias."}
 
 {recomendacao}
 """
 
-    # 🔷 Geração do gráfico combinado
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 8))
+    # 🔷 Gráfico com dois subplots: intervalo de confiança dos desvios padrões + boxplot
+    fig, axes = plt.subplots(2, 1, figsize=(6, 8))
 
-    # 🔹 Intervalos de confiança para std
-    std1 = np.std(dados1, ddof=1)
-    std2 = np.std(dados2, ddof=1)
+    # Intervalo de confiança para desvio padrão
+    ax1 = axes[0]
+    stds = [np.std(dados1, ddof=1), np.std(dados2, ddof=1)]
+    n = [len(dados1), len(dados2)]
+    ci = []
 
-    ci1 = stats.t.interval(0.95, len(dados1)-1, loc=std1, scale=stats.sem(dados1))
-    ci2 = stats.t.interval(0.95, len(dados2)-1, loc=std2, scale=stats.sem(dados2))
+    for i in range(2):
+        chi2_lower = stats.chi2.ppf((1 - (confidence / 100)) / 2, n[i] - 1)
+        chi2_upper = stats.chi2.ppf(1 - (1 - (confidence / 100)) / 2, n[i] - 1)
+        lower = np.sqrt((n[i] - 1) * stds[i]**2 / chi2_upper)
+        upper = np.sqrt((n[i] - 1) * stds[i]**2 / chi2_lower)
+        ci.append((lower, upper))
 
-    ax1.errorbar(x=[col1, col2], y=[std1, std2],
-                 yerr=[std1-ci1[0], std2-ci2[0]],
-                 fmt='o', capsize=5)
-    ax1.set_title('95% Intervalos de Confiança para Std Devs')
+    ax1.errorbar([1, 2], stds,
+                 yerr=[[stds[0] - ci[0][0], stds[1] - ci[1][0]],
+                       [ci[0][1] - stds[0], ci[1][1] - stds[1]]],
+                 fmt='o', capsize=5, color='blue')
+    ax1.set_xticks([1, 2])
+    ax1.set_xticklabels([col1, col2])
+    ax1.set_xlim(0.5, 2.5)
     ax1.set_ylabel('Desvio Padrão')
+    ax1.set_title(f'{int(confidence)}% Intervalo de Confiança para Std Dev')
 
-    # 🔹 Boxplot comparativo
+    # Boxplot comparativo
+    ax2 = axes[1]
     ax2.boxplot([dados1, dados2], labels=[col1, col2])
     ax2.set_title('Boxplot Comparativo')
     ax2.set_ylabel('Data')
@@ -1346,11 +1355,12 @@ p-valor = {p_valor:.2f}
 
     buffer = io.BytesIO()
     plt.savefig(buffer, format='png')
+    plt.close()
     buffer.seek(0)
     img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
-    plt.close()
 
     return texto.strip(), img_base64
+
 
 
 
