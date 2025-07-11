@@ -7,7 +7,7 @@ from fastapi import Form
 import base64  
 import io
 import matplotlib.pyplot as plt
-import inspect
+import inspect 
 
 
 # ✅ Variável global para armazenar df atual 
