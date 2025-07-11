@@ -1284,7 +1284,6 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
 
 
 import pandas as pd
-
 def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     import pandas as pd
     import numpy as np
@@ -1376,7 +1375,7 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-        texto = (
+    texto = (
         f"📊 **Análise – Tendência Linear**\n"
         + f"🔎 **Equação do Modelo:** Yt = {modelo.intercept_:,.2f} – {abs(modelo.coef_[0]):,.2f} * t ✅\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + f"🔎 **MAPE:** {mape:,.2f} ✅ (Excelente <10 | Bom 10–20 | Aceitável 20–50 | Ruim >50)\n".replace(',', 'v').replace('.', ',').replace('v', '.')
@@ -1391,8 +1390,8 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
         + "➡️ Avalie ações para reverter ou estabilizar a tendência identificada.\n"
     )
 
-
     return texto.strip(), grafico_base64
+
 
 
 
