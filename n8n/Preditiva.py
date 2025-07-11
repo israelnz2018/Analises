@@ -1376,20 +1376,21 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    texto = (
+        texto = (
         f"📊 **Análise – Tendência Linear**\n"
-        f"🔎 **Equação do Modelo:** Yt = {modelo.intercept_:,.2f} – {abs(modelo.coef_[0]):,.2f} * t ✅\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + f"🔎 **Equação do Modelo:** Yt = {modelo.intercept_:,.2f} – {abs(modelo.coef_[0]):,.2f} * t ✅\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + f"🔎 **MAPE:** {mape:,.2f} ✅ (Excelente <10 | Bom 10–20 | Aceitável 20–50 | Ruim >50)\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + f"🔎 **MAD:** {mad:,.2f} ✅ (quanto menor melhor – comparar com média da série)\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + f"🔎 **MSD:** {msd:,.2f} ✅ (quanto menor melhor – comparar com média da série)\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + f"🔎 **Previsão para os próximos {horizonte} períodos:** {previsao_texto} ✅\n"
-        "\n🔎 **Conclusão:**\n"
-        f"✅ Modelo ajustado com sucesso. Existe uma tendência {'decrescente' if modelo.coef_[0]<0 else 'crescente'}, indicando variação média de {abs(modelo.coef_[0]):,.2f} unidades por período.\n".replace(',', 'v').replace('.', ',').replace('v', '.')
-        "\n🔎 **Recomendação:**\n"
-        "➡️ Verifique se os dados estão ordenados corretamente para garantir previsões confiáveis.\n"
-        "➡️ Caso o MAPE permaneça elevado, considere modelos mais complexos (ex: ARIMA ou modelos sazonais) para melhorar a acurácia.\n"
-        "➡️ Avalie ações para reverter ou estabilizar a tendência identificada.\n"
+        + "\n🔎 **Conclusão:**\n"
+        + f"✅ Modelo ajustado com sucesso. Existe uma tendência {'decrescente' if modelo.coef_[0]<0 else 'crescente'}, indicando variação média de {abs(modelo.coef_[0]):,.2f} unidades por período.\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + "\n🔎 **Recomendação:**\n"
+        + "➡️ Verifique se os dados estão ordenados corretamente para garantir previsões confiáveis.\n"
+        + "➡️ Caso o MAPE permaneça elevado, considere modelos mais complexos (ex: ARIMA ou modelos sazonais) para melhorar a acurácia.\n"
+        + "➡️ Avalie ações para reverter ou estabilizar a tendência identificada.\n"
     )
+
 
     return texto.strip(), grafico_base64
 
