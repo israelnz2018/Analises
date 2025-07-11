@@ -116,7 +116,7 @@ CONFIG_ANALISES = {
     "Regressão Nominal": ["df", "coluna_y", "lista_x"],
     "Árvore de Decisão - CART": ["df", "coluna_y", "lista_x"],
     "Random Forest": ["df", "coluna_y", "lista_x"],
-    "Série Temporal - ARIMA": ["df", "coluna_y", "Data", "field"],
+    "Série Temporal": ["df", "coluna_y", "Data", "field"],
     "Carta I-MR": ["df", "coluna_y"],
     "Carta X-BarraR": ["df", "coluna_y", "subgrupo"],
     "Carta X-BarraS": ["df", "coluna_y", "subgrupo"], 
