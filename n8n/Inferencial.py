@@ -1235,10 +1235,13 @@ O IQR indica que os 50% centrais dos dados estão distribuídos em um intervalo 
 
 
 
-
-
-
 def analise_2_variancas(df: pd.DataFrame, lista_y: list, field_conf=None):
+    import matplotlib.pyplot as plt
+    import io
+    import base64
+    import numpy as np
+    from scipy import stats
+
     if len(lista_y) != 2:
         return "❌ O teste 2 Variâncias requer exatamente 2 colunas Y.", None
 
@@ -1318,7 +1321,37 @@ p-valor = {p_valor:.2f}
 {recomendacao}
 """
 
-    return texto.strip(), None
+    # 🔷 Geração do gráfico combinado
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 8))
+
+    # 🔹 Intervalos de confiança para std
+    std1 = np.std(dados1, ddof=1)
+    std2 = np.std(dados2, ddof=1)
+
+    ci1 = stats.t.interval(0.95, len(dados1)-1, loc=std1, scale=stats.sem(dados1))
+    ci2 = stats.t.interval(0.95, len(dados2)-1, loc=std2, scale=stats.sem(dados2))
+
+    ax1.errorbar(x=[col1, col2], y=[std1, std2],
+                 yerr=[std1-ci1[0], std2-ci2[0]],
+                 fmt='o', capsize=5)
+    ax1.set_title('95% Intervalos de Confiança para Std Devs')
+    ax1.set_ylabel('Desvio Padrão')
+
+    # 🔹 Boxplot comparativo
+    ax2.boxplot([dados1, dados2], labels=[col1, col2])
+    ax2.set_title('Boxplot Comparativo')
+    ax2.set_ylabel('Data')
+
+    plt.tight_layout()
+
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    img_base64 = base64.b64encode(buffer.read()).decode('utf-8')
+    plt.close()
+
+    return texto.strip(), img_base64
+
 
 
 
