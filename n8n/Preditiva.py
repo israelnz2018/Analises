@@ -1285,7 +1285,7 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
 
 import pandas as pd
 
-def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
+def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
@@ -1293,6 +1293,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     import base64
     from datetime import datetime
     import locale
+    from sklearn.linear_model import LinearRegression
 
     aplicar_estilo_minitab()
 
@@ -1303,7 +1304,7 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
         locale.setlocale(locale.LC_ALL, '')
 
     if not coluna_y or coluna_y not in df.columns:
-        return "❌ O ARIMA requer 1 coluna Y (série temporal).", None
+        return "❌ A Tendência Linear requer 1 coluna Y (série temporal).", None
 
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
@@ -1339,52 +1340,31 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
         return "❌ A série temporal requer pelo menos 10 observações.", None
 
     Y = df_valid[coluna_y].values
+    X = np.arange(len(Y)).reshape(-1,1)
 
-    try:
-        import pmdarima as pm
-    except ImportError:
-        return "❌ O pacote pmdarima não está disponível neste ambiente.", None
-
-    # Modelo ARIMA com configuração aprimorada para detectar tendência
-    modelo = pm.auto_arima(
-        Y,
-        seasonal=False,
-        stepwise=False,  # busca exaustiva para melhor ajuste
-        suppress_warnings=True,
-        d=None,
-        max_d=2,
-        start_p=0,
-        max_p=5,
-        start_q=0,
-        max_q=5,
-        trend='t',  # força tendência linear
-        information_criterion='aic',
-        error_action='ignore'
-    )
-
-    aic = modelo.aic()
-    bic = modelo.bic()
+    # Modelo de tendência linear
+    modelo = LinearRegression()
+    modelo.fit(X, Y)
+    previsao_fit = modelo.predict(X)
 
     horizonte = int(field) if field and str(field).isdigit() else 5
-    previsao = modelo.predict(n_periods=horizonte)
+    X_future = np.arange(len(Y), len(Y)+horizonte).reshape(-1,1)
+    previsao_future = modelo.predict(X_future)
 
-    # Formatação BR (milhar . decimal ,)
-    previsao_texto = ", ".join([f"{p:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') for p in previsao])
+    # Medidas de acurácia
+    mape = np.mean(np.abs((Y - previsao_fit) / Y)) * 100
+    mad = np.mean(np.abs(Y - previsao_fit))
+    msd = np.mean((Y - previsao_fit)**2)
+
+    # Formatação BR
+    previsao_texto = ", ".join([f"{p:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') for p in previsao_future])
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(12, 6))
-
-    if Data and Data in df.columns:
-        ax.plot(index, Y, label='Série Original', color='black')
-        previsao_labels = [f"Prev{i+1}" for i in range(horizonte)]
-        ax.plot(previsao_labels, previsao, label='Previsão', color='blue')
-    else:
-        x_full = list(index) + [len(index)+i for i in range(1, horizonte+1)]
-        y_full = list(Y) + list(previsao)
-        ax.plot(index, Y, label='Série Original', color='black')
-        ax.plot(x_full[-horizonte:], previsao, label='Previsão', color='blue')
-
-    ax.set_title("📊 Análise – Série Temporal (ARIMA)", fontsize=18, fontweight='bold')
+    ax.plot(index, Y, label='Real', color='black')
+    ax.plot(index, previsao_fit, label='Ajuste Linear', color='red')
+    ax.plot(range(len(Y), len(Y)+horizonte), previsao_future, 'g--', label='Previsão')
+    ax.set_title("📊 Análise – Tendência Linear", fontsize=18, fontweight='bold')
     ax.set_ylabel("Valor", fontsize=16, fontweight='bold')
     ax.set_xlabel("Período", fontsize=16, fontweight='bold')
     ax.legend()
@@ -1397,18 +1377,22 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = (
-        f"📊 **Análise – Série Temporal (ARIMA)**\n"
-        f"🔎 **AIC:** {aic:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') + " ✅ (quanto menor melhor – valores abaixo de 100 indicam ajuste excelente)\n"
-        f"🔎 **BIC:** {bic:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') + " ✅ (quanto menor melhor – valores abaixo de 100 indicam ajuste excelente)\n"
-        f"🔎 **Previsão para os próximos {horizonte} períodos:** {previsao_texto} ✅\n"
+        f"📊 **Análise – Tendência Linear**\n"
+        f"🔎 **Equação do Modelo:** Yt = {modelo.intercept_:,.2f} – {abs(modelo.coef_[0]):,.2f} * t ✅\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + f"🔎 **MAPE:** {mape:,.2f} ✅ (Excelente <10 | Bom 10–20 | Aceitável 20–50 | Ruim >50)\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + f"🔎 **MAD:** {mad:,.2f} ✅ (quanto menor melhor – comparar com média da série)\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + f"🔎 **MSD:** {msd:,.2f} ✅ (quanto menor melhor – comparar com média da série)\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + f"🔎 **Previsão para os próximos {horizonte} períodos:** {previsao_texto} ✅\n"
         "\n🔎 **Conclusão:**\n"
-        "✅ Modelo ajustado com sucesso. O processo está estável para previsão com o modelo atual.\n\n"
-        "🔎 **Recomendação:**\n"
+        f"✅ Modelo ajustado com sucesso. Existe uma tendência {'decrescente' if modelo.coef_[0]<0 else 'crescente'}, indicando variação média de {abs(modelo.coef_[0]):,.2f} unidades por período.\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        "\n🔎 **Recomendação:**\n"
         "➡️ Verifique se os dados estão ordenados corretamente para garantir previsões confiáveis.\n"
-        "➡️ Caso a previsão apresente valores constantes ou irreais, avalie a qualidade dos dados ou utilize modelos sazonais em análises futuras.\n"
+        "➡️ Caso o MAPE permaneça elevado, considere modelos mais complexos (ex: ARIMA ou modelos sazonais) para melhorar a acurácia.\n"
+        "➡️ Avalie ações para reverter ou estabilizar a tendência identificada.\n"
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
@@ -1424,6 +1408,6 @@ ANALISES = {
     "Regressão Nominal": analise_regressao_logistica_nominal,
     "Árvore de Decisão - CART": analise_arvore_decisao,
     "Random Forest": analise_random_forest,
-    "Série Temporal - ARIMA": analise_arima
+    "Série Temporal": analise_tendencia_linear
    
 }
