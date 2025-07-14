@@ -957,8 +957,9 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 
     # Prepara X
     X_final = df_valid[lista_x].copy()
-    X_final.columns = [str(i) for i in range(X_final.shape[1])]
-    nomes_originais = dict(zip(X_final.columns, lista_x))
+    X_final.columns = [str(c) for c in lista_x]  # força nomes simples e compatíveis
+    nomes_originais = {str(c): c for c in lista_x}
+
 
     # Ajusta o modelo
     try:
