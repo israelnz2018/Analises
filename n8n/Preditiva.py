@@ -756,8 +756,6 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 - **H₀:** Nenhuma das variáveis independentes está associada à probabilidade do evento ({coluna_y}).  
 - **H₁:** Pelo menos uma variável está associada à probabilidade do evento ({coluna_y}).
 
----
-
 🔹 **Resumo do Modelo**
 
 - **Variável dependente (Y):** {coluna_y}  
@@ -774,14 +772,10 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
         for col, odds in zip(x_cols_final, odds_ratios)
     ]) + f"""
 
----
-
 🔎 **Resultados – Itens Críticos (Obrigatórios para predição)**  
 - R² de McFadden (> 0,20): {r2_mcf:.4f} ✅ (mede o ajuste geral do modelo)  
 - AUC (> 0,70): {auc:.4f} ✅ (mede a capacidade do modelo em distinguir entre casos com e sem {coluna_y})  
 - Alguma preditora significativa (p < 0,05): {'✅' if any(p < 0.05 for p in model.pvalues[1:]) else '❌'}
-
----
 
 🟡 **Resultados – Itens Recomendados (Desejáveis)**  
 - Percentual de acerto (> 70%): {acerto * 100:.2f}% {'✅' if acerto >= 0.7 else '⚠️'}  
@@ -792,8 +786,6 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
         f"- VIF {col} = {v:.2f} {'✅' if v < 10 else '⚠️'} (mede colinearidade entre variáveis)"
         for col, v in zip(x_cols_final, vif)
     ]) + f"""
-
----
 
 🔎 **Conclusão Final**  
 {conclusao}
