@@ -614,7 +614,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     criticos = [
         f"R² preditivo (mínimo 0,50): {r2_pred:.3f} {'✅' if r2_pred >= 0.5 else '❌'}",
         f"p-valor global do modelo (< 0,05): {p_global:.4f} {'✅' if p_global < 0.05 else '❌'}",
-        f"Durbin-Watson (entre 1,5 e 2,5): {dw:.3f} {'✅' if 1.5 <= dw <= 2.5 else '❌'}"
+        f"Durbin-Watson - Independência do resíduos (entre 1,5 e 2,5): {dw:.3f} {'✅' if 1.5 <= dw <= 2.5 else '❌'}"
     ]
 
     # Critérios recomendados
@@ -646,7 +646,6 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
 - **H₀:** Não há relação linear significativa entre pelo menos uma das variáveis independentes ({', '.join(lista_x)}) com a variável resposta ({coluna_y}).
 - **H₁:** Existe relação linear significativa entre pelo menos uma das variáveis independentes ({', '.join(lista_x)}) com {coluna_y}.
 
----
 
 🔹 **Resumo do Modelo**
 
@@ -655,17 +654,12 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
 - **Equação estimada:**  
   {equacao}
 
----
-
 🔎 **Resultados – Itens Críticos (Obrigatórios para predição matemática)**  
 {chr(10).join(['- ' + linha for linha in criticos])}
-
----
 
 🟡 **Resultados – Itens Recomendados (Desejáveis)**  
 {chr(10).join(['- ' + linha for linha in recomendados])}
 
----
 
 🔎 **Conclusão Final**  
 {conclusao}
