@@ -536,6 +536,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     from io import BytesIO
     import base64
 
+    # Validação inicial
     if not coluna_y or not lista_x:
         return "❌ A regressão linear múltipla requer 1 Y e pelo menos 1 X.", None
 
@@ -547,13 +548,14 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
+    # Preparação dos dados
     Y = df_valid[coluna_y].values
     X = pd.get_dummies(df_valid[lista_x], drop_first=True)
     X_cols = X.columns.tolist()
     X_values = X.values
     n, p = X_values.shape
 
-    # Ajuste com statsmodels
+    # Regressão com statsmodels
     X_sm = sm.add_constant(X)
     model = sm.OLS(Y, X_sm).fit()
     Y_pred = model.predict(X_sm)
@@ -561,16 +563,16 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     # Métricas
     r2 = model.rsquared
     r2_adj = model.rsquared_adj
+    p_global = model.f_pvalue
+    p_individuais = model.pvalues[1:]
+    coeficientes = model.params[1:]
+    intercepto = model.params[0]
+
+    # R² preditivo (Leave-One-Out)
     r2_pred = 1 - np.sum([
         (Y[i] - LinearRegression().fit(np.delete(X_values, i, axis=0), np.delete(Y, i)).predict(X_values[i].reshape(1, -1))[0]) ** 2
         for i in range(n)
     ]) / np.sum((Y - np.mean(Y)) ** 2)
-
-    # p-valores
-    p_global = model.f_pvalue
-    p_individuais = model.pvalues[1:]  # Ignora o intercepto
-    coeficientes = model.params[1:]
-    intercepto = model.params[0]
 
     # Cp de Mallows
     mse_full = np.sum((Y - Y_pred) ** 2) / (n - p - 1)
@@ -579,16 +581,14 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     # VIF
     vif_list = [variance_inflation_factor(X_values, i) for i in range(p)]
 
-    # Durbin-Watson
-    dw = sm.stats.stattools.durbin_watson(Y - Y_pred)
-
     # Resíduos
     residuos = Y - Y_pred
+    dw = sm.stats.stattools.durbin_watson(residuos)
     media_residuos = np.mean(residuos)
     p_normalidade = stats.shapiro(residuos).pvalue
     p_heterocedasticidade = sm.stats.diagnostic.het_breuschpagan(residuos, X_sm)[1]
 
-    # Gráfico base64
+    # Gráfico dos resíduos
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.scatter(Y_pred, residuos, color='black')
     ax.axhline(0, color='red', linestyle='--')
@@ -601,44 +601,43 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Equação
-    equacao = f"{coluna_y} = {intercepto:.2f} + " + " + ".join([f"{coef:.2f}·{col}" for coef, col in zip(coeficientes, X_cols)])
+    # Equação do modelo
+    equacao = f"{coluna_y} = {intercepto:.2f} + " + " + ".join(
+        [f"{coef:.2f}·{col}" for coef, col in zip(coeficientes, X_cols)]
+    )
 
-    # Criação do relatório
+    # Strings de resultados
     p_ind_str = " | ".join([f"{col} = {pval:.4f}" for col, pval in zip(X_cols, p_individuais)])
     vif_str = " | ".join([f"{col} = {v:.2f}" for col, v in zip(X_cols, vif_list)])
 
-    # Itens críticos
+    # Critérios obrigatórios (para predição)
     criticos = [
         f"R² preditivo (mínimo 0,50): {r2_pred:.3f} {'✅' if r2_pred >= 0.5 else '❌'}",
         f"p-valor global do modelo (< 0,05): {p_global:.4f} {'✅' if p_global < 0.05 else '❌'}",
-        f"p-valores individuais (< 0,05): {p_ind_str} {'✅' if all(p < 0.05 for p in p_individuais) else '❌'}",
-        f"Durbin-Watson (entre 1,5 e 2,5): {dw:.3f} {'✅' if 1.5 <= dw <= 2.5 else '❌'}",
-        f"Normalidade dos resíduos (p > 0,05): {p_normalidade:.4f} {'✅' if p_normalidade > 0.05 else '❌'}",
-        f"Homocedasticidade dos resíduos (p > 0,05): {p_heterocedasticidade:.4f} {'✅' if p_heterocedasticidade > 0.05 else '❌'}",
-        f"Média dos resíduos ≈ 0: {media_residuos:.4f} {'✅' if abs(media_residuos) < 0.01 else '❌'}"
+        f"Durbin-Watson (entre 1,5 e 2,5): {dw:.3f} {'✅' if 1.5 <= dw <= 2.5 else '❌'}"
     ]
 
-    # Itens recomendados
+    # Critérios recomendados
     recomendados = [
+        f"p-valores individuais (< 0,05): {p_ind_str} {'✅' if all(p < 0.05 for p in p_individuais) else '⚠️'}",
         f"R² e R² ajustado: {r2:.3f} | {r2_adj:.3f} ✅",
         f"Δ R² ajustado vs R² preditivo (< 0,05): {abs(r2_adj - r2_pred):.3f} {'✅' if abs(r2_adj - r2_pred) < 0.05 else '⚠️'}",
         f"Cp de Mallows ≈ p+1: {cp:.2f} {'✅' if abs(cp - (p + 1)) <= 1 else '⚠️'}",
+        f"Normalidade dos resíduos (p > 0,05): {p_normalidade:.4f} {'✅' if p_normalidade > 0.05 else '⚠️'}",
+        f"Homocedasticidade dos resíduos (p > 0,05): {p_heterocedasticidade:.4f} {'✅' if p_heterocedasticidade > 0.05 else '⚠️'}",
+        f"Média dos resíduos ≈ 0: {media_residuos:.4f} ✅",
         f"VIFs (< 10 desejado): {vif_str} {'✅' if all(v < 10 for v in vif_list) else '⚠️'}"
     ]
 
     # Conclusão
-    modelo_valido = all([
-        r2_pred >= 0.5,
-        p_global < 0.05,
-        all(p < 0.05 for p in p_individuais),
-        1.5 <= dw <= 2.5,
-        p_normalidade > 0.05,
-        p_heterocedasticidade > 0.05,
-        abs(media_residuos) < 0.01
-    ])
-    conclusao = "✅ Modelo validado para fins preditivos." if modelo_valido else "❌ Modelo não validado."
+    modelo_valido = (
+        r2_pred >= 0.5 and
+        p_global < 0.05 and
+        1.5 <= dw <= 2.5
+    )
+    conclusao = "✅ Modelo validado para fins preditivos (uso matemático)." if modelo_valido else "❌ Modelo não validado."
 
+    # Geração do texto final
     texto = f"""
 📊 **Análise – Regressão Linear Múltipla**
 
@@ -647,30 +646,33 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
 - **H₀:** Não há relação linear significativa entre pelo menos uma das variáveis independentes ({', '.join(lista_x)}) com a variável resposta ({coluna_y}).
 - **H₁:** Existe relação linear significativa entre pelo menos uma das variáveis independentes ({', '.join(lista_x)}) com {coluna_y}.
 
+---
+
 🔹 **Resumo do Modelo**
 
-- **Variável dependente (Y):** {coluna_y}
-- **Variáveis preditoras (X):** {', '.join(lista_x)}
+- **Variável dependente (Y):** {coluna_y}  
+- **Variáveis preditoras (X):** {', '.join(lista_x)}  
 - **Equação estimada:**  
   {equacao}
 
 ---
 
-🔎 **Resultados – Itens Críticos (Obrigatórios)**
+🔎 **Resultados – Itens Críticos (Obrigatórios para predição matemática)**  
 {chr(10).join(['- ' + linha for linha in criticos])}
 
 ---
 
-🟡 **Resultados – Itens Recomendados (Desejáveis)**
+🟡 **Resultados – Itens Recomendados (Desejáveis)**  
 {chr(10).join(['- ' + linha for linha in recomendados])}
 
 ---
 
-🔎 **Conclusão Final**
+🔎 **Conclusão Final**  
 {conclusao}
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
