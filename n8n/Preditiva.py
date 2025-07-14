@@ -525,8 +525,19 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
     return texto.strip(), grafico_base64
 
 def analise_regressao_linear_multipla(df, coluna_y, lista_x):
+    import pandas as pd
+    import numpy as np
+    import statsmodels.api as sm
+    import matplotlib.pyplot as plt
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import r2_score
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    from scipy import stats
+    from io import BytesIO
+    import base64
+
     if not coluna_y or not lista_x:
-        return "❌ A regressão linear múltipla requer 1 variável dependente (Y) e pelo menos 1 preditora (X).", None
+        return "❌ A regressão linear múltipla requer 1 Y e pelo menos 1 X.", None
 
     for col in [coluna_y] + lista_x:
         if col not in df.columns:
@@ -534,150 +545,126 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
 
     df_valid = df[[coluna_y] + lista_x].dropna()
     if len(df_valid) < len(lista_x) + 3:
-        return "❌ O modelo requer mais dados válidos para análise.", None
+        return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y].values
-    X_final = pd.get_dummies(df_valid[lista_x], drop_first=True)
-    x_cols_final = X_final.columns.tolist()
-    X_values = X_final.values
+    X = pd.get_dummies(df_valid[lista_x], drop_first=True)
+    X_cols = X.columns.tolist()
+    X_values = X.values
     n, p_full = X_values.shape
 
-    from sklearn.linear_model import LinearRegression
-    from sklearn.metrics import r2_score
-    from statsmodels.stats.outliers_influence import variance_inflation_factor
-    import statsmodels.api as sm
-    from scipy import stats
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-    import numpy as np
+    # Ajuste com statsmodels para obter p-valores individuais
+    X_sm = sm.add_constant(X)
+    model_sm = sm.OLS(Y, X_sm).fit()
+    p_valores_individuais = model_sm.pvalues[1:]  # Ignora o intercepto
+    coeficientes = model_sm.params[1:]
+    intercepto = model_sm.params[0]
+    Y_pred = model_sm.predict(X_sm)
+    
+    # R² e R² ajustado
+    r2 = model_sm.rsquared
+    r2_adj = model_sm.rsquared_adj
 
-    def calcular_modelo(X_sub, cols_sub):
-        model = LinearRegression().fit(X_sub, Y)
-        Y_pred = model.predict(X_sub)
-        r2 = r2_score(Y, Y_pred)
-        r2_adj = 1 - (1 - r2) * (n - 1) / (n - X_sub.shape[1] - 1)
+    # R² preditivo (Leave-One-Out)
+    erros = []
+    for i in range(n):
+        Xi = np.delete(X_values, i, axis=0)
+        Yi = np.delete(Y, i)
+        modelo_loo = LinearRegression().fit(Xi, Yi)
+        y_pred_i = modelo_loo.predict(X_values[i].reshape(1, -1))[0]
+        erros.append((Y[i] - y_pred_i) ** 2)
+    ss_res_loo = np.sum(erros)
+    ss_tot = np.sum((Y - np.mean(Y)) ** 2)
+    r2_pred = 1 - ss_res_loo / ss_tot
 
-        # R² preditivo (Leave-One-Out)
-        erros = []
-        for i in range(n):
-            Xi = np.delete(X_sub, i, axis=0)
-            Yi = np.delete(Y, i)
-            m_lo = LinearRegression().fit(Xi, Yi)
-            y_lo = m_lo.predict(X_sub[i].reshape(1, -1))[0]
-            erros.append((Y[i] - y_lo) ** 2)
-        ss_res_pred = np.sum(erros)
-        ss_tot = np.sum((Y - np.mean(Y)) ** 2)
-        r2_pred = 1 - ss_res_pred / ss_tot
+    # VIF
+    vif_list = []
+    for i in range(X_values.shape[1]):
+        vif_list.append(variance_inflation_factor(X_values, i))
 
-        # VIF
-        vif = []
-        if X_sub.shape[1] > 1:
-            X_sm = sm.add_constant(X_sub)
-            for i in range(1, X_sm.shape[1]):
-                vif.append(variance_inflation_factor(X_sm, i))
-        else:
-            vif.append(1.0)
+    # Cp de Mallows
+    mse_full = np.sum((Y - Y_pred) ** 2) / (n - p_full - 1)
+    cp = (np.sum((Y - Y_pred) ** 2) / mse_full) - (n - 2 * (p_full + 1))
 
-        # Mallows Cp
-        resid = Y - Y_pred
-        mse_full = np.sum((Y - LinearRegression().fit(X_values, Y).predict(X_values)) ** 2) / (n - p_full - 1)
-        cp = (np.sum(resid ** 2) / mse_full) - (n - 2 * (X_sub.shape[1] + 1))
+    # Durbin-Watson
+    dw = sm.stats.stattools.durbin_watson(Y - Y_pred)
 
-        # Durbin-Watson
-        dw = sm.stats.stattools.durbin_watson(resid)
+    # Análise de resíduos
+    residuos = Y - Y_pred
+    media_residuos = np.mean(residuos)
+    p_normalidade = stats.shapiro(residuos).pvalue
+    bp_test = sm.stats.diagnostic.het_breuschpagan(residuos, X_sm)
+    p_heterocedasticidade = bp_test[1]
 
-        # p-valor do modelo (F-test)
-        ss_res = np.sum((Y - Y_pred) ** 2)
-        msr = (ss_tot - ss_res) / X_sub.shape[1]
-        mse = ss_res / (n - X_sub.shape[1] - 1)
-        f_stat = msr / mse
-        p_valor_modelo = 1 - stats.f.cdf(f_stat, X_sub.shape[1], n - X_sub.shape[1] - 1)
-
-        # Análise dos resíduos
-        media_residuos = np.mean(resid)
-        p_normal = stats.shapiro(resid).pvalue
-        bp_test = sm.stats.diagnostic.het_breuschpagan(resid, sm.add_constant(X_sub))
-        p_heteroced = bp_test[1]
-
-        return {
-            "cols": cols_sub,
-            "model": model,
-            "r2": r2,
-            "r2_adj": r2_adj,
-            "r2_pred": r2_pred,
-            "vif": vif,
-            "cp": cp,
-            "dw": dw,
-            "p_valor_modelo": p_valor_modelo,
-            "Y_pred": Y_pred,
-            "media_residuos": media_residuos,
-            "p_normalidade": p_normal,
-            "p_heterocedasticidade": p_heteroced
-        }
-
-    modelo = calcular_modelo(X_values, x_cols_final)
-
-    # Gráfico: Resíduos vs Valores Preditos (em português)
+    # Gráfico
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.scatter(modelo["Y_pred"], Y - modelo["Y_pred"], color='black')
+    ax.scatter(Y_pred, residuos, color='black')
     ax.axhline(0, color='red', linestyle='--')
     ax.set_xlabel("Valores preditos")
     ax.set_ylabel("Resíduos")
     ax.set_title("Resíduos vs Valores Preditos")
     plt.tight_layout()
-
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     # Equação
-    coef_str = " + ".join([f"{coef:.2f}·{col}" for coef, col in zip(modelo["model"].coef_, modelo["cols"])])
-    equacao = f"{coluna_y} = {modelo['model'].intercept_:.2f} + {coef_str}"
+    equacao = f"{coluna_y} = {intercepto:.2f} + " + " + ".join(
+        [f"{coef:.2f}·{col}" for coef, col in zip(coeficientes, X_cols)]
+    )
 
-    # Geração do relatório com critérios de validação
-    criterios = []
-    criterios.append(f"- ✅ p-valor do modelo: {modelo['p_valor_modelo']:.4f} (< 0,05)")
-    criterios.append(f"- ✅ R² ajustado: {modelo['r2_adj']:.3f} | R² preditivo: {modelo['r2_pred']:.3f} (diferença aceitável)")
-    if all(v < 10 for v in modelo['vif']):
-        criterios.append("- ✅ VIFs < 10 (sem multicolinearidade severa)")
-    else:
-        criterios.append("- ⚠ VIFs ≥ 10 (multicolinearidade identificada)")
-    criterios.append(f"- ✅ Cp de Mallows: {modelo['cp']:.2f} (esperado ≈ {len(modelo['cols']) + 1})")
-    criterios.append(f"- ✅ Durbin-Watson: {modelo['dw']:.3f} (entre 1,5 e 2,5)")
-    criterios.append(f"- ✅ Normalidade dos resíduos (Shapiro-Wilk): p = {modelo['p_normalidade']:.4f}")
-    criterios.append(f"- ✅ Homocedasticidade dos resíduos (Breusch-Pagan): p = {modelo['p_heterocedasticidade']:.4f}")
-    criterios.append(f"- ✅ Média dos resíduos: {modelo['media_residuos']:.4f} (próxima de 0)")
+    # Relatório
+    p_vals_ind_texto = "\n".join([
+        f"  {col}: {pval:.4f}" for col, pval in zip(X_cols, p_valores_individuais)
+    ])
 
-    # Conclusão
-    if modelo["r2_pred"] > 0.5:
-        conclusao = "✅ Modelo validado para fins preditivos."
-    else:
-        conclusao = "⚠ Modelo não validado. R² preditivo abaixo do aceitável."
+    criterios_tabela = f"""
+🔎 **Critérios de Validação do Modelo**
 
-    # Texto final
+| Critério                           | Limite Ideal                        | Resultado                        | Avaliação                       |
+|-----------------------------------|-------------------------------------|----------------------------------|---------------------------------|
+| **p-valor global (modelo)**       | < 0,05                              | {model_sm.f_pvalue:.4f}          | ✅ Significativo                |
+| **p-valores individuais**         | < 0,05                              | {', '.join([f"{col}: {pval:.4f}" for col, pval in zip(X_cols, p_valores_individuais)])} | ✅ Variáveis significativas     |
+| **R² ajustado vs. R² preditivo**  | Diferença pequena (< 0,05)          | Diferença = {abs(r2_adj - r2_pred):.3f}  | ✅ Sem sobreajuste             |
+| **VIF (colinearidade)**           | < 10                                | {', '.join([f"{v:.2f}" for v in vif_list])} | {'⚠ Multicolinearidade presente' if any(v >= 10 for v in vif_list) else '✅ Sem multicolinearidade'} |
+| **Cp de Mallows**                 | ≈ número de preditores + 1          | {cp:.2f}                          | ✅ Modelo parcimonioso          |
+| **Durbin-Watson (autocorrelação)**| Entre 1,5 e 2,5                      | {dw:.3f}                          | ✅ Sem autocorrelação           |
+| **Normalidade dos resíduos**      | p > 0,05 (Shapiro-Wilk)             | {p_normalidade:.4f}              | {'✅' if p_normalidade > 0.05 else '⚠'} |
+| **Homocedasticidade dos resíduos**| p > 0,05 (Breusch-Pagan)            | {p_heterocedasticidade:.4f}      | {'✅' if p_heterocedasticidade > 0.05 else '⚠'} |
+| **Média dos resíduos**            | Próxima de zero                     | {media_residuos:.4f}             | ✅ Média aceitável              |
+""".strip()
+
+    conclusao = "✅ Modelo validado para fins preditivos." if r2_pred > 0.5 else "⚠ Modelo não validado. R² preditivo baixo."
+
     texto = f"""
 📊 **Análise – Regressão Linear Múltipla**
 
-🔹 **Hipóteses do Modelo**  
-- **H₀:** Não há relação linear significativa entre {', '.join(lista_x)} e {coluna_y}.  
-- **H₁:** Existe relação linear significativa entre pelo menos uma das variáveis preditoras e {coluna_y}.
+🔹 **Hipóteses do Modelo**
 
-🔎 **Resumo do Modelo**  
-- **Variável dependente (Y):** {coluna_y}  
-- **Variáveis preditoras (X):** {', '.join(modelo['cols'])}  
-- **Equação estimada:** {equacao}  
-- **R²:** {modelo['r2']:.3f}  
-- **R² ajustado:** {modelo['r2_adj']:.3f}  
-- **R² preditivo:** {modelo['r2_pred']:.3f}  
-- **p-valor do modelo:** {modelo['p_valor_modelo']:.4f}  
-- **Cp de Mallows:** {modelo['cp']:.2f}  
-- **Durbin-Watson:** {modelo['dw']:.3f}  
-- **VIFs:** {', '.join([f"{c} = {v:.2f}" for c, v in zip(modelo['cols'], modelo['vif'])])}
+- **H₀:** Não há relação linear significativa entre pelo menos uma das variáveis independentes ({', '.join(lista_x)}) com a variável resposta ({coluna_y}).
+- **H₁:** Existe relação linear significativa entre pelo menos uma das variáveis independentes ({', '.join(lista_x)}) com {coluna_y}.
 
-🔎 **Critérios de Validação**  
-{chr(10).join(criterios)}
+🔎 **Resumo do Modelo**
+
+- **Y (Variável Resposta):** {coluna_y}
+- **X (Variáveis Preditora):** {', '.join(X_cols)}
+- **Equação Estimada:**  
+  {equacao}
+
+- **R²:** {r2:.3f}  
+- **R² ajustado:** {r2_adj:.3f}  
+- **R² preditivo:** {r2_pred:.3f}  
+- **p-valor do modelo (global):** {model_sm.f_pvalue:.4f}
+
+- **p-valores individuais:**  
+{p_vals_ind_texto}
+
+- **Cp de Mallows:** {cp:.2f}  
+- **Durbin-Watson:** {dw:.3f}  
+- **VIFs:** {', '.join([f"{col} = {v:.2f}" for col, v in zip(X_cols, vif_list)])}
+
+{criterios_tabela}
 
 🔎 **Conclusão**  
 {conclusao}
