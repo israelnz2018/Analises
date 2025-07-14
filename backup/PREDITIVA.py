@@ -1,93 +1,105 @@
 from suporte import *
 
-def analise_tipo_modelo_regressao(df: pd.DataFrame, coluna_y):
-    if not coluna_y:
-        return "❌ O Tipo de modelo de regressão requer 1 coluna Y.", None
+def analise_melhor_modelo(df: pd.DataFrame, coluna_y, coluna_x):
+    import statsmodels.api as sm
+    from sklearn.metrics import r2_score
 
-    if coluna_y not in df.columns:
-        return f"❌ Coluna {coluna_y} não encontrada no arquivo.", None
+    if not coluna_y or not coluna_x:
+        return "❌ O teste requer exatamente 1 coluna Y e 1 coluna X.", None
 
-    colunas_x = [col for col in df.columns if col != coluna_y and pd.api.types.is_numeric_dtype(df[col])]
-    if not colunas_x:
-        return "❌ Nenhuma coluna X numérica encontrada automaticamente no arquivo.", None
+    if coluna_y not in df.columns or coluna_x not in df.columns:
+        return "❌ As colunas informadas não foram encontradas no arquivo.", None
 
-    coluna_x = colunas_x[0]
     df_valid = df[[coluna_x, coluna_y]].dropna()
-    if len(df_valid) < 5:
-        return "❌ São necessários pelo menos 5 pares válidos para análise.", None
+    if df_valid.empty:
+        return "❌ Não há dados suficientes após remoção de valores nulos.", None
 
-    X_raw = df_valid[coluna_x].values
-    Y = df_valid[coluna_y].values
+    x = df_valid[coluna_x].to_numpy()
+    y = df_valid[coluna_y].to_numpy()
 
-    modelos = {
-        "Linear": np.polyfit(X_raw, Y, 1),
-        "Quadrático": np.polyfit(X_raw, Y, 2),
-        "Cúbico": np.polyfit(X_raw, Y, 3)
-    }
+    resultados = []
+    detalhes_modelos = ""
 
-    X_log = X_raw[X_raw > 0]
-    Y_log = Y[X_raw > 0]
-    if len(X_log) >= 5:
-        modelos["Logarítmico"] = np.polyfit(np.log(X_log), Y_log, 1)
+    # 1. Modelo Linear
+    X_lin = sm.add_constant(x)
+    modelo_lin = sm.OLS(y, X_lin).fit()
+    r2_lin = modelo_lin.rsquared
+    eq_lin = f"Y = {modelo_lin.params[0]:.3f} + {modelo_lin.params[1]:.3f}X"
+    resultados.append(("Linear", r2_lin, modelo_lin, eq_lin))
 
-    Y_exp = Y[Y > 0]
-    X_exp = X_raw[Y > 0]
-    if len(Y_exp) >= 5:
-        modelos["Exponencial"] = np.polyfit(X_exp, np.log(Y_exp), 1)
+    # 2. Modelo Log-linear
+    if all(y > 0):
+        modelo_loglin = sm.OLS(np.log(y), X_lin).fit()
+        y_pred_loglin = np.exp(modelo_loglin.predict(X_lin))
+        r2_loglin = r2_score(y, y_pred_loglin)
+        eq_loglin = f"ln(Y) = {modelo_loglin.params[0]:.3f} + {modelo_loglin.params[1]:.3f}X"
+        resultados.append(("Log-linear", r2_loglin, modelo_loglin, eq_loglin))
+    
+    # 3. Modelo Exponencial
+    if all(y > 0):
+        modelo_exp = sm.OLS(np.log(y), X_lin).fit()
+        y_pred_exp = np.exp(modelo_exp.predict(X_lin))
+        r2_exp = r2_score(y, y_pred_exp)
+        eq_exp = f"Y = exp({modelo_exp.params[0]:.3f} + {modelo_exp.params[1]:.3f}X)"
+        resultados.append(("Exponencial", r2_exp, modelo_exp, eq_exp))
 
-    resultados = {}
-    for nome, coef in modelos.items():
-        if nome == "Logarítmico":
-            y_pred = np.polyval(coef, np.log(X_raw[X_raw > 0]))
-            y_pred_full = np.full_like(Y, np.nan)
-            y_pred_full[X_raw > 0] = y_pred
-            y_pred = y_pred_full
-        elif nome == "Exponencial":
-            y_pred = np.exp(np.polyval(coef, X_raw))
-        else:
-            y_pred = np.polyval(coef, X_raw)
+    # 4. Modelo Potência
+    if all(x > 0) and all(y > 0):
+        X_pot = sm.add_constant(np.log(x))
+        modelo_pot = sm.OLS(np.log(y), X_pot).fit()
+        y_pred_pot = np.exp(modelo_pot.predict(X_pot))
+        r2_pot = r2_score(y, y_pred_pot)
+        eq_pot = f"Y = exp({modelo_pot.params[0]:.3f}) * X^{modelo_pot.params[1]:.3f}"
+        resultados.append(("Potência", r2_pot, modelo_pot, eq_pot))
 
-        ss_res = np.nansum((Y - y_pred) ** 2)
-        ss_tot = np.nansum((Y - np.nanmean(Y)) ** 2)
-        r2 = 1 - ss_res / ss_tot
-        adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - len(coef) - 1)
+    # 5. Modelo Polinomial grau 2
+    X_poly = np.column_stack((x, x**2))
+    X_poly = sm.add_constant(X_poly)
+    modelo_poly = sm.OLS(y, X_poly).fit()
+    r2_poly = modelo_poly.rsquared
+    eq_poly = f"Y = {modelo_poly.params[0]:.3f} + {modelo_poly.params[1]:.3f}X + {modelo_poly.params[2]:.3f}X²"
+    resultados.append(("Polinomial", r2_poly, modelo_poly, eq_poly))
 
-        resultados[nome] = {
-            "coef": coef,
-            "r2": r2,
-            "r2_adj": adj
-        }
+    # Monta texto com todos os modelos
+    for nome, r2, _, eq in resultados:
+        detalhes_modelos += f"🔹 {nome}\n- Equação: {eq}\n- R² = {r2:.3f}\n\n"
 
-    resultados_validos = {k: v for k, v in resultados.items() if v["r2_adj"] >= 0}
+    # Ordena por R² decrescente
+    resultados.sort(key=lambda x: x[1], reverse=True)
 
-    if not resultados_validos:
-        return "❌ Nenhum modelo apresentou R² ajustado positivo. Regressão não recomendada.", None
+    # Critério de desempate
+    melhor = resultados[0]
+    for modelo in resultados[1:]:
+        if abs(melhor[1] - modelo[1]) < 0.05:
+            # Se diferença <5%, escolhe modelo mais simples (pela ordem original)
+            ordem_simples = ["Linear", "Log-linear", "Exponencial", "Potência", "Polinomial"]
+            if ordem_simples.index(modelo[0]) < ordem_simples.index(melhor[0]):
+                melhor = modelo
 
-    melhor = max(resultados_validos.items(), key=lambda x: x[1]["r2_adj"])
-    nome_vencedor, res_vencedor = melhor
+    tipo_modelo, r2_melhor, modelo_melhor, eq_melhor = melhor
 
-    aviso = ""
-    if all(r["r2_adj"] < 0.3 for r in resultados_validos.values()):
-        aviso = "⚠ Todos os modelos apresentaram baixo poder de explicação (R² ajustado < 0.3). Use com cautela.\n"
-
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.scatter(X_raw, Y, color='black', label='Dados')
-
-    if nome_vencedor == "Logarítmico":
-        X_plot = X_raw[X_raw > 0]
-        y_fit = np.polyval(res_vencedor["coef"], np.log(X_plot))
-        ax.plot(X_plot, y_fit, color='blue', label=f'Modelo: {nome_vencedor}')
-    elif nome_vencedor == "Exponencial":
-        y_fit = np.exp(np.polyval(res_vencedor["coef"], X_raw))
-        ax.plot(X_raw, y_fit, color='blue', label=f'Modelo: {nome_vencedor}')
+    # Calcula y_pred para o modelo vencedor
+    if tipo_modelo == "Linear":
+        y_pred = modelo_melhor.predict(sm.add_constant(x))
+    elif tipo_modelo == "Log-linear":
+        y_pred = np.exp(modelo_melhor.predict(sm.add_constant(x)))
+    elif tipo_modelo == "Exponencial":
+        y_pred = np.exp(modelo_melhor.predict(sm.add_constant(x)))
+    elif tipo_modelo == "Potência":
+        y_pred = np.exp(modelo_melhor.predict(sm.add_constant(np.log(x))))
+    elif tipo_modelo == "Polinomial":
+        y_pred = modelo_melhor.predict(X_poly)
     else:
-        y_fit = np.polyval(res_vencedor["coef"], X_raw)
-        ax.plot(X_raw, y_fit, color='blue', label=f'Modelo: {nome_vencedor}')
+        y_pred = np.zeros_like(y)
 
+    # Gráfico do modelo vencedor
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(8,4))
+    ax.scatter(x, y, label="Observado", color="#0072B2")
+    ax.plot(x, y_pred, label="Modelo Ajustado", color="#E69F00")
+    ax.set_title(eq_melhor)
     ax.set_xlabel(coluna_x)
     ax.set_ylabel(coluna_y)
-    ax.set_title("Tipo de Modelo de Regressão")
     ax.legend()
     plt.tight_layout()
 
@@ -96,20 +108,31 @@ def analise_tipo_modelo_regressao(df: pd.DataFrame, coluna_y):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
-    linhas = []
-    for nome, r in resultados.items():
-        coef_txt = " + ".join([f"{c:.4f}*X^{i}" for i, c in enumerate(r["coef"][::-1])])
-        linhas.append(f"- {nome}: R²={r['r2']:.4f}, R² ajustado={r['r2_adj']:.4f}\n  Equação: {coef_txt}")
+    # Alerta se R² < 50%
+    alerta = ""
+    if r2_melhor < 0.50:
+        alerta = "⚠️ **Atenção:** O modelo possui baixo poder explicativo (R² < 50%). Recomenda-se adicionar mais fatores (variáveis X) para melhorar o ajuste.\n"
 
+    # Report padronizado
     texto = f"""
-**Tipo de Modelo de Regressão**
-{chr(10).join(linhas)}
+📊 **Análise – Melhor Modelo de Regressão**
 
-**Conclusão**
-{aviso}Modelo recomendado: {nome_vencedor} (R² ajustado = {res_vencedor['r2_adj']:.4f})
+🔎 **Resultados de todos os modelos:**
+{detalhes_modelos}
+
+🔎 **Modelo escolhido:**
+- Tipo: {tipo_modelo}
+- Equação: {eq_melhor}
+- R² = {r2_melhor:.3f}
+
+🔎 **Justificativa:**
+O modelo {tipo_modelo} foi selecionado por apresentar o maior R² considerando simplicidade como critério secundário.
+
+{alerta}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
@@ -121,7 +144,6 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
         return f"❌ Coluna {coluna_y} ou {coluna_x} não encontrada no arquivo.", None
 
     df_valid = df[[coluna_x, coluna_y]].dropna()
-
     if len(df_valid) < 5:
         return "❌ O modelo requer ao menos 5 observações válidas.", None
 
@@ -135,18 +157,13 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     ss_res = np.sum((Y - y_pred) ** 2)
     ss_tot = np.sum((Y - np.mean(Y)) ** 2)
     r2 = 1 - ss_res / ss_tot
-    r2_adj = 1 - (1 - r2) * (len(Y) - 1) / (len(Y) - 2)
+    n = len(Y)
+    p = 2
+    r2_adj = 1 - (1 - r2) * (n - 1) / (n - p)
 
-    X_mat = np.vstack([np.ones_like(X), X]).T
-    beta, residuals, rank, s = np.linalg.lstsq(X_mat, Y, rcond=None)
-    mse = ss_res / (len(Y) - 2)
-    var_beta = mse * np.linalg.inv(X_mat.T @ X_mat)
-    se_beta1 = np.sqrt(var_beta[1,1])
-    t_stat = beta[1] / se_beta1
-    p_valor_beta1 = 2 * (1 - stats.t.cdf(abs(t_stat), df=len(Y)-2))
-
+    # R² preditivo (Leave-One-Out)
     erros = []
-    for i in range(len(Y)):
+    for i in range(n):
         X_train = np.delete(X, i)
         Y_train = np.delete(Y, i)
         coef_lo = np.polyfit(X_train, Y_train, 1)
@@ -155,23 +172,55 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     ss_pred = np.sum(erros)
     r2_pred = 1 - ss_pred / ss_tot
 
+    # p-valor do coeficiente angular
+    X_mat = np.vstack([np.ones_like(X), X]).T
+    beta, residuals, rank, s = np.linalg.lstsq(X_mat, Y, rcond=None)
+    mse = ss_res / (n - p)
+    var_beta = mse * np.linalg.inv(X_mat.T @ X_mat)
+    se_beta1 = np.sqrt(var_beta[1,1])
+    t_stat = beta[1] / se_beta1
+    p_valor_beta1 = 2 * (1 - stats.t.cdf(abs(t_stat), df=n-p))
+
+    # Testes de normalidade dos resíduos
     residuos = Y - y_pred
     ad = stats.anderson(residuos)
-    ad_crit = ad.critical_values
-    ad_sig = list(ad.significance_level)
-    if 5 in ad_sig:
-        idx = ad_sig.index(5)
-        ad_normal = ad.statistic < ad_crit[idx]
-    else:
-        ad_normal = False
+    sw_stat, sw_p = stats.shapiro(residuos)
+    dp_stat, dp_p = stats.normaltest(residuos)
 
-    conclusao = []
-    conclusao.append("✅ Resíduos seguem distribuição normal (Anderson-Darling)." if ad_normal else "⚠ Resíduos podem não ser normais (Anderson-Darling).")
-    conclusao.append(f"✅ Coeficiente angular significativo (p = {p_valor_beta1:.4f})." if p_valor_beta1 < 0.05 else f"⚠ Coeficiente angular não significativo (p = {p_valor_beta1:.4f}).")
-    if ad_normal and p_valor_beta1 < 0.05 and r2_pred > 0.5:
-        conclusao.append("✅ Modelo validado.")
+    testes_normalidade = {
+        "Anderson-Darling": (ad.statistic, ad.statistic < ad.critical_values[2], 0.05),
+        "Shapiro-Wilk": (sw_p, sw_p > 0.05, sw_p),
+        "D’Agostino-Pearson": (dp_p, dp_p > 0.05, dp_p)
+    }
+    melhor_teste = max(testes_normalidade.items(), key=lambda x: x[1][2])
+    nome_teste, (stat, aprovado, p_valor) = melhor_teste
+    normalidade_residuos = aprovado
+
+    # Conclusão baseada em critérios
+    motivos = []
+    if not normalidade_residuos:
+        motivos.append("os resíduos não são normais")
+    if p_valor_beta1 >= 0.05:
+        motivos.append("o coeficiente angular não é significativo (p-valor >= 0.05)")
+    if r2 < 0.5:
+        motivos.append("o R² é inferior a 50%")
+
+    if not motivos:
+        validacao = "✅ Modelo validado. O modelo linear é adequado para os dados."
     else:
-        conclusao.append("⚠ Modelo pode não ser adequado. Verifique os indicadores acima.")
+        motivos_txt = "; ".join(motivos)
+        validacao = f"⚠️ Modelo não validado porque {motivos_txt}."
+
+    # Recomendação prática
+    recomendacoes = []
+    if r2 < 0.5:
+        recomendacoes.append("➔ O R² está abaixo de 50%. Considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo.")
+    if not normalidade_residuos:
+        recomendacoes.append("➔ Os resíduos não são normais. Verifique a estabilidade do processo ou colete mais dados.")
+    if p_valor_beta1 >= 0.05:
+        recomendacoes.append("➔ O coeficiente angular não é significativo. Avalie a relação entre as variáveis ou considere outro modelo.")
+
+    recomendacao_final = "\n".join(recomendacoes)
 
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6,4))
@@ -189,22 +238,291 @@ def analise_regressao_linear_simples(df: pd.DataFrame, coluna_y, coluna_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-**Regressão Linear Simples**
+📊 **Análise – Regressão Linear Simples**
+
+🔹 **Hipóteses do modelo**
+- **H₀:** Não há relação linear entre {coluna_x} e {coluna_y}
+- **H₁:** Existe relação linear entre {coluna_x} e {coluna_y}
+
+🔎 **Resumo do modelo**
 - Equação: Y = {intercepto:.4f} + {angular:.4f} * X
 - R²: {r2:.4f}
 - R² ajustado: {r2_adj:.4f}
 - R² preditivo: {r2_pred:.4f}
 - p-valor do coeficiente angular: {p_valor_beta1:.4f}
-- Anderson-Darling dos resíduos: estatística={ad.statistic:.4f}, normalidade={'Aprovada' if ad_normal else 'Reprovada'}
 
-**Conclusão**
-{chr(10).join(conclusao)}
+🔎 **Normalidade dos resíduos**
+{"✅ Os resíduos podem ser considerados normais" if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste})."}
+
+🔎 **Conclusão**
+{validacao}
+
+🔧 **Recomendação**
+{recomendacao_final}
 """
 
     return texto.strip(), grafico_base64
 
 
 
+def analise_regressao_quadratica(df: pd.DataFrame, coluna_y, coluna_x):
+    if not coluna_y or not coluna_x:
+        return "❌ A regressão quadrática requer 1 coluna Y e 1 coluna X.", None
+
+    if coluna_y not in df.columns or coluna_x not in df.columns:
+        return f"❌ Coluna {coluna_y} ou {coluna_x} não encontrada no arquivo.", None
+
+    df_valid = df[[coluna_x, coluna_y]].dropna()
+    if len(df_valid) < 5:
+        return "❌ O modelo requer ao menos 5 observações válidas.", None
+
+    X = df_valid[coluna_x].values
+    Y = df_valid[coluna_y].values
+
+    # Ajuste quadrático
+    coef = np.polyfit(X, Y, 2)
+    y_pred = np.polyval(coef, X)
+    a, b, c = coef[0], coef[1], coef[2]
+
+    ss_res = np.sum((Y - y_pred) ** 2)
+    ss_tot = np.sum((Y - np.mean(Y)) ** 2)
+    r2 = 1 - ss_res / ss_tot
+    n = len(Y)
+    p = 3
+    r2_adj = 1 - (1 - r2) * (n - 1) / (n - p)
+
+    # R² preditivo (Leave-One-Out)
+    erros = []
+    for i in range(n):
+        X_train = np.delete(X, i)
+        Y_train = np.delete(Y, i)
+        coef_lo = np.polyfit(X_train, Y_train, 2)
+        y_pred_lo = np.polyval(coef_lo, X[i])
+        erros.append((Y[i] - y_pred_lo) ** 2)
+    ss_pred = np.sum(erros)
+    r2_pred = 1 - ss_pred / ss_tot
+
+    # p-valor do modelo (F-test)
+    msr = (ss_tot - ss_res) / (p - 1)
+    mse = ss_res / (n - p)
+    f_stat = msr / mse
+    p_valor_modelo = 1 - stats.f.cdf(f_stat, p - 1, n - p)
+
+    # Testes de normalidade dos resíduos
+    residuos = Y - y_pred
+    ad = stats.anderson(residuos)
+    sw_stat, sw_p = stats.shapiro(residuos)
+    dp_stat, dp_p = stats.normaltest(residuos)
+
+    testes_normalidade = {
+        "Anderson-Darling": (ad.statistic, ad.statistic < ad.critical_values[2], 0.05),
+        "Shapiro-Wilk": (sw_p, sw_p > 0.05, sw_p),
+        "D’Agostino-Pearson": (dp_p, dp_p > 0.05, dp_p)
+    }
+    melhor_teste = max(testes_normalidade.items(), key=lambda x: x[1][2])
+    nome_teste, (stat, aprovado, p_valor) = melhor_teste
+    normalidade_residuos = aprovado
+
+    # Conclusão baseada em critérios
+    motivos = []
+    if not normalidade_residuos:
+        motivos.append("os resíduos não são normais")
+    if p_valor_modelo >= 0.05:
+        motivos.append("o modelo não é estatisticamente significativo (p-valor >= 0.05)")
+    if r2 < 0.5:
+        motivos.append("o R² é inferior a 50%")
+
+    if not motivos:
+        validacao = "✅ Modelo validado. O modelo quadrático é adequado para os dados."
+    else:
+        motivos_txt = "; ".join(motivos)
+        validacao = f"⚠️ Modelo não validado porque {motivos_txt}."
+
+    # Recomendação prática (independente do R²)
+    recomendacoes = []
+    if r2 < 0.5:
+        recomendacoes.append("➔ O R² está abaixo de 50%. Considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva.")
+    if not normalidade_residuos:
+        recomendacoes.append("➔ Os resíduos não são normais. Recomenda-se verificar a estabilidade do processo ou coletar mais dados.")
+    if p_valor_modelo >= 0.05:
+        recomendacoes.append("➔ O modelo não é estatisticamente significativo. Avalie se há relação entre as variáveis ou considere outro tipo de modelo.")
+
+    recomendacao_final = "\n".join(recomendacoes)
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6,4))
+    ax.scatter(X, Y, color='black', label='Dados')
+
+    # Curva quadrática
+    x_seq = np.linspace(X.min(), X.max(), 300)
+    y_seq = np.polyval(coef, x_seq)
+    ax.plot(x_seq, y_seq, color='blue', label='Curva ajustada')
+
+    ax.set_title("Regressão Quadrática")
+    ax.set_xlabel(coluna_x)
+    ax.set_ylabel(coluna_y)
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+📊 **Análise – Regressão Quadrática**
+
+🔹 **Hipóteses do modelo**
+- **H₀:** Não há relação quadrática entre {coluna_x} e {coluna_y}
+- **H₁:** Existe relação quadrática entre {coluna_x} e {coluna_y}
+
+🔎 **Resumo do modelo**
+- Equação: Y = {a:.4f}X² + {b:.4f}X + {c:.4f}
+- R²: {r2:.4f}
+- R² ajustado: {r2_adj:.4f}
+- R² preditivo: {r2_pred:.4f}
+- p-valor do modelo quadrático: {p_valor_modelo:.4f}
+
+🔎 **Normalidade dos resíduos**
+{"✅ Os resíduos podem ser considerados normais" if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste})."}
+
+🔎 **Conclusão**
+{validacao}
+
+🔧 **Recomendação**
+{recomendacao_final}
+"""
+
+    return texto.strip(), grafico_base64
+
+
+def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
+    if not coluna_y or not coluna_x:
+        return "❌ A regressão cúbica requer 1 coluna Y e 1 coluna X.", None
+
+    if coluna_y not in df.columns or coluna_x not in df.columns:
+        return f"❌ Coluna {coluna_y} ou {coluna_x} não encontrada no arquivo.", None
+
+    df_valid = df[[coluna_x, coluna_y]].dropna()
+    if len(df_valid) < 5:
+        return "❌ O modelo requer ao menos 5 observações válidas.", None
+
+    X = df_valid[coluna_x].values
+    Y = df_valid[coluna_y].values
+
+    # Ajuste cúbico (3º grau)
+    coef = np.polyfit(X, Y, 3)
+    y_pred = np.polyval(coef, X)
+    a, b, c, d = coef[0], coef[1], coef[2], coef[3]
+
+    ss_res = np.sum((Y - y_pred) ** 2)
+    ss_tot = np.sum((Y - np.mean(Y)) ** 2)
+    r2 = 1 - ss_res / ss_tot
+    n = len(Y)
+    p = 4  # parâmetros a, b, c, d
+    r2_adj = 1 - (1 - r2) * (n - 1) / (n - p)
+
+    # R² preditivo (Leave-One-Out)
+    erros = []
+    for i in range(n):
+        X_train = np.delete(X, i)
+        Y_train = np.delete(Y, i)
+        coef_lo = np.polyfit(X_train, Y_train, 3)
+        y_pred_lo = np.polyval(coef_lo, X[i])
+        erros.append((Y[i] - y_pred_lo) ** 2)
+    ss_pred = np.sum(erros)
+    r2_pred = 1 - ss_pred / ss_tot
+
+    # p-valor do modelo (F-test)
+    msr = (ss_tot - ss_res) / (p - 1)
+    mse = ss_res / (n - p)
+    f_stat = msr / mse
+    p_valor_modelo = 1 - stats.f.cdf(f_stat, p - 1, n - p)
+
+    # Testes de normalidade dos resíduos
+    residuos = Y - y_pred
+
+    ad = stats.anderson(residuos)
+    sw_stat, sw_p = stats.shapiro(residuos)
+    dp_stat, dp_p = stats.normaltest(residuos)
+
+    # Melhor teste (maior p-valor)
+    testes_normalidade = {
+        "Anderson-Darling": (ad.statistic, ad.statistic < ad.critical_values[2], 0.05),
+        "Shapiro-Wilk": (sw_p, sw_p > 0.05, sw_p),
+        "D’Agostino-Pearson": (dp_p, dp_p > 0.05, dp_p)
+    }
+    melhor_teste = max(testes_normalidade.items(), key=lambda x: x[1][2])
+    nome_teste, (stat, aprovado, p_valor) = melhor_teste
+
+    normalidade_residuos = aprovado
+
+    # Conclusão com justificativas
+    motivos = []
+    if not normalidade_residuos:
+        motivos.append("os resíduos não são normais")
+    if p_valor_modelo >= 0.05:
+        motivos.append("o modelo não é estatisticamente significativo (p-valor >= 0.05)")
+    if r2 < 0.5:
+        motivos.append("o R² é inferior a 50%")
+
+    if not motivos:
+        validacao = "✅ Modelo validado. O modelo cúbico é adequado para os dados."
+    else:
+        motivos_txt = "; ".join(motivos)
+        validacao = f"⚠️ Modelo não validado porque {motivos_txt}."
+
+    conclusao_normalidade = f"✅ Os resíduos podem ser considerados normais (p = {p_valor:.4f}, {nome_teste})." if normalidade_residuos else f"❌ Os resíduos não são normais (p = {p_valor:.4f}, {nome_teste}). Recomenda-se verificar a estabilidade do processo ou coletar mais dados."
+
+    # Recomendação apenas se R² < 50%
+    recomendacao = ""
+    if r2 < 0.5:
+        recomendacao = "🔧 **Recomendação**\n➔ O R² está abaixo de 50%. Considere adicionar mais variáveis (Xs) ou testar outro tipo de modelo para melhorar a capacidade preditiva."
+
+    aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(6,4))
+    ax.scatter(X, Y, color='black', label='Dados')
+
+    # Curva cúbica
+    x_seq = np.linspace(X.min(), X.max(), 300)
+    y_seq = np.polyval(coef, x_seq)
+    ax.plot(x_seq, y_seq, color='blue', label='Curva ajustada')
+
+    ax.set_title("Regressão Cúbica")
+    ax.set_xlabel(coluna_x)
+    ax.set_ylabel(coluna_y)
+    ax.legend()
+    plt.tight_layout()
+
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+    texto = f"""
+📊 **Análise – Regressão Cúbica**
+
+🔹 **Hipóteses do modelo**
+- **H₀:** Não há relação cúbica entre {coluna_x} e {coluna_y}
+- **H₁:** Existe relação cúbica entre {coluna_x} e {coluna_y}
+
+🔎 **Resumo do modelo**
+- Equação: Y = {a:.4f}X³ + {b:.4f}X² + {c:.4f}X + {d:.4f}
+- R²: {r2:.4f}
+- R² ajustado: {r2_adj:.4f}
+- R² preditivo: {r2_pred:.4f}
+- p-valor do modelo cúbico: {p_valor_modelo:.4f}
+
+🔎 **Normalidade dos resíduos**
+{conclusao_normalidade}
+
+🔎 **Conclusão**
+{validacao}
+
+{recomendacao}
+"""
+
+    return texto.strip(), grafico_base64
 
 def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
@@ -233,6 +551,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     from io import BytesIO
     import base64
     import numpy as np
+    from scipy import stats
 
     def calcular_modelo(X_sub, cols_sub):
         model = LinearRegression().fit(X_sub, Y)
@@ -240,6 +559,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         r2 = r2_score(Y, Y_pred)
         r2_adj = 1 - (1 - r2) * (n - 1) / (n - X_sub.shape[1] - 1)
 
+        # R² preditivo (Leave-One-Out)
         erros = []
         for i in range(n):
             Xi = np.delete(X_sub, i, axis=0)
@@ -251,6 +571,7 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         ss_tot = np.sum((Y - np.mean(Y)) ** 2)
         r2_pred = 1 - ss_res_pred / ss_tot
 
+        # VIF
         vif = []
         if X_sub.shape[1] > 1:
             X_sm = sm.add_constant(X_sub)
@@ -259,10 +580,20 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
         else:
             vif.append(1.0)
 
+        # Mallows Cp
         resid = Y - Y_pred
         mse_full = np.sum((Y - LinearRegression().fit(X_values, Y).predict(X_values)) ** 2) / (n - p_full - 1)
         cp = (np.sum(resid ** 2) / mse_full) - (n - 2 * (X_sub.shape[1] + 1))
+
+        # Durbin-Watson
         dw = sm.stats.stattools.durbin_watson(resid)
+
+        # p-valor do modelo (F-test)
+        ss_res = np.sum((Y - Y_pred) ** 2)
+        msr = (ss_tot - ss_res) / X_sub.shape[1]
+        mse = ss_res / (n - X_sub.shape[1] - 1)
+        f_stat = msr / mse
+        p_valor_modelo = 1 - stats.f.cdf(f_stat, X_sub.shape[1], n - X_sub.shape[1] - 1)
 
         return {
             "cols": cols_sub,
@@ -273,29 +604,15 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
             "vif": vif,
             "cp": cp,
             "dw": dw,
+            "p_valor_modelo": p_valor_modelo,
             "Y_pred": Y_pred
         }
 
-    resultados = []
-    if len(x_cols_final) > 5:
-        x_cols_final = x_cols_final[:5]
-
-    for k in range(1, len(x_cols_final) + 1):
-        for subset in combinations(range(len(x_cols_final)), k):
-            cols_sub = [x_cols_final[i] for i in subset]
-            X_sub = X_final[cols_sub].values
-            resultados.append(calcular_modelo(X_sub, cols_sub))
-
-    melhor = max(resultados, key=lambda r: r["r2_pred"])
-    simples = sorted(resultados, key=lambda r: len(r["cols"]))
-    modelo_recomendado = melhor
-    for m in simples:
-        if (melhor["r2_pred"] - m["r2_pred"]) < 0.01:
-            modelo_recomendado = m
-            break
+    # ➔ Modelo completo com todas as preditoras
+    modelo_completo = calcular_modelo(X_values, x_cols_final)
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.scatter(modelo_recomendado["Y_pred"], Y - modelo_recomendado["Y_pred"], color='black')
+    ax.scatter(modelo_completo["Y_pred"], Y - modelo_completo["Y_pred"], color='black')
     ax.axhline(0, color='red', linestyle='--')
     ax.set_xlabel("Valores preditos")
     ax.set_ylabel("Resíduos")
@@ -308,41 +625,51 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     # Equação
-    coef_str = " + ".join([f"{coef:.2f}·{col}" for coef, col in zip(modelo_recomendado["model"].coef_, modelo_recomendado["cols"])])
-    equacao = f"Y = {modelo_recomendado['model'].intercept_:.2f} + {coef_str}"
+    coef_str = " + ".join([f"{coef:.2f}·{col}" for coef, col in zip(modelo_completo["model"].coef_, modelo_completo["cols"])])
+    equacao = f"Y = {modelo_completo['model'].intercept_:.2f} + {coef_str}"
 
     # Diagnóstico
     conclusao = []
-    if modelo_recomendado['r2_pred'] > 0.5:
-        conclusao.append("✅ R² preditivo adequado.")
+    if modelo_completo['r2_pred'] > 0.5:
+        conclusao.append("✅ Modelo validado (R² preditivo adequado).")
     else:
-        conclusao.append("⚠ R² preditivo baixo.")
-    if all(v < 10 for v in modelo_recomendado['vif']):
+        conclusao.append("⚠ Modelo não validado (R² preditivo baixo).")
+
+    if all(v < 10 for v in modelo_completo['vif']):
         conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
     else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF ≥ 10).")
-    if abs(modelo_recomendado["cp"] - (len(modelo_recomendado["cols"]) + 1)) < 2:
-        conclusao.append("✅ Cp dentro do esperado.")
+        conclusao.append("⚠ Multicolinearidade identificada (VIF ≥ 10). VIF acima de 10 indica alta correlação entre preditoras.")
+
+    if abs(modelo_completo["cp"] - (len(modelo_completo["cols"]) + 1)) < 2:
+        conclusao.append("✅ Cp dentro do esperado (Cp ≈ p+1 indica modelo sem viés).")
     else:
-        conclusao.append("⚠ Cp elevado, modelo pode estar superajustado.")
-    if 1.5 < modelo_recomendado["dw"] < 2.5:
-        conclusao.append("✅ Sem autocorrelação nos resíduos (DW adequado).")
+        conclusao.append("⚠ Cp elevado, modelo pode estar superajustado (Cp muito maior que p+1).")
+
+    if 1.5 < modelo_completo["dw"] < 2.5:
+        conclusao.append("✅ Sem autocorrelação nos resíduos (Durbin-Watson entre 1.5 e 2.5).")
     else:
-        conclusao.append("⚠ Autocorrelação identificada nos resíduos (DW fora do ideal).")
+        conclusao.append("⚠ Autocorrelação identificada nos resíduos (DW fora do ideal). DW <1.5 indica autocorrelação positiva; >2.5 negativa.")
 
     texto = f"""
-**Regressão Linear Múltipla**
+📊 **Análise – Regressão Linear Múltipla**
 
-📌 Modelo recomendado: {', '.join(modelo_recomendado['cols'])}  
-📈 Equação: {equacao}  
-R²: {modelo_recomendado['r2']:.4f}  
-R² ajustado: {modelo_recomendado['r2_adj']:.4f}  
-R² preditivo: {modelo_recomendado['r2_pred']:.4f}  
-Mallows Cp: {modelo_recomendado['cp']:.4f}  
-Durbin-Watson: {modelo_recomendado['dw']:.4f}  
-VIFs: {', '.join([f"{c}={v:.2f}" for c, v in zip(modelo_recomendado['cols'], modelo_recomendado['vif'])])}
+🔹 **Hipóteses do modelo**
+- **H₀:** Não há relação linear entre {', '.join(lista_x)} e {coluna_y}
+- **H₁:** Existe relação linear entre {', '.join(lista_x)} e {coluna_y}
 
-**Conclusão**  
+🔎 **Resumo do modelo**
+- Y: {coluna_y}
+- Xs: {', '.join(modelo_completo['cols'])}
+- Equação: {equacao}
+- R²: {modelo_completo['r2']:.3f}
+- R² ajustado: {modelo_completo['r2_adj']:.3f}
+- R² preditivo: {modelo_completo['r2_pred']:.3f}
+- p-valor do modelo: {modelo_completo['p_valor_modelo']:.4f}
+- Mallows Cp: {modelo_completo['cp']:.3f}
+- Durbin-Watson: {modelo_completo['dw']:.3f}
+- VIFs: {', '.join([f"{c}={v:.2f}" for c, v in zip(modelo_completo['cols'], modelo_completo['vif'])])}
+
+🔎 **Conclusão**
 {chr(10).join(conclusao)}
 """.strip()
 
@@ -413,11 +740,11 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
         ax.legend()
     else:
         fpr, tpr, _ = roc_curve(Y, Y_pred_prob)
-        ax.plot(fpr, tpr, color='blue', label=f'ROC AUC = {auc:.2f}')
+        ax.plot(fpr, tpr, color='blue', label=f'AUC = {auc:.2f}')
         ax.plot([0, 1], [0, 1], color='grey', linestyle='--')
-        ax.set_xlabel('FPR')
-        ax.set_ylabel('TPR')
-        ax.set_title('Curva ROC')
+        ax.set_xlabel('TFP (Taxa de Falso Positivo)')
+        ax.set_ylabel('TAP (Taxa de Acerto Positivo)')
+        ax.set_title('Curva ROC\nTAP = Sensibilidade | TFP = 1 - Especificidade')
         ax.legend()
 
     plt.tight_layout()
@@ -429,36 +756,60 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     linhas = []
     for name, coef, pval in zip(['Const'] + x_cols_final, model.params, model.pvalues):
         linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
-    linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
-    linhas.append(f"AUC: {auc:.4f}")
-    linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
+    linhas.append(f"- R² de McFadden: {r2_mcf:.4f}")
+    linhas.append(f"- AUC: {auc:.4f}")
+    linhas.append(f"- Percentual de acerto: {acerto*100:.2f}%")
+    linhas.append("- VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
 
-    conclusao = []
-    if r2_mcf > 0.2:
-        conclusao.append("✅ Modelo apresenta bom ajuste (R² de McFadden adequado).")
-    else:
-        conclusao.append("⚠ R² de McFadden baixo, modelo pode não ter bom ajuste.")
+    # Modelo de reporte completo com conclusão antes da recomendação
+    validado = (r2_mcf > 0.2) and (auc > 0.7) and all(v < 10 for v in vif) and any(p < 0.05 for p in model.pvalues[1:])
 
-    if auc > 0.7:
-        conclusao.append("✅ Capacidade discriminativa aceitável (AUC > 0.7).")
-    else:
-        conclusao.append("⚠ Capacidade discriminativa baixa (AUC <= 0.7).")
+    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
 
-    if all(v < 10 for v in vif):
-        conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
-    else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
+    criterios = []
+    criterios.append(f"- R² de McFadden = {r2_mcf:.4f} {'✅ adequado (>0.2)' if r2_mcf > 0.2 else '❌ baixo (<=0.2)'}")
+    criterios.append(f"- AUC = {auc:.4f} {'✅ adequado (>0.7)' if auc > 0.7 else '❌ baixo (<=0.7)'}")
+    criterios.append(f"- Percentual de acerto = {acerto*100:.2f}%")
+    for name, pval in zip(x_cols_final, model.pvalues[1:]):
+        criterios.append(f"- p-valor {name} = {pval:.4f} {'✅ significativo (<0.05)' if pval < 0.05 else '❌ não significativo (>=0.05)'}")
+    for c, v in zip(x_cols_final, vif):
+        criterios.append(f"- VIF {c} = {v:.2f} {'✅ adequado (<10)' if v < 10 else '❌ alto (>=10)'}")
+
+    recomendacao = ""
+    if not validado:
+        recomendacao = """
+🔎 **Observação / Recomendação**
+➡️ O modelo não foi validado. Considere:
+- Remover preditoras não significativas (p >= 0.05).
+- Adicionar variáveis ou categorias.
+- Aumentar o tamanho amostral para maior poder estatístico.
+""".strip()
 
     texto = f"""
-**Regressão Logística Binária**
+📊 **Análise – Regressão Logística Binária**
+
+🔹 **Hipóteses do modelo**
+- H₀: Nenhuma variável está associada à probabilidade do evento
+- H₁: Pelo menos uma variável está associada à probabilidade do evento
+
+🔎 **Resumo do modelo**
+- Variável dependente (Y): {coluna_y}
+- Variáveis independentes (Xs): {', '.join(x_cols_final)}
 {chr(10).join(linhas)}
 
-**Conclusão**
-{chr(10).join(conclusao)}
-"""
+🔎 **Conclusão**
+{conclusao_status}
 
-    return texto.strip(), grafico_base64
+🔹 **Critérios avaliados:**
+{chr(10).join(criterios)}
+
+{recomendacao}
+""".strip()
+
+    return texto, grafico_base64
+
+
+
 
 
 import pandas as pd
@@ -475,6 +826,15 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         return "❌ A regressão logística ordinal requer 1 Y e pelo menos 1 X.", None
 
     try:
+        import pandas as pd
+        import numpy as np
+        from statsmodels.miscmodels.ordinal_model import OrderedModel
+        import statsmodels.api as sm
+        from statsmodels.stats.outliers_influence import variance_inflation_factor
+        import matplotlib.pyplot as plt
+        from io import BytesIO
+        import base64
+
         # Selecionar e limpar dados
         df = df[[coluna_y] + lista_x].copy()
         df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
@@ -498,24 +858,60 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         odds_ratios = np.exp(result.params)
         pvalores = result.pvalues
 
-        texto_resultado = "📊 **Regressão Logística Ordinal**\n\n"
-        texto_resultado += "Categorias (ordem): " + " < ".join(categorias_unicas) + "\n\n"
-        texto_resultado += "📌 **Parâmetros estimados**:\n"
-        for param, val in result.params.items():
-            texto_resultado += f"- {param}: {val:.4f} (p = {pvalores[param]:.4f})\n"
+        # Conclusão e validação
+        validado = all(p < 0.05 for p in pvalores)
 
-        texto_resultado += "\n💡 **Odds Ratios**:\n"
+        conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
+
+        # Reporte
+        texto_resultado = f"""
+📊 **Análise – Regressão Logística Ordinal**
+
+🔹 **Hipóteses do modelo**
+- H₀: Não há relação entre as variáveis independentes e a ordem das categorias
+- H₁: Pelo menos uma variável independente está associada à ordem das categorias
+
+🔎 **Resumo do modelo**
+- Variável dependente (Y): {coluna_y}
+- Variáveis independentes (Xs): {', '.join(lista_x)}
+- Categorias (ordem): {' < '.join(categorias_unicas)}
+
+📌 **Parâmetros estimados:**
+"""
+        for param, val in result.params.items():
+            texto_resultado += f"- {param}: {val:.2f} (p = {pvalores[param]:.3f})\n"
+
+        texto_resultado += "\n💡 **Odds Ratios:**\n"
         for param, val in odds_ratios.items():
-            texto_resultado += f"- {param}: {val:.4f}\n"
+            texto_resultado += f"- {param}: {val:.2f}\n"
 
         # VIF
-        vif_texto = "\n📉 **VIF (Multicolinearidade)**:\n"
+        texto_resultado += "\n📉 **VIF (Multicolinearidade):**\n"
         X_vif = df[lista_x]
         X_vif_const = sm.add_constant(X_vif)
         for i in range(1, X_vif_const.shape[1]):
-            vif = variance_inflation_factor(X_vif_const.values, i)
-            vif_texto += f"- {X_vif_const.columns[i]}: {vif:.2f}\n"
-        texto_resultado += vif_texto
+            vif_val = variance_inflation_factor(X_vif_const.values, i)
+            status_vif = "✅ adequado (<10)" if vif_val < 10 else "❌ alto (>=10)"
+            texto_resultado += f"- {X_vif_const.columns[i]}: {vif_val:.2f} {status_vif}\n"
+
+        # Conclusão
+        texto_resultado += f"\n🔎 **Conclusão**\n{conclusao_status}\n"
+
+        # Critérios avaliados
+        texto_resultado += "\n🔹 **Critérios avaliados:**\n"
+        for param, pval in pvalores.items():
+            status = "✅ significativo (<0,05)" if pval < 0.05 else "❌ não significativo (>=0,05)"
+            texto_resultado += f"- p-valor {param}: {pval:.3f} {status}\n"
+
+        # Recomendação
+        if not validado:
+            texto_resultado += """
+🔎 **Observação / Recomendação**
+➡️ O modelo não foi validado. Considere:
+- Remover variáveis não significativas.
+- Adicionar variáveis ou categorias relevantes.
+- Aumentar o tamanho amostral para maior poder estatístico.
+""".strip()
 
         # Gráfico de boxplot para visualização
         fig, ax = plt.subplots(figsize=(8, 4))
@@ -532,7 +928,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
         plt.close()
 
-        return texto_resultado, imagem_base64
+        return texto_resultado.strip(), imagem_base64
 
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
@@ -566,10 +962,9 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     Y_codes.name = "target"
     Y_labels = dict(enumerate(Y.cat.categories))
 
-    # Prepara X com nomes seguros (strings) e únicos
+    # Prepara X com nomes seguros
     X_final = df_valid[lista_x].copy()
     X_final.columns = [str(i) for i in range(X_final.shape[1])]
-    X_final.columns = [str(col) for col in X_final.columns]
     nomes_originais = dict(zip(X_final.columns, lista_x))
 
     # Ajusta modelo MNLogit
@@ -579,6 +974,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
 
+    # R² de McFadden
     try:
         ll_null = sm.MNLogit(Y_codes, np.ones((len(Y_codes), 1))).fit(disp=0).llf
         ll_model = res.llf
@@ -598,7 +994,9 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     # Previsões e matriz de confusão
     Y_pred = res.predict().argmax(axis=1)
     cm = confusion_matrix(Y_codes, Y_pred)
+    acerto = (cm.diagonal().sum()) / cm.sum()
 
+    # Gráfico matriz de confusão
     fig, ax = plt.subplots(figsize=(6, 4))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(Y_labels.values()))
     disp.plot(ax=ax, cmap="Blues", colorbar=False)
@@ -610,55 +1008,78 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Resultados do modelo
-    linhas = []
-    melhor_var = None
-    menor_pval = 1.0
+    # Resultados simples por variável
+    variaveis_relevantes = []
+    variaveis_nrelevantes = []
+    pvalores_dict = {}
 
-    for (cat, coef, pval) in zip(res.params.index, res.params.values, res.pvalues.values):
-        coef_str = ", ".join([f"{c:.4f}" for c in coef])
-        pval_str = ", ".join([f"{p:.4f}" for p in pval])
-        linhas.append(f"- {cat}: coef=[{coef_str}], p-valor=[{pval_str}]")
+    for nome_coluna in X_final.columns:
+        try:
+            pvals_col = res.pvalues.xs(nome_coluna, level=1)
+            min_pval = pvals_col.min()
+            pvalores_dict[nome_coluna] = min_pval
 
-        for nome_coluna, p in zip(X_final.columns, pval):
-            if p < menor_pval:
-                menor_pval = p
-                melhor_var = nomes_originais[nome_coluna]
+            if min_pval < 0.05:
+                variaveis_relevantes.append((nomes_originais[nome_coluna], min_pval))
+            else:
+                variaveis_nrelevantes.append((nomes_originais[nome_coluna], min_pval))
+        except:
+            pvalores_dict[nome_coluna] = None
+            variaveis_nrelevantes.append((nomes_originais[nome_coluna], None))
 
+    # Critérios avaliados
+    criterios = []
     if r2_mcf is not None:
-        linhas.append(f"R² de McFadden: {r2_mcf:.4f}")
-    acerto = (cm.diagonal().sum()) / cm.sum()
-    linhas.append(f"Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("VIFs: " + ", ".join([f"{nomes_originais[c]}={v:.2f}" for c, v in zip(X_final.columns, vif)]))
+        status_r2 = "✅ adequado (>0,2)" if r2_mcf > 0.2 else "❌ baixo (<=0,2)"
+        criterios.append(f"- R² de McFadden = {str(round(r2_mcf,3)).replace('.',',')} {status_r2}")
+    criterios.append(f"- Percentual de acerto = {round(acerto*100,2):.2f}%")
+    for c, v in zip(X_final.columns, vif):
+        status_vif = "✅ adequado (<10)" if v < 10 else "❌ alto (>=10)"
+        pval_str = str(round(pvalores_dict[c],3)).replace('.',',') if pvalores_dict[c] is not None else "N/A"
+        status_pval = "✅ significativo (<0,05)" if pvalores_dict[c] is not None and pvalores_dict[c] < 0.05 else "❌ não significativo (>=0,05)"
+        criterios.append(f"- {nomes_originais[c]}: p-valor = {pval_str} {status_pval}, VIF = {str(round(v,2)).replace('.',',')} {status_vif}")
 
-    # Sugestões e conclusão
-    sugestao = ""
-    if melhor_var:
-        sugestao = f"\n📌 A variável **{melhor_var}** teve o menor p-valor ({menor_pval:.4f}) e pode ser a explicação mais relevante isoladamente."
-    if len(lista_x) > 1 and any(v >= 10 for v in vif):
-        sugestao += "\n⚠ Considere remover variáveis com VIF alto ou p-valor elevado para melhorar o modelo."
+    # Conclusão
+    validado = (r2_mcf is not None and r2_mcf > 0.2 and all(v < 10 for v in vif))
+    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
 
-    conclusao = []
-    if r2_mcf is not None:
-        if r2_mcf > 0.2:
-            conclusao.append("✅ Modelo apresenta bom ajuste (R² de McFadden adequado).")
-        else:
-            conclusao.append("⚠ R² de McFadden baixo, modelo pode não ter bom ajuste.")
-    if all(v < 10 for v in vif):
-        conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
+    # Recomendação
+    recomendacao = "\n🔎 **Observação / Recomendação**\n➡️ O modelo não foi validado. Considere:"
+    if variaveis_nrelevantes:
+        recomendacao += "\n- Remover variáveis não significativas: " + ", ".join([f"{v[0]} (p = {str(round(v[1],3)).replace('.',',') if v[1] is not None else 'N/A'})" for v in variaveis_nrelevantes])
     else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF >= 10).")
+        recomendacao += "\n- Nenhuma variável para remoção."
+    recomendacao += "\n- Adicionar variáveis ou categorias relevantes.\n- Aumentar o tamanho amostral para maior poder estatístico."
 
+    # Reporte final
     texto = f"""
-**Regressão Logística Nominal**
-{chr(10).join(linhas)}
-{sugestao}
+📊 **Análise – Regressão Logística Nominal**
 
-**Conclusão**
-{chr(10).join(conclusao)}
-"""
+🔹 **Hipóteses do modelo**
+- H₀: Nenhuma variável está associada às categorias da variável dependente
+- H₁: Pelo menos uma variável está associada às categorias
 
-    return texto.strip(), grafico_base64
+🔎 **Resumo do modelo**
+- Variável dependente (Y): {coluna_y}
+- Variáveis independentes (Xs): {', '.join([nomes_originais[c] for c in X_final.columns])}
+
+🔎 **Conclusão**
+{conclusao_status}
+
+🔹 **Critérios avaliados:**
+{chr(10).join(criterios)}
+
+🔎 **Variáveis relevantes**
+- {', '.join([f"{v[0]} (p = {str(round(v[1],3)).replace('.',',')})" for v in variaveis_relevantes]) if variaveis_relevantes else 'Nenhuma significativa'}
+
+{recomendacao}
+""".strip()
+
+    return texto, grafico_base64
+
+
+
+
 
 
 
@@ -670,15 +1091,14 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 
 
 import pandas as pd
-
 def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
-        return "A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
+        return "❌ A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
 
     cols = [coluna_y] + lista_x
     df_valid = df[cols].dropna()
     if len(df_valid) < len(lista_x) + 5:
-        return "O modelo requer mais dados válidos.", None
+        return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
     X = df_valid[lista_x]
@@ -689,27 +1109,34 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     import base64
     import matplotlib.pyplot as plt
 
+    tipo_modelo = "classificação"
     if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
         model = DecisionTreeRegressor(max_depth=4, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
         score = r2_score(Y, Y_pred)
-        score_txt = f"R²: {score:.4f}"
+        score_txt = f"R²: {score:.2f}".replace('.', ',')
+        criterio_status = "✅ adequado (>0,6)" if score >= 0.6 else "❌ baixo (<=0,6)"
+        desempenho = score
+        tipo_modelo = "regressão"
     else:
         model = DecisionTreeClassifier(max_depth=4, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
-        score_txt = f"Percentual de acerto: {acc * 100:.2f}%"
+        score_txt = f"Percentual de acerto: {acc * 100:.2f}%".replace('.', ',')
+        criterio_status = "✅ adequado (>70%)" if acc >= 0.7 else "❌ baixo (<=70%)"
+        desempenho = acc
 
-    importancias = ", ".join([f"{c} = {v * 100:.2f}%" for c, v in zip(lista_x, model.feature_importances_)])
+    importancias = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, model.feature_importances_)])
     regras = export_text(model, feature_names=lista_x)
 
+    # Gráfico árvore
     fig, ax = plt.subplots(figsize=(10, 6))
     plot_tree(
         model,
         feature_names=lista_x,
-        class_names=[str(c) for c in Y.unique()] if not pd.api.types.is_numeric_dtype(Y) else None,
+        class_names=[str(c) for c in Y.unique()] if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
         fontsize=8,
@@ -721,33 +1148,56 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Conclusão
+    validado = (tipo_modelo == "regressão" and desempenho >= 0.6) or (tipo_modelo == "classificação" and desempenho >= 0.7)
+    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
 
+    # Recomendação
+    recomendacao = ""
+    if not validado:
+        recomendacao = (
+            "\n🔎 **Observação / Recomendação**\n➡️ O modelo não foi validado. Considere:\n"
+            "- Ajustar parâmetros do modelo (ex: max_depth).\n"
+            "- Adicionar variáveis relevantes.\n"
+            "- Aumentar o tamanho amostral para maior poder preditivo."
+        )
 
+    # Reporte final
     texto = (
-        f"📊 **Análise com Árvore de Decisão**\n\n"
-        f"🔹 **Desempenho do modelo**:\n{score_txt}\n\n"
-        f"🔹 **Estrutura da árvore**:\n"
+        f"📊 **Análise – Árvore de Decisão**\n\n"
+        f"🔹 **Hipóteses do modelo**\n"
+        f"- O modelo consegue explicar ou classificar a variável Y com base em Xs.\n\n"
+        f"🔎 **Resumo do modelo**\n"
+        f"- Tipo: {tipo_modelo.capitalize()}\n"
+        f"- Variável dependente (Y): {coluna_y}\n"
+        f"- Variáveis independentes (Xs): {', '.join(lista_x)}\n\n"
+        f"🔎 **Conclusão**\n"
+        f"{conclusao_status}\n\n"
+        f"🔹 **Critérios avaliados:**\n"
+        f"- {score_txt} {criterio_status}\n"
         f"- Número de decisões finais (folhas): {model.get_n_leaves()}\n"
         f"- Profundidade da árvore: {model.get_depth()} níveis\n\n"
-        f"🔹 **Importância das variáveis utilizadas**:\n"
+        f"🔹 **Importância das variáveis:**\n"
         f"{importancias}\n\n"
-        f"📘 **Regras aprendidas pelo modelo**\n"
-        f"{regras}"
+        f"📘 **Regras aprendidas pelo modelo:**\n"
+        f"{regras}\n"
+        f"{recomendacao}"
     )
 
     return texto.strip(), grafico_base64
+
 
 
 import pandas as pd
 
 def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
-        return "O Random Forest requer 1 coluna Y e pelo menos 1 X.", None
+        return "❌ O Random Forest requer 1 coluna Y e pelo menos 1 X.", None
 
     cols = [coluna_y] + lista_x
     df_valid = df[cols].dropna()
     if len(df_valid) < len(lista_x) + 5:
-        return "O modelo requer mais dados válidos.", None
+        return "❌ O modelo requer mais dados válidos.", None
 
     Y = df_valid[coluna_y]
     X = df_valid[lista_x]
@@ -758,22 +1208,29 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     import base64
     import matplotlib.pyplot as plt
 
+    tipo_modelo = "classificação"
     if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
         model = RandomForestRegressor(n_estimators=100, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
         score = r2_score(Y, Y_pred)
-        score_txt = f"R²: {score:.4f}"
+        score_txt = f"R²: {score:.2f}".replace('.', ',')
+        criterio_status = "✅ adequado (>0,6)" if score >= 0.6 else "❌ baixo (<=0,6)"
+        desempenho = score
+        tipo_modelo = "regressão"
     else:
         model = RandomForestClassifier(n_estimators=100, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
-        score_txt = f"Percentual de acerto: {acc * 100:.2f}%"
+        score_txt = f"Percentual de acerto: {acc * 100:.2f}%".replace('.', ',')
+        criterio_status = "✅ adequado (>70%)" if acc >= 0.7 else "❌ baixo (<=70%)"
+        desempenho = acc
 
     importancias = model.feature_importances_
-    importancia_str = ", ".join([f"{c} = {v * 100:.2f}%" for c, v in zip(lista_x, importancias)])
+    importancia_str = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, importancias)])
 
+    # Gráfico de importância das variáveis
     fig, ax = plt.subplots(figsize=(8, 5))
     sorted_idx = importancias.argsort()
     ax.barh([lista_x[i] for i in sorted_idx], importancias[sorted_idx])
@@ -786,12 +1243,37 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
+    # Conclusão
+    validado = (tipo_modelo == "regressão" and desempenho >= 0.6) or (tipo_modelo == "classificação" and desempenho >= 0.7)
+    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
+
+    # Recomendação
+    recomendacao = ""
+    if not validado:
+        recomendacao = (
+            "\n🔎 **Observação / Recomendação**\n➡️ O modelo não foi validado. Considere:\n"
+            "- Ajustar parâmetros do modelo (ex: n_estimators, max_depth).\n"
+            "- Adicionar variáveis relevantes.\n"
+            "- Aumentar o tamanho amostral para maior poder preditivo."
+        )
+
+    # Reporte final
     texto = (
-        "Random Forest - Resultado\n\n"
-        f"Desempenho do modelo:\n{score_txt}\n\n"
-        "Número de árvores usadas: 100\n\n"
-        "Importância das variáveis:\n"
-        f"{importancia_str}"
+        f"📊 **Análise – Random Forest**\n\n"
+        f"🔹 **Hipóteses do modelo**\n"
+        f"- O modelo consegue explicar ou classificar a variável Y com base em Xs.\n\n"
+        f"🔎 **Resumo do modelo**\n"
+        f"- Tipo: {tipo_modelo.capitalize()}\n"
+        f"- Variável dependente (Y): {coluna_y}\n"
+        f"- Variáveis independentes (Xs): {', '.join(lista_x)}\n"
+        f"- Número de árvores usadas: 100\n\n"
+        f"🔎 **Conclusão**\n"
+        f"{conclusao_status}\n\n"
+        f"🔹 **Critérios avaliados:**\n"
+        f"- {score_txt} {criterio_status}\n\n"
+        f"🔹 **Importância das variáveis:**\n"
+        f"{importancia_str}\n"
+        f"{recomendacao}"
     )
 
     return texto.strip(), grafico_base64
@@ -800,40 +1282,107 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
 
 
 
+
 import pandas as pd
-
-def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
-    if not coluna_y or coluna_y not in df.columns:
-        return "O ARIMA requer 1 coluna Y (série temporal).", None
-
-    df_valid = df[[coluna_y]].dropna()
-    if len(df_valid) < 10:
-        return "A série temporal requer pelo menos 10 observações.", None
-
-    Y = df_valid[coluna_y].values
-
-    try:
-        import pmdarima as pm
-    except ImportError:
-        return "O pacote pmdarima não está disponível neste ambiente.", None
-
-    modelo = pm.auto_arima(Y, seasonal=False, stepwise=True, suppress_warnings=True)
-    ordem = modelo.order
-    aic = modelo.aic()
-    bic = modelo.bic()
-
-    horizonte = int(field) if field and str(field).isdigit() else 5
-    previsao = modelo.predict(n_periods=horizonte)
-
+def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
+    import pandas as pd
+    import numpy as np
     import matplotlib.pyplot as plt
     from io import BytesIO
     import base64
+    from datetime import datetime
+    import locale
+    from sklearn.linear_model import LinearRegression
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(range(len(Y)), Y, label='Série Original', color='black')
-    ax.plot(range(len(Y), len(Y) + horizonte), previsao, label='Previsão', color='blue')
-    ax.set_title(f'Modelo ARIMA{ordem} - Previsão de {horizonte} períodos')
+    aplicar_estilo_minitab()
+
+    # Configura locale BR para casas decimais
+    try:
+        locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+    except:
+        locale.setlocale(locale.LC_ALL, '')
+
+    if not coluna_y or coluna_y not in df.columns:
+        return "❌ A Tendência Linear requer 1 coluna Y (série temporal).", None
+
+    if Data and Data in df.columns:
+        df_valid = df[[Data, coluna_y]].dropna()
+        textos_originais = df_valid[Data].tolist()
+
+        meses_pt = {'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6,
+                    'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12}
+        meses_en = {'jan':1, 'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6,
+                    'jul':7, 'aug':8, 'sep':9, 'oct':10, 'nov':11, 'dec':12}
+
+        def converter_mes(mes_str):
+            mes_lower = str(mes_str).strip().lower()[:3]
+            mes_num = meses_pt.get(mes_lower) or meses_en.get(mes_lower)
+            if mes_num:
+                return datetime(datetime.now().year, mes_num, 1)
+            else:
+                return pd.to_datetime(mes_str, errors='coerce', dayfirst=False, infer_datetime_format=True)
+
+        df_valid['DataConvertida'] = df_valid[Data].apply(converter_mes)
+
+        if df_valid['DataConvertida'].isnull().any():
+            return "❌ Existem datas inválidas ou em formato não reconhecido. Use abreviações corretas como Jan, Fev, etc.", None
+
+        df_valid = df_valid.sort_values(by='DataConvertida')
+        index = textos_originais
+
+    else:
+        df_valid = df[[coluna_y]].dropna()
+        df_valid = df_valid.reset_index()
+        index = df_valid.index.values.tolist()
+
+    if len(df_valid) < 10:
+        return "❌ A série temporal requer pelo menos 10 observações.", None
+
+    Y = df_valid[coluna_y].values
+    X = np.arange(len(Y)).reshape(-1,1)
+
+    # Modelo de tendência linear
+    modelo = LinearRegression()
+    modelo.fit(X, Y)
+    previsao_fit = modelo.predict(X)
+
+    horizonte = int(field) if field and str(field).isdigit() else 5
+    X_future = np.arange(len(Y), len(Y)+horizonte).reshape(-1,1)
+    previsao_future = modelo.predict(X_future)
+
+    # Medidas de acurácia
+    mape = np.mean(np.abs((Y - previsao_fit) / Y)) * 100
+    mad = np.mean(np.abs(Y - previsao_fit))
+    msd = np.mean((Y - previsao_fit)**2)
+
+    # Classificação MAPE
+    if mape < 10:
+        mape_status = "Excelente"
+    elif mape < 20:
+        mape_status = "Bom"
+    elif mape < 50:
+        mape_status = "Aceitável"
+    else:
+        mape_status = "Ruim"
+
+    # Comparação MAD e MSD
+    media_y = np.mean(Y)
+    mad_status = "baixo" if mad < media_y * 0.1 else "alto"
+    msd_status = "baixo" if msd < media_y * 0.1 else "alto"
+
+    # Formatação BR
+    previsao_texto = ", ".join([f"{p:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') for p in previsao_future])
+
+    # Gráfico
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(index, Y, label='Real', color='black')
+    ax.plot(index, previsao_fit, label='Ajuste Linear', color='red')
+    ax.plot(range(len(Y), len(Y)+horizonte), previsao_future, 'g--', label='Previsão')
+    ax.set_title("📊 Análise – Tendência Linear", fontsize=18, fontweight='bold')
+    ax.set_ylabel("Valor", fontsize=16, fontweight='bold')
+    ax.set_xlabel("Período", fontsize=16, fontweight='bold')
     ax.legend()
+    plt.xticks(rotation=45)
     plt.tight_layout()
 
     buf = BytesIO()
@@ -841,18 +1390,19 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    previsao_texto = ", ".join([f"{p:.2f}" for p in previsao])
-
     texto = (
-        f"Modelo ARIMA\n\n"
-        f"Configuração do modelo: ARIMA{ordem}\n"
-        f"Qualidade do ajuste:\n"
-        f"- AIC: {aic:.2f}\n"
-        f"- BIC: {bic:.2f}\n\n"
-        f"Previsão para os próximos {horizonte} períodos:\n"
-        f"{previsao_texto}\n\n"
-        f"O modelo foi ajustado automaticamente. "
-        f"Use o gráfico para avaliar a tendência e decidir se precisa refinar manualmente."
+        "📊 **Análise – Tendência Linear**\n"
+        + f"Equação do Modelo: Yt = {modelo.intercept_:,.2f} – {abs(modelo.coef_[0]):,.2f} * t\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + f"MAPE: {mape:,.2f} – {mape_status} (o erro percentual médio está {mape_status.lower()})\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + f"MAD: {mad:,.2f} – {mad_status.capitalize()} (comparado à média de {media_y:,.2f})\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + f"MSD: {msd:,.2f} – {msd_status.capitalize()} (comparado à média de {media_y:,.2f})\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + f"Previsão para os próximos {horizonte} períodos: {previsao_texto}\n"
+        + "\n**Conclusão:**\n"
+        + f"{'✅ ' if mape_status != 'Ruim' else ''}Modelo ajustado. Existe uma tendência {'decrescente' if modelo.coef_[0]<0 else 'crescente'}, indicando variação média de {abs(modelo.coef_[0]):,.2f} unidades por período.\n".replace(',', 'v').replace('.', ',').replace('v', '.')
+        + "Observação: modelo ajustado significa que foi calculado, mas os erros estão altos, indicando baixa precisão para previsão exata.\n"
+        + "\n**Recomendação:**\n"
+        + ( "➡️ O MAPE está bom, o modelo pode ser usado para previsões.\n" if mape_status in ["Excelente", "Bom"] 
+            else "➡️ O MAPE está ruim, recomenda-se avaliar modelos mais complexos (ex: ARIMA ou modelos sazonais) caso seja necessário previsão precisa.\n" )
     )
 
     return texto.strip(), grafico_base64
@@ -860,72 +1410,20 @@ def analise_arima(df: pd.DataFrame, coluna_y: str, field=None):
 
 
 
-import pandas as pd
-
-def analise_holt_winters(df: pd.DataFrame, coluna_y, field=None):
-    if not coluna_y or len(coluna_y) != 1:
-        return "O Holt-Winters requer exatamente 1 coluna Y (série temporal).", None
-
-    y_col = coluna_y[0]
-    if y_col not in df.columns:
-        return f"Coluna {y_col} não encontrada no arquivo.", None
-
-    df_valid = df[[y_col]].dropna()
-    if len(df_valid) < 10:
-        return "A série temporal requer pelo menos 10 observações.", None
-
-    Y = df_valid[y_col].values
-
-    try:
-        from statsmodels.tsa.holtwinters import ExponentialSmoothing
-    except ImportError:
-        return "O pacote statsmodels não está disponível neste ambiente.", None
-
-    horizonte = int(field) if field and str(field).isdigit() else 5
-    modelo = ExponentialSmoothing(Y, trend="add", seasonal=None, damped_trend=True).fit()
-    previsao = modelo.forecast(horizonte)
-
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(range(len(Y)), Y, label="Série Original", color="black")
-    ax.plot(range(len(Y), len(Y) + horizonte), previsao, label="Previsão", color="blue")
-    ax.set_title(f"Holt-Winters - Previsão de {horizonte} períodos")
-    ax.legend()
-    plt.tight_layout()
-
-    buf = BytesIO()
-    plt.savefig(buf, format="png")
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-
-    previsao_texto = ", ".join([f"{p:.2f}" for p in previsao])
-
-    texto = (
-        "Holt-Winters (Suavização Exponencial)\n\n"
-        "Tendência: aditiva (com amortecimento)\n"
-        "Sazonalidade: não aplicada\n\n"
-        f"Previsão para os próximos {horizonte} períodos:\n{previsao_texto}\n\n"
-        "Conclusão:\n"
-        "Modelo ajustado automaticamente. Simples e robusto para séries com tendência.\n"
-        "Use o gráfico para avaliar se ajustes adicionais são necessários (ex: sazonalidade)."
-    )
-
-    return texto.strip(), grafico_base64
 
 
 # Dicionário de análises
 ANALISES = {
-    "Tipo de modelo de regressão": analise_tipo_modelo_regressao,
-    "Regressão linear simples": analise_regressao_linear_simples,
-    "Regressão linear múltipla": analise_regressao_linear_multipla,
-    "Regressão logística binária": analise_regressao_logistica_binaria,
-    "Regressão logística ordinal": analise_regressao_logistica_ordinal,
-    "Regressão logística nominal": analise_regressao_logistica_nominal,
-    "Árvore de decisão": analise_arvore_decisao,
+    "Tipo de modelo de regressão": analise_melhor_modelo,
+    "Regressão Linear": analise_regressao_linear_simples,
+    "Regressão Quadrática": analise_regressao_quadratica,
+    "Regressão Cúbica": analise_regressao_cubica,
+    "Regressão Linear Múltipla": analise_regressao_linear_multipla,
+    "Regressão Binária": analise_regressao_logistica_binaria,
+    "Regressão Ordinal": analise_regressao_logistica_ordinal,
+    "Regressão Nominal": analise_regressao_logistica_nominal,
+    "Árvore de Decisão - CART": analise_arvore_decisao,
     "Random Forest": analise_random_forest,
-    "ARIMA": analise_arima,
-    "Holt-Winters": analise_holt_winters
+    "Série Temporal": analise_tendencia_linear
+   
 }
