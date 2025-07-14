@@ -829,7 +829,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         from io import BytesIO
         import base64
 
-        # Selecionar e limpar dados
+        # Limpeza dos dados
         df = df[[coluna_y] + lista_x].copy()
         df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
         df.dropna(inplace=True)
@@ -844,70 +844,69 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         df[coluna_y] = pd.Categorical(df[coluna_y], categories=categorias_unicas, ordered=True)
 
         y = df[coluna_y]
-        X = df[lista_x]  # NÃO adicionar constante para OrderedModel
+        X = df[lista_x]
 
         model = OrderedModel(y, X, distr='logit')
         result = model.fit(method='bfgs', disp=False)
 
         odds_ratios = np.exp(result.params)
         pvalores = result.pvalues
-
-        # Conclusão e validação
         validado = all(p < 0.05 for p in pvalores)
 
-        conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
-
-        # Reporte
-        texto_resultado = f"""
+        texto = f"""
 📊 **Análise – Regressão Logística Ordinal**
 
-🔹 **Hipóteses do modelo**
-- H₀: Não há relação entre as variáveis independentes e a ordem das categorias
-- H₁: Pelo menos uma variável independente está associada à ordem das categorias
+🔹 **Hipóteses do Modelo**
 
-🔎 **Resumo do modelo**
-- Variável dependente (Y): {coluna_y}
-- Variáveis independentes (Xs): {', '.join(lista_x)}
-- Categorias (ordem): {' < '.join(categorias_unicas)}
+- **H₀:** Não há relação entre as variáveis independentes e a ordem das categorias da variável {coluna_y}.  
+- **H₁:** Pelo menos uma variável está associada à ordem das categorias.
+
+🔹 **Resumo do Modelo**
+
+- **Variável dependente (Y):** {coluna_y}  
+- **Variáveis preditoras (X):** {', '.join(lista_x)}  
+- **Categorias ordenadas:** {' < '.join(categorias_unicas)}
 
 📌 **Parâmetros estimados:**
 """
         for param, val in result.params.items():
-            texto_resultado += f"- {param}: {val:.2f} (p = {pvalores[param]:.3f})\n"
+            texto += f"- {param}: {val:.2f} (p = {pvalores[param]:.3f})\n"
 
-        texto_resultado += "\n💡 **Odds Ratios:**\n"
-        for param, val in odds_ratios.items():
-            texto_resultado += f"- {param}: {val:.2f}\n"
+        texto += "\n💡 **Odds Ratios (interpretação prática):**\n"
+        for param, odds in odds_ratios.items():
+            if round(odds, 2) == 1:
+                texto += f"- {param}: {odds:.2f} → Cada unidade a mais não altera significativamente a chance de mudança de categoria.\n"
+            elif odds > 1:
+                texto += f"- {param}: {odds:.2f} → Cada unidade a mais aumenta a chance de estar em uma categoria superior em {((odds - 1) * 100):.0f}%.\n"
+            else:
+                texto += f"- {param}: {odds:.2f} → Cada unidade a mais reduz a chance de estar em uma categoria superior em {((1 - odds) * 100):.0f}%.\n"
 
-        # VIF
-        texto_resultado += "\n📉 **VIF (Multicolinearidade):**\n"
-        X_vif = df[lista_x]
-        X_vif_const = sm.add_constant(X_vif)
-        for i in range(1, X_vif_const.shape[1]):
-            vif_val = variance_inflation_factor(X_vif_const.values, i)
-            status_vif = "✅ adequado (<10)" if vif_val < 10 else "❌ alto (>=10)"
-            texto_resultado += f"- {X_vif_const.columns[i]}: {vif_val:.2f} {status_vif}\n"
+        texto += "\n📉 **VIF (Multicolinearidade):**\n"
+        X_vif = sm.add_constant(df[lista_x])
+        for i in range(1, X_vif.shape[1]):
+            v = variance_inflation_factor(X_vif.values, i)
+            status_vif = "✅ adequado (<10)" if v < 10 else "❌ alto (≥10)"
+            texto += f"- {X_vif.columns[i]}: {v:.2f} {status_vif} (mede correlação entre variáveis)\n"
 
-        # Conclusão
-        texto_resultado += f"\n🔎 **Conclusão**\n{conclusao_status}\n"
-
-        # Critérios avaliados
-        texto_resultado += "\n🔹 **Critérios avaliados:**\n"
+        texto += f"\n🔎 **Resultados – Itens Críticos (Obrigatórios para predição)**\n"
         for param, pval in pvalores.items():
-            status = "✅ significativo (<0,05)" if pval < 0.05 else "❌ não significativo (>=0,05)"
-            texto_resultado += f"- p-valor {param}: {pval:.3f} {status}\n"
+            status = "✅ significativo (< 0,05)" if pval < 0.05 else "❌ não significativo (≥ 0,05)"
+            texto += f"- p-valor {param}: {pval:.3f} {status}\n"
 
-        # Recomendação
+        texto += f"\n🔎 **Conclusão Final**\n"
+        texto += "✅ **Modelo validado para fins preditivos.**\n" if validado else "❌ **Modelo não validado.**\n"
+
+        # Recomendação (somente se houver variáveis não significativas)
         if not validado:
-            texto_resultado += """
-🔎 **Observação / Recomendação**
-➡️ O modelo não foi validado. Considere:
-- Remover variáveis não significativas.
-- Adicionar variáveis ou categorias relevantes.
-- Aumentar o tamanho amostral para maior poder estatístico.
+            texto += """
+🔹 **Recomendações**
+➡️ O modelo não foi validado. Para melhorá-lo:
+- Remova variáveis com p ≥ 0,05;
+- Adicione novas variáveis relevantes;
+- Aumente o número de observações (amostra).
 """.strip()
 
-        # Gráfico de boxplot para visualização
+        # Gráfico ilustrativo
         fig, ax = plt.subplots(figsize=(8, 4))
         df.boxplot(column=lista_x[0], by=coluna_y, ax=ax, grid=False)
         plt.suptitle('')
@@ -916,16 +915,17 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         plt.ylabel(lista_x[0])
         plt.tight_layout()
 
-        buffer = BytesIO()
-        plt.savefig(buffer, format="png")
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
 
-        return texto_resultado.strip(), imagem_base64
+        return texto.strip(), imagem_base64
 
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
+
 
 
 
