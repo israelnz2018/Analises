@@ -927,10 +927,16 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
 
 
+def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
+    import pandas as pd
+    import statsmodels.api as sm
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
+    import numpy as np
 
-
-
-def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
 
@@ -942,26 +948,17 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    import statsmodels.api as sm
-    from statsmodels.stats.outliers_influence import variance_inflation_factor
-    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-    import numpy as np
-
-    # Converte Y em categorias numéricas
+    # Codificar variável dependente
     Y = df_valid[coluna_y].astype("category")
     Y_codes = Y.cat.codes
     Y_labels = dict(enumerate(Y.cat.categories))
 
-    # Prepara X
+    # Preparar variáveis independentes
     X_final = df_valid[lista_x].copy()
-    X_final.columns = [str(c) for c in lista_x]  # força nomes simples e compatíveis
+    X_final.columns = [str(c) for c in lista_x]  # nomes seguros como string
     nomes_originais = {str(c): c for c in lista_x}
 
-
-    # Ajusta o modelo
+    # Ajuste do modelo
     try:
         model = sm.MNLogit(Y_codes, X_final)
         res = model.fit(disp=0)
@@ -990,7 +987,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 
     # Matriz de confusão (gráfico)
     fig, ax = plt.subplots(figsize=(6, 4))
-    disp = ConfusionMatrixDisplay.from_predictions(Y_codes, Y_pred, display_labels=list(Y_labels.values()), cmap="Blues", ax=ax, colorbar=False)
+    ConfusionMatrixDisplay.from_predictions(Y_codes, Y_pred, display_labels=list(Y_labels.values()), cmap="Blues", ax=ax, colorbar=False)
     ax.set_title("Matriz de Confusão – Regressão Logística Nominal")
     plt.tight_layout()
     buf = BytesIO()
@@ -998,15 +995,15 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # P-valores por variável (mínimo entre as categorias)
+    # Extração segura de p-valores
     pvalores_dict = {}
     variaveis_relevantes = []
     variaveis_nrelevantes = []
 
     for col in X_final.columns:
         try:
-            pvals_col = res.pvalues.xs(col, level=1)
-            min_pval = pvals_col.min()
+            pvals_col = res.pvalues.loc[[i for i in res.pvalues.index if i[1] == col]]
+            min_pval = float(pvals_col.min())
             pvalores_dict[col] = min_pval
 
             if min_pval < 0.05:
@@ -1023,28 +1020,29 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
         status_r2 = "✅ adequado (> 0,2)" if r2_mcf > 0.2 else "❌ baixo (≤ 0,2)"
         criterios.append(f"- R² de McFadden = {r2_mcf:.3f} {status_r2}")
     criterios.append(f"- Percentual de acerto = {acuracia*100:.2f}%")
-
     for i, v in enumerate(vif):
         col = list(X_final.columns)[i]
         nome = nomes_originais[col]
-        vif_txt = f"{v:.2f}".replace('.', ',')
         pval = pvalores_dict.get(col)
         pval_txt = f"{pval:.3f}".replace('.', ',') if pval is not None else "N/A"
         status_pval = "✅ significativo (< 0,05)" if pval is not None and pval < 0.05 else "❌ não significativo (≥ 0,05)"
         status_vif = "✅ adequado (< 10)" if v < 10 else "❌ alto (≥ 10)"
-        criterios.append(f"- {nome}: p-valor = {pval_txt} {status_pval}, VIF = {vif_txt} {status_vif}")
+        criterios.append(f"- {nome}: p-valor = {pval_txt} {status_pval}, VIF = {v:.2f} {status_vif}")
 
     # Conclusão
-    validado = (r2_mcf is not None and r2_mcf > 0.2 and any(p < 0.05 for p in pvalores_dict.values() if p is not None))
+    houve_significativas = any(p < 0.05 for p in pvalores_dict.values() if p is not None)
+    validado = (r2_mcf is not None and r2_mcf > 0.2 and houve_significativas)
     conclusao = "✅ **Modelo validado para fins preditivos.**" if validado else "❌ **Modelo não validado.**"
 
-    # Recomendação, se necessário
+    # Recomendação
     recomendacao = ""
     if not validado:
         recomendacao += "\n🔹 **Recomendações**\n➡️ O modelo não foi validado. Para melhorá-lo:"
         if variaveis_nrelevantes:
-            recomendacao += "\n- Remova variáveis não significativas: " + ", ".join([f"{v[0]} (p = {str(round(v[1], 3)).replace('.', ',') if v[1] is not None else 'N/A'})" for v in variaveis_nrelevantes])
-        recomendacao += "\n- Adicione novas variáveis que possam explicar a escolha;\n- Utilize uma amostra maior para aumentar a robustez."
+            recomendacao += "\n- Remova variáveis não significativas: " + ", ".join([
+                f"{v[0]} (p = {str(round(v[1], 3)).replace('.', ',') if v[1] is not None else 'N/A'})" for v in variaveis_nrelevantes])
+        recomendacao += "\n- Adicione variáveis que influenciem a variável resposta."
+        recomendacao += "\n- Aumente o tamanho amostral para maior robustez."
 
     # Texto final
     texto = f"""
@@ -1061,7 +1059,7 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 🔎 **Resultados – Itens Críticos (Obrigatórios para predição)**
 {criterios[0]}
 {criterios[1]}
-- Alguma variável significativa (p < 0,05): {'✅ Sim' if any(p < 0.05 for p in pvalores_dict.values() if p is not None) else '❌ Não'}
+- Alguma variável significativa (p < 0,05): {'✅ Sim' if houve_significativas else '❌ Não'}
 
 🟡 **Resultados – Itens Recomendados (Desejáveis)**
 {chr(10).join(criterios[2:])}
@@ -1076,13 +1074,6 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
-
-
-
-
-
-
-
 
 
 
