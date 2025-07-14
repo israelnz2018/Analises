@@ -953,15 +953,14 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     # Converte Y em categorias numéricas
     Y = df_valid[coluna_y].astype("category")
     Y_codes = Y.cat.codes
-    Y_codes.name = "target"
     Y_labels = dict(enumerate(Y.cat.categories))
 
-    # Prepara X com nomes seguros
+    # Prepara X
     X_final = df_valid[lista_x].copy()
     X_final.columns = [str(i) for i in range(X_final.shape[1])]
     nomes_originais = dict(zip(X_final.columns, lista_x))
 
-    # Ajusta modelo MNLogit
+    # Ajusta o modelo
     try:
         model = sm.MNLogit(Y_codes, X_final)
         res = model.fit(disp=0)
@@ -971,105 +970,112 @@ def analise_regressao_logistica_nominal(df: pd.DataFrame, coluna_y, lista_x):
     # R² de McFadden
     try:
         ll_null = sm.MNLogit(Y_codes, np.ones((len(Y_codes), 1))).fit(disp=0).llf
-        ll_model = res.llf
-        r2_mcf = 1 - ll_model / ll_null
+        r2_mcf = 1 - res.llf / ll_null
     except:
         r2_mcf = None
 
-    # Calcula VIFs
+    # VIFs
     vif = []
     if X_final.shape[1] > 1:
-        X_vif = sm.add_constant(X_final.copy())
+        X_vif = sm.add_constant(X_final)
         for i in range(1, X_vif.shape[1]):
             vif.append(variance_inflation_factor(X_vif.values, i))
     else:
         vif.append(1.0)
 
-    # Previsões e matriz de confusão
+    # Previsões e acurácia
     Y_pred = res.predict().argmax(axis=1)
-    cm = confusion_matrix(Y_codes, Y_pred)
-    acerto = (cm.diagonal().sum()) / cm.sum()
+    acuracia = (confusion_matrix(Y_codes, Y_pred).diagonal().sum()) / len(Y_codes)
 
-    # Gráfico matriz de confusão
+    # Matriz de confusão (gráfico)
     fig, ax = plt.subplots(figsize=(6, 4))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=list(Y_labels.values()))
-    disp.plot(ax=ax, cmap="Blues", colorbar=False)
-    ax.set_title("Matriz de Confusão - Regressão Logística Nominal")
+    disp = ConfusionMatrixDisplay.from_predictions(Y_codes, Y_pred, display_labels=list(Y_labels.values()), cmap="Blues", ax=ax, colorbar=False)
+    ax.set_title("Matriz de Confusão – Regressão Logística Nominal")
     plt.tight_layout()
-
     buf = BytesIO()
     plt.savefig(buf, format='png')
-    plt.close(fig)
+    plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Resultados simples por variável
+    # P-valores por variável (mínimo entre as categorias)
+    pvalores_dict = {}
     variaveis_relevantes = []
     variaveis_nrelevantes = []
-    pvalores_dict = {}
 
-    for nome_coluna in X_final.columns:
+    for col in X_final.columns:
         try:
-            pvals_col = res.pvalues.xs(nome_coluna, level=1)
+            pvals_col = res.pvalues.xs(col, level=1)
             min_pval = pvals_col.min()
-            pvalores_dict[nome_coluna] = min_pval
+            pvalores_dict[col] = min_pval
 
             if min_pval < 0.05:
-                variaveis_relevantes.append((nomes_originais[nome_coluna], min_pval))
+                variaveis_relevantes.append((nomes_originais[col], min_pval))
             else:
-                variaveis_nrelevantes.append((nomes_originais[nome_coluna], min_pval))
+                variaveis_nrelevantes.append((nomes_originais[col], min_pval))
         except:
-            pvalores_dict[nome_coluna] = None
-            variaveis_nrelevantes.append((nomes_originais[nome_coluna], None))
+            pvalores_dict[col] = None
+            variaveis_nrelevantes.append((nomes_originais[col], None))
 
-    # Critérios avaliados
+    # Avaliação dos critérios
     criterios = []
     if r2_mcf is not None:
-        status_r2 = "✅ adequado (>0,2)" if r2_mcf > 0.2 else "❌ baixo (<=0,2)"
-        criterios.append(f"- R² de McFadden = {str(round(r2_mcf,3)).replace('.',',')} {status_r2}")
-    criterios.append(f"- Percentual de acerto = {round(acerto*100,2):.2f}%")
-    for c, v in zip(X_final.columns, vif):
-        status_vif = "✅ adequado (<10)" if v < 10 else "❌ alto (>=10)"
-        pval_str = str(round(pvalores_dict[c],3)).replace('.',',') if pvalores_dict[c] is not None else "N/A"
-        status_pval = "✅ significativo (<0,05)" if pvalores_dict[c] is not None and pvalores_dict[c] < 0.05 else "❌ não significativo (>=0,05)"
-        criterios.append(f"- {nomes_originais[c]}: p-valor = {pval_str} {status_pval}, VIF = {str(round(v,2)).replace('.',',')} {status_vif}")
+        status_r2 = "✅ adequado (> 0,2)" if r2_mcf > 0.2 else "❌ baixo (≤ 0,2)"
+        criterios.append(f"- R² de McFadden = {r2_mcf:.3f} {status_r2}")
+    criterios.append(f"- Percentual de acerto = {acuracia*100:.2f}%")
+
+    for i, v in enumerate(vif):
+        col = list(X_final.columns)[i]
+        nome = nomes_originais[col]
+        vif_txt = f"{v:.2f}".replace('.', ',')
+        pval = pvalores_dict.get(col)
+        pval_txt = f"{pval:.3f}".replace('.', ',') if pval is not None else "N/A"
+        status_pval = "✅ significativo (< 0,05)" if pval is not None and pval < 0.05 else "❌ não significativo (≥ 0,05)"
+        status_vif = "✅ adequado (< 10)" if v < 10 else "❌ alto (≥ 10)"
+        criterios.append(f"- {nome}: p-valor = {pval_txt} {status_pval}, VIF = {vif_txt} {status_vif}")
 
     # Conclusão
-    validado = (r2_mcf is not None and r2_mcf > 0.2 and all(v < 10 for v in vif))
-    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
+    validado = (r2_mcf is not None and r2_mcf > 0.2 and any(p < 0.05 for p in pvalores_dict.values() if p is not None))
+    conclusao = "✅ **Modelo validado para fins preditivos.**" if validado else "❌ **Modelo não validado.**"
 
-    # Recomendação
-    recomendacao = "\n🔎 **Observação / Recomendação**\n➡️ O modelo não foi validado. Considere:"
-    if variaveis_nrelevantes:
-        recomendacao += "\n- Remover variáveis não significativas: " + ", ".join([f"{v[0]} (p = {str(round(v[1],3)).replace('.',',') if v[1] is not None else 'N/A'})" for v in variaveis_nrelevantes])
-    else:
-        recomendacao += "\n- Nenhuma variável para remoção."
-    recomendacao += "\n- Adicionar variáveis ou categorias relevantes.\n- Aumentar o tamanho amostral para maior poder estatístico."
+    # Recomendação, se necessário
+    recomendacao = ""
+    if not validado:
+        recomendacao += "\n🔹 **Recomendações**\n➡️ O modelo não foi validado. Para melhorá-lo:"
+        if variaveis_nrelevantes:
+            recomendacao += "\n- Remova variáveis não significativas: " + ", ".join([f"{v[0]} (p = {str(round(v[1], 3)).replace('.', ',') if v[1] is not None else 'N/A'})" for v in variaveis_nrelevantes])
+        recomendacao += "\n- Adicione novas variáveis que possam explicar a escolha;\n- Utilize uma amostra maior para aumentar a robustez."
 
-    # Reporte final
+    # Texto final
     texto = f"""
 📊 **Análise – Regressão Logística Nominal**
 
-🔹 **Hipóteses do modelo**
-- H₀: Nenhuma variável está associada às categorias da variável dependente
-- H₁: Pelo menos uma variável está associada às categorias
+🔹 **Hipóteses do Modelo**
+- **H₀:** Nenhuma variável está associada às categorias da variável dependente ({coluna_y})
+- **H₁:** Pelo menos uma variável está associada às categorias
 
-🔎 **Resumo do modelo**
+🔹 **Resumo do Modelo**
 - Variável dependente (Y): {coluna_y}
-- Variáveis independentes (Xs): {', '.join([nomes_originais[c] for c in X_final.columns])}
+- Variáveis preditoras (Xs): {', '.join([nomes_originais[c] for c in X_final.columns])}
 
-🔎 **Conclusão**
-{conclusao_status}
+🔎 **Resultados – Itens Críticos (Obrigatórios para predição)**
+{criterios[0]}
+{criterios[1]}
+- Alguma variável significativa (p < 0,05): {'✅ Sim' if any(p < 0.05 for p in pvalores_dict.values() if p is not None) else '❌ Não'}
 
-🔹 **Critérios avaliados:**
-{chr(10).join(criterios)}
+🟡 **Resultados – Itens Recomendados (Desejáveis)**
+{chr(10).join(criterios[2:])}
+
+🔎 **Conclusão Final**
+{conclusao}
 
 🔎 **Variáveis relevantes**
-- {', '.join([f"{v[0]} (p = {str(round(v[1],3)).replace('.',',')})" for v in variaveis_relevantes]) if variaveis_relevantes else 'Nenhuma significativa'}
+- {', '.join([f"{v[0]} (p = {str(round(v[1], 3)).replace('.', ',')})" for v in variaveis_relevantes]) if variaveis_relevantes else 'Nenhuma significativa'}
 
 {recomendacao}
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
