@@ -955,7 +955,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     # Preparar variáveis independentes
     X_final = df_valid[lista_x].copy()
-    X_final.columns = [str(c) for c in lista_x]  # nomes seguros como string
+    X_final.columns = [str(c) for c in lista_x]  # nomes seguros
     nomes_originais = {str(c): c for c in lista_x}
 
     # Ajuste do modelo
@@ -1002,7 +1002,11 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     for col in X_final.columns:
         try:
-            pvals_col = res.pvalues.loc[[i for i in res.pvalues.index if i[1] == col]]
+            if isinstance(res.pvalues.index, pd.MultiIndex):
+                pvals_col = res.pvalues.loc[[i for i in res.pvalues.index if i[1] == col]]
+            else:
+                pvals_col = res.pvalues.filter(like=col, axis=0)
+
             min_pval = float(pvals_col.min())
             pvalores_dict[col] = min_pval
 
@@ -1074,9 +1078,6 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
-
-
-
 
 
 
