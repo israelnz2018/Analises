@@ -672,21 +672,19 @@ def analise_regressao_linear_multipla(df, coluna_y, lista_x):
 
 
 
-
-
 def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     if not coluna_y or not lista_x:
         return "❌ A regressão logística binária requer 1 Y e pelo menos 1 X.", None
 
     for col in [coluna_y] + lista_x:
         if col not in df.columns:
-            return f"❌ Coluna {col} não encontrada no arquivo.", None
+            return f"❌ Coluna '{col}' não encontrada no conjunto de dados.", None
 
     df_valid = df[[coluna_y] + lista_x].dropna()
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    # Mapeamento automático do Y categórico
+    # Codificação binária da variável dependente
     classes = df_valid[coluna_y].unique()
     if len(classes) != 2:
         return "❌ A variável Y deve conter exatamente 2 categorias distintas para regressão logística binária.", None
@@ -704,23 +702,27 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     import base64
     import numpy as np
 
+    # Ajuste do modelo
     X_sm = sm.add_constant(X_final)
     model = sm.Logit(Y, X_sm).fit(disp=0)
     Y_pred_prob = model.predict(X_sm)
     Y_pred_class = (Y_pred_prob >= 0.5).astype(int)
 
+    # Métricas do modelo
     ll_null = sm.Logit(Y, np.ones((len(Y), 1))).fit(disp=0).llf
     ll_model = model.llf
     r2_mcf = 1 - ll_model / ll_null
-
-    vif = []
-    for i in range(1, X_sm.shape[1]):
-        vif.append(variance_inflation_factor(X_sm.values, i))
-
     auc = roc_auc_score(Y, Y_pred_prob)
     cm = confusion_matrix(Y, Y_pred_class)
     acerto = (cm.diagonal().sum()) / cm.sum()
 
+    # VIF
+    vif = [variance_inflation_factor(X_sm.values, i) for i in range(1, X_sm.shape[1])]
+
+    # Odds Ratios
+    odds_ratios = np.exp(model.params[1:])
+
+    # Gráfico
     fig, ax = plt.subplots(figsize=(6, 4))
     if len(x_cols_final) == 1:
         X_plot = np.linspace(X_final.iloc[:, 0].min(), X_final.iloc[:, 0].max(), 100)
@@ -748,60 +750,68 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    linhas = []
-    for name, coef, pval in zip(['Const'] + x_cols_final, model.params, model.pvalues):
-        linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
-    linhas.append(f"- R² de McFadden: {r2_mcf:.4f}")
-    linhas.append(f"- AUC: {auc:.4f}")
-    linhas.append(f"- Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("- VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
+    # Conclusão do modelo (com base apenas nos critérios obrigatórios)
+    crit_validado = (r2_mcf > 0.2) and (auc > 0.7) and any(p < 0.05 for p in model.pvalues[1:])
+    conclusao = "✅ Modelo validado para fins preditivos." if crit_validado else "❌ Modelo não validado."
 
-    # Modelo de reporte completo com conclusão antes da recomendação
-    validado = (r2_mcf > 0.2) and (auc > 0.7) and all(v < 10 for v in vif) and any(p < 0.05 for p in model.pvalues[1:])
-
-    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
-
-    criterios = []
-    criterios.append(f"- R² de McFadden = {r2_mcf:.4f} {'✅ adequado (>0.2)' if r2_mcf > 0.2 else '❌ baixo (<=0.2)'}")
-    criterios.append(f"- AUC = {auc:.4f} {'✅ adequado (>0.7)' if auc > 0.7 else '❌ baixo (<=0.7)'}")
-    criterios.append(f"- Percentual de acerto = {acerto*100:.2f}%")
-    for name, pval in zip(x_cols_final, model.pvalues[1:]):
-        criterios.append(f"- p-valor {name} = {pval:.4f} {'✅ significativo (<0.05)' if pval < 0.05 else '❌ não significativo (>=0.05)'}")
-    for c, v in zip(x_cols_final, vif):
-        criterios.append(f"- VIF {c} = {v:.2f} {'✅ adequado (<10)' if v < 10 else '❌ alto (>=10)'}")
-
-    recomendacao = ""
-    if not validado:
-        recomendacao = """
-🔎 **Observação / Recomendação**
-➡️ O modelo não foi validado. Considere:
-- Remover preditoras não significativas (p >= 0.05).
-- Adicionar variáveis ou categorias.
-- Aumentar o tamanho amostral para maior poder estatístico.
-""".strip()
-
-    texto = f"""
+    # Criação do texto do relatório
+    resumo = f"""
 📊 **Análise – Regressão Logística Binária**
 
-🔹 **Hipóteses do modelo**
-- H₀: Nenhuma variável está associada à probabilidade do evento
-- H₁: Pelo menos uma variável está associada à probabilidade do evento
+🔹 **Hipóteses do Modelo**
 
-🔎 **Resumo do modelo**
-- Variável dependente (Y): {coluna_y}
-- Variáveis independentes (Xs): {', '.join(x_cols_final)}
-{chr(10).join(linhas)}
+- **H₀:** Nenhuma das variáveis independentes está associada à probabilidade do evento ({coluna_y}).  
+- **H₁:** Pelo menos uma variável está associada à probabilidade do evento ({coluna_y}).
 
-🔎 **Conclusão**
-{conclusao_status}
 
-🔹 **Critérios avaliados:**
-{chr(10).join(criterios)}
+🔹 **Resumo do Modelo**
 
-{recomendacao}
-""".strip()
+- **Variável dependente (Y):** {coluna_y}  
+- **Variáveis preditoras (X):** {', '.join(x_cols_final)}  
+- **Equação estimada:**  
+  log(p / (1 – p)) = {model.params[0]:.4f} {' '.join([f"+ {coef:.4f}·{col}" for coef, col in zip(model.params[1:], x_cols_final)])}
 
-    return texto, grafico_base64
+- **Odds Ratios:**  
+""" + '\n'.join([
+        f"  {col}: {odds:.2f} " +
+        ("✅ (associada positivamente)" if odds > 1 and p < 0.05 else
+         "⚠️ (associação fraca ou não significativa)" if p >= 0.05 else
+         "✅ (associada negativamente)" if odds < 1 and p < 0.05 else "")
+        for col, odds, p in zip(x_cols_final, odds_ratios, model.pvalues[1:])
+    ]) + f"""
+
+
+🔎 **Resultados – Itens Críticos (Obrigatórios para predição)**  
+- R² de McFadden (> 0,20): {r2_mcf:.4f} {'✅' if r2_mcf > 0.2 else '❌'}  
+- AUC (> 0,70): {auc:.4f} {'✅' if auc > 0.7 else '❌'}  
+- Alguma preditora significativa (p < 0,05): {"✅" if any(p < 0.05 for p in model.pvalues[1:]) else '❌'}  
+
+
+🟡 **Resultados – Itens Recomendados (Desejáveis)**  
+- Percentual de acerto (> 70%): {acerto * 100:.2f}% {'✅' if acerto >= 0.7 else '⚠️'}  
+""" + '\n'.join([
+        f"- p-valor {col} = {p:.4f} {'✅' if p < 0.05 else '❌'}"
+        for col, p in zip(x_cols_final, model.pvalues[1:])
+    ]) + '\n' + '\n'.join([
+        f"- VIF {col} = {v:.2f} {'✅' if v < 10 else '⚠️'}"
+        for col, v in zip(x_cols_final, vif)
+    ]) + f"""
+
+
+🔎 **Conclusão Final**  
+{conclusao}
+
+""" + ("""
+🔹 **Recomendações**  
+➡️ O modelo não foi validado. Considere:
+- Remover preditoras não significativas (p ≥ 0,05);  
+- Incluir novas variáveis relevantes;  
+- Aumentar o tamanho da amostra;  
+- Avaliar transformações ou termos de interação.
+""" if not crit_validado else "")
+
+    return resumo.strip(), grafico_base64
+
 
 
 
