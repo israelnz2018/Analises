@@ -950,6 +950,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     # Transformar variável resposta em categoria
     df_valid[coluna_y] = df_valid[coluna_y].astype("category")
+    df_valid[coluna_y] = df_valid[coluna_y].cat.codes
     Y_labels = dict(enumerate(df_valid[coluna_y].cat.categories))
 
     # Preparar variáveis X com nomes seguros
