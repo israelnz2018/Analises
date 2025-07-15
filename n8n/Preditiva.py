@@ -928,7 +928,6 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 
 
 
-
 def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     import pandas as pd
     import statsmodels.api as sm
@@ -999,18 +998,16 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Extração segura de p-valores
+    # Extração de p-valores de forma robusta
     pvalores_dict = {}
     variaveis_relevantes = []
     variaveis_nrelevantes = []
 
     for col in X_final.columns:
         try:
-            try:
-                pvals_col = res.pvalues.xs(col, level=1, drop_level=False)
-            except:
-                pvals_col = res.pvalues.filter(like=col, axis=0)
-
+            # busca todos os índices que contenham a variável
+            indices_relacionados = [idx for idx in res.pvalues.index if isinstance(idx, tuple) and idx[1] == col]
+            pvals_col = res.pvalues.loc[indices_relacionados]
             min_pval = float(pvals_col.min())
             pvalores_dict[col] = min_pval
 
@@ -1082,6 +1079,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
