@@ -1884,93 +1884,156 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 
 
 def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from scipy import stats
+
     if not coluna_x or not coluna_y:
-        return "❌ O teste 2 Proporções requer as colunas X (grupo) e Y (resultado binário).", None
+        return "❌ O teste 2 Proporções requer as colunas X (grupo) e Y (resultado binário).", None, None
 
     if coluna_x not in df.columns:
-        return f"❌ A coluna {coluna_x} não foi encontrada no arquivo.", None
+        return f"❌ A coluna {coluna_x} não foi encontrada no arquivo.", None, None
 
     if coluna_y not in df.columns:
-        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
+        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None, None
 
     df_valid = df[[coluna_x, coluna_y]].dropna()
     grupos = df_valid[coluna_x].unique()
     if len(grupos) != 2:
-        return "❌ O teste 2 Proporções requer exatamente 2 grupos distintos na coluna X.", None
+        return "❌ O teste 2 Proporções requer exatamente 2 grupos distintos na coluna X.", None, None
+
+    # identificar os dois possíveis valores de Y
+    valores_y = df_valid[coluna_y].unique()
+    if len(valores_y) != 2:
+        return "❌ O teste 2 Proporções requer exatamente 2 categorias (ex: aprovado/reprovado) na coluna Y.", None, None
 
     nivel_conf = 95.0
     alpha = 1 - (nivel_conf / 100)
     z = stats.norm.ppf(1 - alpha / 2)
 
-    prop = {}
-    n = {}
-    for g in grupos:
-        sub = df_valid[df_valid[coluna_x] == g][coluna_y]
-        n[g] = len(sub)
-        if n[g] < 5:
-            return f"❌ O grupo {g} requer ao menos 5 valores não nulos.", None
-        prop[g] = np.mean(sub == sub.unique()[0])  # considera sucesso como a primeira categoria encontrada
+    # estrutura para armazenar resultados de cada hipótese (aprovado/reprovado)
+    resultados = {}
+    graficos = {}
 
-    g1, g2 = grupos
-    p1, p2 = prop[g1], prop[g2]
-    n1, n2 = n[g1], n[g2]
+    for i, valor_interesse in enumerate(valores_y):
+        # contagem por grupo e categoria
+        contagem = {}
+        proporcao = {}
+        n = {}
+        for g in grupos:
+            sub = df_valid[df_valid[coluna_x] == g][coluna_y]
+            n[g] = len(sub)
+            contagem[g] = np.sum(sub == valor_interesse)
+            proporcao[g] = contagem[g] / n[g] if n[g] > 0 else np.nan
+            if n[g] < 5:
+                return f"❌ O grupo {g} requer ao menos 5 valores não nulos.", None, None
 
-    # cálculo estatístico - Z test
-    p_pool = (p1 * n1 + p2 * n2) / (n1 + n2)
-    se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
-    z_stat = (p1 - p2) / se
-    p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+        g1, g2 = grupos
+        p1, p2 = proporcao[g1], proporcao[g2]
+        n1, n2 = n[g1], n[g2]
 
-    # IC da diferença
-    se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
-    diff = p1 - p2
-    ic_lower = diff - z * se_diff
-    ic_upper = diff + z * se_diff
+        # cálculo estatístico - Z test
+        p_pool = (contagem[g1] + contagem[g2]) / (n1 + n2)
+        se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
+        z_stat = (p1 - p2) / se
+        p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
-    # gráfico
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
-    ax.errorbar([0, 1], [p1, p2],
-                yerr=[[p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)),
-                       p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2))],
-                      [min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1,
-                       min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2]],
-                fmt='o', color='black', capsize=5)
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels([g1, g2])
-    ax.set_ylim(0, 1)
-    ax.set_ylabel("Proporção")
-    ax.set_title(f"2 Proporções - IC {nivel_conf:.1f}% e Teste H0: p1 = p2")
-    plt.tight_layout()
+        # IC da diferença
+        se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
+        diff = p1 - p2
+        ic_lower = diff - z * se_diff
+        ic_upper = diff + z * se_diff
 
-    buf = BytesIO()
-    plt.savefig(buf, format='png')
-    plt.close(fig)
-    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        # gráfico para esse valor de Y
+        plt.style.use('seaborn-v0_8-muted')
+        fig, ax = plt.subplots(figsize=(5, 4))
+        bars = ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
+        yerrs = [
+            [p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)), p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2))],
+            [min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1, min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2],
+        ]
+        ax.errorbar([0, 1], [p1, p2], yerr=yerrs, fmt='o', color='black', capsize=5)
+        ax.set_xticks([0, 1])
+        ax.set_xticklabels([g1, g2])
+        ax.set_ylim(0, 1)
+        ax.set_ylabel(f"Proporção de {valor_interesse}")
+        ax.set_title(f"2 Proporções ({valor_interesse}) - IC {nivel_conf:.1f}%")
+        plt.tight_layout()
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close(fig)
+        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        graficos[valor_interesse] = grafico_base64
 
+        resultados[valor_interesse] = {
+            "g1": g1, "g2": g2,
+            "n1": n1, "n2": n2,
+            "cont1": contagem[g1], "cont2": contagem[g2],
+            "p1": p1, "p2": p2,
+            "diff": diff,
+            "ic_lower": ic_lower,
+            "ic_upper": ic_upper,
+            "z_stat": z_stat,
+            "p_valor": p_valor
+        }
+
+    # relatório final
+    v1, v2 = valores_y
+    r1, r2 = resultados[v1], resultados[v2]
     texto = f"""
-📊 **Análise – Teste de 2 Proporções**
+📊 **Análise – Teste de 2 Proporções: {v1} e {v2}**
 
-🔹 **Hipóteses:**
-- H₀: As proporções de {g1} e {g2} são iguais
-- H₁: As proporções de {g1} e {g2} são diferentes
+---
 
-🔎 **Estatísticas Descritivas:**
-- {g1}: proporção = {p1:.2f}, N = {n1}
-- {g2}: proporção = {p2:.2f}, N = {n2}
+### 1️⃣ Hipótese para {v1}
+- H₀: A proporção de {v1} é igual nos grupos {r1['g1']} e {r1['g2']}.
+- H₁: A proporção de {v1} é diferente nos grupos {r1['g1']} e {r1['g2']}.
 
-🔎 **Teste de 2 Proporções (Z-test):**
-- Diferença = {diff:.2f}
-- Intervalo {nivel_conf:.1f}% = [{ic_lower:.2f}, {ic_upper:.2f}]
-- Estatística Z = {z_stat:.2f}
-- p-valor = {p_valor:.2f}
+**Resumo dos dados:**
+| Grupo | Total | {v1} | Proporção {v1} |
+|-------|-------|------|----------------|
+| {r1['g1']} | {r1['n1']} | {r1['cont1']} | {r1['p1']:.2f} |
+| {r1['g2']} | {r1['n2']} | {r1['cont2']} | {r1['p2']:.2f} |
 
-🔎 **Conclusão:**
-{"✅ Com {nivel_conf:.1f}% de confiança, rejeitamos H0. As proporções são estatisticamente diferentes." if p_valor < alpha else f"⚠️ Com {nivel_conf:.1f}% de confiança, não rejeitamos H0. Não há diferença significativa entre as proporções."}
+**Teste Z:**  
+- Diferença = {r1['diff']:.2f}  
+- Intervalo {nivel_conf:.1f}% = [{r1['ic_lower']:.2f}, {r1['ic_upper']:.2f}]  
+- Estatística Z = {r1['z_stat']:.2f}  
+- p-valor = {r1['p_valor']:.2f}
+
+**Conclusão:**  
+{"✅ Rejeitamos H₀: diferença significativa." if r1['p_valor'] < alpha else "⚠️ Não rejeitamos H₀: não há diferença significativa."}
+
+---
+
+### 2️⃣ Hipótese para {v2}
+- H₀: A proporção de {v2} é igual nos grupos {r2['g1']} e {r2['g2']}.
+- H₁: A proporção de {v2} é diferente nos grupos {r2['g1']} e {r2['g2']}.
+
+**Resumo dos dados:**
+| Grupo | Total | {v2} | Proporção {v2} |
+|-------|-------|------|----------------|
+| {r2['g1']} | {r2['n1']} | {r2['cont1']} | {r2['p1']:.2f} |
+| {r2['g2']} | {r2['n2']} | {r2['cont2']} | {r2['p2']:.2f} |
+
+**Teste Z:**  
+- Diferença = {r2['diff']:.2f}  
+- Intervalo {nivel_conf:.1f}% = [{r2['ic_lower']:.2f}, {r2['ic_upper']:.2f}]  
+- Estatística Z = {r2['z_stat']:.2f}  
+- p-valor = {r2['p_valor']:.2f}
+
+**Conclusão:**  
+{"✅ Rejeitamos H₀: diferença significativa." if r2['p_valor'] < alpha else "⚠️ Não rejeitamos H₀: não há diferença significativa."}
+
+---
+
+> Foram gerados dois gráficos: um para cada hipótese (basta exibir ambos para o aluno comparar os cenários).
+
 """
+    return texto.strip(), graficos[v1], graficos[v2]
 
-    return texto.strip(), grafico_base64
 
 
 
