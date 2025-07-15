@@ -2053,12 +2053,17 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
 
 
 def analise_k_proporcoes(df: pd.DataFrame, lista_y):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from scipy.stats import norm
+
     if len(lista_y) < 2:
         return "❌ O teste K Proporções requer pelo menos 2 colunas Y (grupos).", None
 
-    sucessos = []
-    totais = []
-    proporcoes = {}
+    maiores = []   # (grupo, categoria, prop, n, ic_min, ic_max)
+    menores = []
 
     for col in lista_y:
         if col not in df.columns:
@@ -2067,62 +2072,104 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y):
         if len(dados) < 5:
             return f"❌ O grupo {col} requer ao menos 5 valores não nulos.", None
 
-        # Conversão: detecta automaticamente a primeira categoria como sucesso
-        unique_vals = dados.unique()
-        if len(unique_vals) != 2:
+        # identifica todas as categorias e suas frequências
+        vals, counts = np.unique(dados, return_counts=True)
+        if len(vals) != 2:
             return f"❌ A coluna {col} precisa conter exatamente 2 categorias distintas (binárias).", None
 
-        sucesso_val = unique_vals[0]
-        sucesso = np.sum(dados == sucesso_val)
         total = len(dados)
+        # Maior proporção
+        idx_maior = np.argmax(counts)
+        cat_maior = vals[idx_maior]
+        prop_maior = counts[idx_maior] / total
+        se_maior = np.sqrt(prop_maior * (1 - prop_maior) / total)
+        z = norm.ppf(0.975)
+        ic_maior = (max(0, prop_maior - z * se_maior), min(1, prop_maior + z * se_maior))
+        maiores.append((col, cat_maior, prop_maior, total, ic_maior[0], ic_maior[1]))
 
-        sucessos.append(sucesso)
-        totais.append(total)
-        proporcoes[col] = sucesso / total
+        # Menor proporção
+        idx_menor = np.argmin(counts)
+        cat_menor = vals[idx_menor]
+        prop_menor = counts[idx_menor] / total
+        se_menor = np.sqrt(prop_menor * (1 - prop_menor) / total)
+        ic_menor = (max(0, prop_menor - z * se_menor), min(1, prop_menor + z * se_menor))
+        menores.append((col, cat_menor, prop_menor, total, ic_menor[0], ic_menor[1]))
 
-    # Montagem da tabela de contingência
-    table = np.array([sucessos, [t - s for s, t in zip(sucessos, totais)]])
-    stat, p_valor, dof, expected = stats.chi2_contingency(table.T)
+    # Gera gráficos (um único painel)
+    plt.style.use('seaborn-v0_8-muted')
+    fig, axes = plt.subplots(2, 1, figsize=(10, 8))
 
-    # Gráfico
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.bar(range(len(lista_y)), [proporcoes[c] for c in lista_y], color='skyblue')
-    ax.set_xticks(range(len(lista_y)))
-    ax.set_xticklabels(lista_y)
-    ax.set_ylim(0, 1)
-    ax.set_ylabel("Proporção")
-    ax.set_title("K Proporções - Proporção por Grupo")
+    # Gráfico maiores proporções
+    grupos = [m[0] for m in maiores]
+    props_maior = [m[2] for m in maiores]
+    ic_inferior_maior = [m[2] - m[4] for m in maiores]
+    ic_superior_maior = [m[5] - m[2] for m in maiores]
+    labels_maior = [f"{m[1]}" for m in maiores]
+
+    bars1 = axes[0].bar(grupos, props_maior, color='skyblue')
+    axes[0].errorbar(grupos, props_maior, yerr=[ic_inferior_maior, ic_superior_maior], fmt='o', color='black', capsize=5)
+    axes[0].set_ylim(0, 1)
+    axes[0].set_ylabel("Proporção")
+    axes[0].set_title("Categoria Mais Frequente em Cada Grupo (IC 95%)")
+    for i, bar in enumerate(bars1):
+        axes[0].text(bar.get_x() + bar.get_width() / 2, props_maior[i] + 0.03, f"{labels_maior[i]}", ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+    # Gráfico menores proporções
+    props_menor = [m[2] for m in menores]
+    ic_inferior_menor = [m[2] - m[4] for m in menores]
+    ic_superior_menor = [m[5] - m[2] for m in menores]
+    labels_menor = [f"{m[1]}" for m in menores]
+
+    bars2 = axes[1].bar(grupos, props_menor, color='lightgreen')
+    axes[1].errorbar(grupos, props_menor, yerr=[ic_inferior_menor, ic_superior_menor], fmt='o', color='black', capsize=5)
+    axes[1].set_ylim(0, 1)
+    axes[1].set_ylabel("Proporção")
+    axes[1].set_title("Categoria Menos Frequente em Cada Grupo (IC 95%)")
+    for i, bar in enumerate(bars2):
+        axes[1].text(bar.get_x() + bar.get_width() / 2, props_menor[i] + 0.03, f"{labels_menor[i]}", ha='center', va='bottom', fontsize=10, fontweight='bold')
+
     plt.tight_layout()
-
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Report padronizado
-    proporcao_texto = "\n".join([f"- {col}: proporção = {proporcoes[col]:.2f}, N = {totais[i]}" for i, col in enumerate(lista_y)])
+    # Monta tabelas para relatório
+    tabela_maior = "\n".join([
+        f"| **{col}** | **{cat}** | **{prop:.2f}** | **{n}** | **[{ic1:.2f}, {ic2:.2f}]** |"
+        for col, cat, prop, n, ic1, ic2 in maiores
+    ])
+    tabela_menor = "\n".join([
+        f"| **{col}** | **{cat}** | **{prop:.2f}** | **{n}** | **[{ic1:.2f}, {ic2:.2f}]** |"
+        for col, cat, prop, n, ic1, ic2 in menores
+    ])
 
     texto = f"""
-📊 **Análise – Teste de K Proporções**
+📊 **Análise – K Proporções: Maiores e Menores Proporções**
 
-🔹 **Hipóteses:**
-- H₀: As proporções dos grupos são todas iguais
-- H₁: Ao menos uma proporção é diferente
 
-🔎 **Estatísticas Descritivas:**
-{proporcao_texto}
+### **Proporções Maiores (categoria mais frequente de cada grupo):**
 
-🔎 **Teste Qui-Quadrado:**
-- Estatística χ² = {stat:.2f}
-- p-valor = {p_valor:.2f}
-- Graus de liberdade = {dof}
+| Grupo | Categoria | Proporção | N | IC 95% |
 
-🔎 **Conclusão:**
-{"✅ Com 95% de confiança, rejeitamos H0. Há diferença significativa entre as proporções dos grupos." if p_valor < 0.05 else "⚠️ Com 95% de confiança, não rejeitamos H0. Não há diferença significativa entre as proporções dos grupos."}
+{tabela_maior}
+
+---
+
+### **Proporções Menores (categoria menos frequente de cada grupo):**
+
+| Grupo | Categoria | Proporção | N | IC 95% |
+
+{tabela_menor}
+
+
+- As categorias podem variar entre os grupos.
+- Os gráficos abaixo apresentam, respectivamente, as proporções **maiores** e **menores** de cada grupo, com seus intervalos de confiança de 95%.
+
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
