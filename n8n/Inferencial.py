@@ -2047,22 +2047,17 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
 
 
 
-
-
-
-
-
 def analise_k_proporcoes(df: pd.DataFrame, lista_y):
     import numpy as np
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
-    from scipy.stats import norm
+    from scipy.stats import norm, chi2_contingency
 
     if len(lista_y) < 2:
         return "❌ O teste K Proporções requer pelo menos 2 colunas Y (grupos).", None
 
-    maiores = []   # (grupo, categoria, prop, n, ic_min, ic_max)
+    maiores = []   # (grupo, categoria, prop, n, ic_min, ic_max, contagem)
     menores = []
 
     for col in lista_y:
@@ -2085,7 +2080,7 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y):
         se_maior = np.sqrt(prop_maior * (1 - prop_maior) / total)
         z = norm.ppf(0.975)
         ic_maior = (max(0, prop_maior - z * se_maior), min(1, prop_maior + z * se_maior))
-        maiores.append((col, cat_maior, prop_maior, total, ic_maior[0], ic_maior[1]))
+        maiores.append((col, cat_maior, prop_maior, total, ic_maior[0], ic_maior[1], counts[idx_maior]))
 
         # Menor proporção
         idx_menor = np.argmin(counts)
@@ -2093,7 +2088,19 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y):
         prop_menor = counts[idx_menor] / total
         se_menor = np.sqrt(prop_menor * (1 - prop_menor) / total)
         ic_menor = (max(0, prop_menor - z * se_menor), min(1, prop_menor + z * se_menor))
-        menores.append((col, cat_menor, prop_menor, total, ic_menor[0], ic_menor[1]))
+        menores.append((col, cat_menor, prop_menor, total, ic_menor[0], ic_menor[1], counts[idx_menor]))
+
+    # Teste Qui-Quadrado para maiores
+    maiores_obs = np.array([m[6] for m in maiores])
+    maiores_n = np.array([m[3] for m in maiores])
+    tabela_maiores = np.vstack([maiores_obs, maiores_n - maiores_obs]).T
+    stat_maior, p_maior, dof_maior, _ = chi2_contingency(tabela_maiores)
+
+    # Teste Qui-Quadrado para menores
+    menores_obs = np.array([m[6] for m in menores])
+    menores_n = np.array([m[3] for m in menores])
+    tabela_menores = np.vstack([menores_obs, menores_n - menores_obs]).T
+    stat_menor, p_menor, dof_menor, _ = chi2_contingency(tabela_menores)
 
     # Gera gráficos (um único painel)
     plt.style.use('seaborn-v0_8-muted')
@@ -2134,41 +2141,60 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Monta tabelas para relatório
+    # Monta tabelas para relatório (apenas títulos em negrito)
     tabela_maior = "\n".join([
-        f"| **{col}** | **{cat}** | **{prop:.2f}** | **{n}** | **[{ic1:.2f}, {ic2:.2f}]** |"
-        for col, cat, prop, n, ic1, ic2 in maiores
+        f"| {col} | {cat} | {prop:.2f} | {n} | [{ic1:.2f}, {ic2:.2f}] |"
+        for col, cat, prop, n, ic1, ic2, _ in maiores
     ])
     tabela_menor = "\n".join([
-        f"| **{col}** | **{cat}** | **{prop:.2f}** | **{n}** | **[{ic1:.2f}, {ic2:.2f}]** |"
-        for col, cat, prop, n, ic1, ic2 in menores
+        f"| {col} | {cat} | {prop:.2f} | {n} | [{ic1:.2f}, {ic2:.2f}] |"
+        for col, cat, prop, n, ic1, ic2, _ in menores
     ])
 
     texto = f"""
 📊 **Análise – K Proporções: Maiores e Menores Proporções**
 
 
-### **Proporções Maiores (categoria mais frequente de cada grupo):**
+**Hipótese 1 (proporções maiores):**  
+- H₀: As proporções das categorias mais frequentes são todas iguais entre os grupos.  
+- H₁: Pelo menos uma proporção das categorias mais frequentes é diferente entre os grupos.
 
-| Grupo | Categoria | Proporção | N | IC 95% |
+**Hipótese 2 (proporções menores):**  
+- H₀: As proporções das categorias menos frequentes são todas iguais entre os grupos.  
+- H₁: Pelo menos uma proporção das categorias menos frequentes é diferente entre os grupos.
 
+
+**Proporções Maiores (categoria mais frequente de cada grupo):**
+
+| **Grupo** | **Categoria** | **Proporção** | **N** | **IC 95%** |
 {tabela_maior}
 
----
+- **Teste Qui-Quadrado (maiores):**  
+  Estatística χ² = **{stat_maior:.2f}**  
+  p-valor = **{p_maior:.2f}**  
+  Graus de liberdade = {dof_maior}
 
-### **Proporções Menores (categoria menos frequente de cada grupo):**
+**Proporções Menores (categoria menos frequente de cada grupo):**
 
-| Grupo | Categoria | Proporção | N | IC 95% |
-
+| **Grupo** | **Categoria** | **Proporção** | **N** | **IC 95%** |
 {tabela_menor}
 
+- **Teste Qui-Quadrado (menores):**  
+  Estatística χ² = **{stat_menor:.2f}**  
+  p-valor = **{p_menor:.2f}**  
+  Graus de liberdade = {dof_menor}
 
+
+**Conclusão:**
+- Para as **proporções maiores**, {"✅ rejeitamos H₀. Há diferença significativa." if p_maior < 0.05 else "⚠️ não rejeitamos H₀. Não há diferença significativa."} (p = {p_maior:.2f}).
+- Para as **proporções menores**, {"✅ rejeitamos H₀. Há diferença significativa." if p_menor < 0.05 else "⚠️ não rejeitamos H₀. Não há diferença significativa."} (p = {p_menor:.2f}).
 - As categorias podem variar entre os grupos.
-- Os gráficos abaixo apresentam, respectivamente, as proporções **maiores** e **menores** de cada grupo, com seus intervalos de confiança de 95%.
+- Os gráficos abaixo apresentam, respectivamente, as proporções maiores e menores de cada grupo, com seus intervalos de confiança de 95%.
 
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
