@@ -936,43 +936,39 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     import base64
     import numpy as np
 
+    # Validar colunas
     if not coluna_y or not lista_x:
-        return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
+        return "❌ Requer 1 Y categórico e ao menos 1 X numérico.", None
     for col in [coluna_y] + lista_x:
         if col not in df.columns:
             return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    # Filtrar apenas linhas completas
+    # Limpar dados
     df_valid = df[[coluna_y] + lista_x].dropna()
     if len(df_valid) < len(lista_x) + 3:
-        return "❌ O modelo requer mais dados válidos.", None
+        return "❌ Poucos dados válidos.", None
 
-    # Garantir que todas as variáveis X sejam contínuas
-    for col in lista_x:
-        if not np.issubdtype(df_valid[col].dtype, np.number):
-            return f"❌ A variável X '{col}' deve ser numérica (contínua).", None
-
-    # Codificar Y como categoria e transformar em códigos numéricos
+    # Y como categoria
     y_categ = df_valid[coluna_y].astype("category")
+    y = y_categ.cat.codes
     Y_labels = dict(enumerate(y_categ.cat.categories))
-    df_valid["Y_cod"] = y_categ.cat.codes
+    df_valid["Y_cod"] = y
 
-    # Preparar X
-    X = df_valid[lista_x].astype(float)
+    # X apenas numéricos
+    X = df_valid[lista_x].apply(pd.to_numeric, errors="coerce")
+    if X.isnull().any().any():
+        return "❌ Todos os X devem ser numéricos e sem NA.", None
     X = sm.add_constant(X)
 
-    # Y final
-    y = df_valid["Y_cod"]
-
     try:
-        model = sm.MNLogit(y, X)
+        model = sm.MNLogit(df_valid["Y_cod"], X)
         res = model.fit(disp=0)
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
 
     # R² McFadden
     try:
-        null_model = sm.MNLogit(y, np.ones((len(y), 1))).fit(disp=0)
+        null_model = sm.MNLogit(df_valid["Y_cod"], np.ones((len(y), 1))).fit(disp=0)
         r2_mcf = 1 - res.llf / null_model.llf
     except:
         r2_mcf = None
@@ -980,14 +976,14 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     # VIF
     vif = []
     if X.shape[1] > 1:
-        for i in range(1, X.shape[1]):  # ignorando o intercepto
+        for i in range(1, X.shape[1]):
             vif.append(variance_inflation_factor(X.values, i))
     else:
         vif.append(1.0)
 
     # Previsão e acurácia
     y_pred = res.predict().argmax(axis=1)
-    acuracia = (y.values == y_pred).sum() / len(y)
+    acuracia = (y == y_pred).sum() / len(y)
 
     # Matriz de confusão
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -999,13 +995,12 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # P-valores
+    # P-valores (pega o menor p-valor de cada X nas equações das categorias)
     pvalores_dict = {}
     variaveis_relevantes = []
     variaveis_nrelevantes = []
-    for col in X.columns[1:]:  # ignora o intercepto
+    for ix, col in enumerate(X.columns[1:]):  # pula o "const"
         try:
-            # Pega o menor p-valor do coeficiente entre as classes
             pvals = res.pvalues.loc[:, col]
             min_pval = float(pvals.min())
             pvalores_dict[col] = min_pval
@@ -1013,7 +1008,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
                 variaveis_relevantes.append((col, min_pval))
             else:
                 variaveis_nrelevantes.append((col, min_pval))
-        except:
+        except Exception as e:
             pvalores_dict[col] = None
             variaveis_nrelevantes.append((col, None))
 
@@ -1072,8 +1067,6 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
-
-
 
 
 
