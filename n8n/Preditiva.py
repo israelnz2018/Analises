@@ -926,7 +926,6 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
 
-
 def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     import pandas as pd
     import statsmodels.api as sm
@@ -1002,9 +1001,10 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     for col in X_final.columns:
         try:
-            pvals_col = res.pvalues.xs(col, level=1, drop_level=False)
-         except KeyError:
-            pvals_col = res.pvalues.filter(like=col, axis=0)
+            try:
+                pvals_col = res.pvalues.xs(col, level=1, drop_level=False)
+            except KeyError:
+                pvals_col = res.pvalues.filter(like=col, axis=0)
 
             min_pval = float(pvals_col.min())
             pvalores_dict[col] = min_pval
@@ -1077,7 +1077,6 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
-
 
 
 
