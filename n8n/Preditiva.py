@@ -953,12 +953,9 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     y_labels = list(pd.Categorical(dados[coluna_y]).categories)
     X = dados[lista_x].astype(float)  # só numérico
 
-    # Adiciona intercepto (igual Minitab)
-    X_ = sm.add_constant(X)
-
-    # Ajustar modelo multinomial
+    # Ajustar modelo multinomial (sem add_constant)
     try:
-        modelo = sm.MNLogit(y, X_)
+        modelo = sm.MNLogit(y, X)
         resultado = modelo.fit(method='newton', disp=0)
     except Exception as e:
         return f"❌ Erro ao ajustar modelo: {str(e)}", None
@@ -971,14 +968,14 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     pvalores_txt = ""
     for categoria in range(1, len(y_labels)):
         pvalores_txt += f"\nClasse '{y_labels[categoria]}' vs referência '{y_labels[0]}':"
-        for ix, xname in enumerate(X_.columns):
+        for xname in X.columns:
             pval = pvalores.iloc[categoria-1][xname]
             coefval = coef.iloc[categoria-1][xname]
             pvalores_txt += f"\n- {xname}: coef = {coefval:.3f}, p = {pval:.4f} {'✅' if pval < 0.05 else '❌'}"
         pvalores_txt += "\n"
 
     # Previsão e acurácia
-    y_pred = resultado.predict(X_).idxmax(axis=1)
+    y_pred = resultado.predict(X).idxmax(axis=1)
     acuracia = (y == y_pred).mean() * 100
 
     # Matriz de confusão
@@ -1010,6 +1007,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     """.strip()
 
     return texto, grafico_base64
+
 
 
 
