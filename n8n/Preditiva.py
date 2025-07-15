@@ -950,6 +950,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     # Codificar variável dependente
     Y = df_valid[coluna_y].astype("category")
     Y_codes = Y.cat.codes
+    Y_codes = pd.Series(Y_codes.values, index=range(len(Y_codes)))  # <- CORREÇÃO CRÍTICA
     Y_labels = dict(enumerate(Y.cat.categories))
 
     # Preparar variáveis independentes
@@ -962,6 +963,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     # Mapeamento original para nomes amigáveis
     nomes_originais = {c: c for c in X_final.columns}
+
 
 
     # Ajuste do modelo
