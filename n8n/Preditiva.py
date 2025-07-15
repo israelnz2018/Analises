@@ -930,7 +930,6 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     import pandas as pd
     import statsmodels.api as sm
-    import statsmodels.formula.api as smf
     from statsmodels.stats.outliers_influence import variance_inflation_factor
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
     import matplotlib.pyplot as plt
@@ -948,54 +947,49 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    # Transformar variável resposta em categoria
-    df_valid[coluna_y] = df_valid[coluna_y].astype("category")
-    df_valid[coluna_y] = df_valid[coluna_y].cat.codes
-    Y_labels = dict(enumerate(df_valid[coluna_y].cat.categories))
+    # Codificar Y como categoria e transformar em códigos numéricos
+    y_categ = df_valid[coluna_y].astype("category")
+    Y_labels = dict(enumerate(y_categ.cat.categories))
+    df_valid["Y_cod"] = y_categ.cat.codes
 
-    # Preparar variáveis X com nomes seguros
+    # Preparar X
     X_raw = df_valid[lista_x].copy()
-    X_dummies = pd.get_dummies(X_raw, drop_first=True)
-    X_dummies.columns = [c.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_') for c in X_dummies.columns]
+    X_raw = pd.get_dummies(X_raw, drop_first=True)
+    X_raw.columns = [c.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_') for c in X_raw.columns]
+    X_raw.index = pd.RangeIndex(len(X_raw))
 
-    # Renomear coluna Y para evitar espaços/símbolos
-    y_seguro = coluna_y.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')
-    df_modelo = pd.concat([df_valid[[coluna_y]], X_dummies], axis=1)
-    df_modelo = df_modelo.rename(columns={coluna_y: y_seguro})
-
-    # Fórmula segura
-    formula = f"{y_seguro} ~ " + " + ".join(X_dummies.columns)
+    # Y final
+    y = df_valid["Y_cod"]
 
     try:
-        modelo = smf.mnlogit(formula, data=df_modelo)
-        res = modelo.fit(disp=0)
+        model = sm.MNLogit(y, X_raw)
+        res = model.fit(disp=0)
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
 
-    # R² de McFadden
+    # R² McFadden
     try:
-        modelo_nulo = smf.mnlogit(f"{y_seguro} ~ 1", data=df_modelo).fit(disp=0)
-        r2_mcf = 1 - res.llf / modelo_nulo.llf
+        null_model = sm.MNLogit(y, np.ones((len(y), 1))).fit(disp=0)
+        r2_mcf = 1 - res.llf / null_model.llf
     except:
         r2_mcf = None
 
     # VIF
     vif = []
-    if X_dummies.shape[1] > 1:
-        X_vif = sm.add_constant(X_dummies)
+    if X_raw.shape[1] > 1:
+        X_vif = sm.add_constant(X_raw)
         for i in range(1, X_vif.shape[1]):
             vif.append(variance_inflation_factor(X_vif.values, i))
     else:
         vif.append(1.0)
 
-    # Previsões e acurácia
-    Y_true = df_valid[coluna_y].cat.codes
-    Y_pred = res.predict().values.argmax(axis=1)
-    acuracia = (Y_true == Y_pred).sum() / len(Y_true)
+    # Previsão e acurácia
+    y_pred = res.predict().values.argmax(axis=1)
+    acuracia = (y == y_pred).sum() / len(y)
 
-    # Matriz de confusão (gráfico)
+    # Matriz de confusão
     fig, ax = plt.subplots(figsize=(6, 4))
-    ConfusionMatrixDisplay.from_predictions(Y_true, Y_pred, display_labels=list(Y_labels.values()), cmap="Blues", ax=ax, colorbar=False)
+    ConfusionMatrixDisplay.from_predictions(y, y_pred, display_labels=list(Y_labels.values()), cmap="Blues", ax=ax, colorbar=False)
     ax.set_title("Matriz de Confusão – Regressão Logística Nominal")
     plt.tight_layout()
     buf = BytesIO()
@@ -1003,33 +997,37 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # P-valores por variável base
-    pvalores_raw = res.summary2().tables[1]
-    variaveis_raw = {}
-    for nome, row in pvalores_raw.iterrows():
-        if nome.startswith('Intercept'):
-            continue
-        base = nome.split('[')[0]
-        variaveis_raw.setdefault(base, []).append(row['P>|z|'])
+    # P-valores
+    pvalores_dict = {}
+    variaveis_relevantes = []
+    variaveis_nrelevantes = []
+    for col in X_raw.columns:
+        try:
+            pvals = res.pvalues.xs(col, level=1)
+            min_pval = float(pvals.min())
+            pvalores_dict[col] = min_pval
+            if min_pval < 0.05:
+                variaveis_relevantes.append((col, min_pval))
+            else:
+                variaveis_nrelevantes.append((col, min_pval))
+        except:
+            pvalores_dict[col] = None
+            variaveis_nrelevantes.append((col, None))
 
-    pvalores = {var: min(vals) for var, vals in variaveis_raw.items()}
-    variaveis_relevantes = [(k, v) for k, v in pvalores.items() if v < 0.05]
-    variaveis_nrelevantes = [(k, v) for k, v in pvalores.items() if v >= 0.05]
-
-    # Avaliação dos critérios
+    # Avaliação
     criterios = []
     if r2_mcf is not None:
         status_r2 = "✅ adequado (> 0,2)" if r2_mcf > 0.2 else "❌ baixo (≤ 0,2)"
         criterios.append(f"- R² de McFadden = {r2_mcf:.3f} {status_r2}")
     criterios.append(f"- Percentual de acerto = {acuracia*100:.2f}%")
-    for i, col in enumerate(X_dummies.columns):
-        pval = pvalores.get(col, None)
+    for i, col in enumerate(X_raw.columns):
+        pval = pvalores_dict.get(col)
         pval_txt = f"{pval:.3f}".replace('.', ',') if pval is not None else "N/A"
         status_pval = "✅ significativo (< 0,05)" if pval is not None and pval < 0.05 else "❌ não significativo (≥ 0,05)"
         status_vif = "✅ adequado (< 10)" if vif[i] < 10 else "❌ alto (≥ 10)"
         criterios.append(f"- {col}: p-valor = {pval_txt} {status_pval}, VIF = {vif[i]:.2f} {status_vif}")
 
-    houve_significativas = any(p < 0.05 for p in pvalores.values())
+    houve_significativas = any(p is not None and p < 0.05 for p in pvalores_dict.values())
     validado = r2_mcf is not None and r2_mcf > 0.2 and houve_significativas
     conclusao = "✅ **Modelo validado para fins preditivos.**" if validado else "❌ **Modelo não validado.**"
 
@@ -1038,7 +1036,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         recomendacao += "\n🔹 **Recomendações**\n➡️ O modelo não foi validado. Para melhorá-lo:"
         if variaveis_nrelevantes:
             recomendacao += "\n- Remova variáveis não significativas: " + ", ".join([
-                f"{v[0]} (p = {str(round(v[1], 3)).replace('.', ',')})" for v in variaveis_nrelevantes])
+                f"{v[0]} (p = {str(round(v[1], 3)).replace('.', ',') if v[1] is not None else 'N/A'})" for v in variaveis_nrelevantes])
         recomendacao += "\n- Adicione variáveis que influenciem a variável resposta."
         recomendacao += "\n- Aumente o tamanho amostral."
 
@@ -1071,8 +1069,6 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
-
-
 
 
 
