@@ -943,21 +943,30 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         if col not in df.columns:
             return f"❌ Coluna {col} não encontrada no arquivo.", None
 
-    df_valid = df[[coluna_y] + lista_x].dropna()
+    df_valid = df[[coluna_y] + lista_x].dropna().copy()
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    # Y como categoria
+    # Codifica Y como categoria
     y_categ = df_valid[coluna_y].astype("category")
     Y_labels = dict(enumerate(y_categ.cat.categories))
     y = y_categ.cat.codes
 
-    # X dummies
-    X = pd.get_dummies(df_valid[lista_x], drop_first=True)
-    X.columns = [c.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_') for c in X.columns]
+    # X: separa numéricas e categóricas (gera dummies só para categóricas)
+    X_numericas = df_valid[lista_x].select_dtypes(include=[np.number])
+    X_categoricas = df_valid[lista_x].select_dtypes(exclude=[np.number])
+    if not X_categoricas.empty:
+        X_dummies = pd.get_dummies(X_categoricas, drop_first=True, prefix_sep="_")
+        X = pd.concat([X_numericas.reset_index(drop=True), X_dummies.reset_index(drop=True)], axis=1)
+    else:
+        X = X_numericas.reset_index(drop=True)
+    X = X.astype(float)
+
+    # Limpa colunas de nomes esquisitos
+    X.columns = [str(c).replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_') for c in X.columns]
     X.index = pd.RangeIndex(len(X))
 
-    # Ajusta o modelo MNLogit
+    # Ajusta modelo MNLogit
     try:
         model = sm.MNLogit(y, X)
         res = model.fit(disp=0)
@@ -995,25 +1004,23 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # P-valores (agora funciona)
+    # P-valores
     pvalores_dict = {}
     variaveis_relevantes = []
     variaveis_nrelevantes = []
-    # res.pvalues: DataFrame (n_classes-1 x n_coefs)
     for i, col in enumerate(X.columns):
         try:
-            pvals = res.pvalues.iloc[:, i]  # P-valor da variável para cada classe vs baseline
+            pvals = res.pvalues.iloc[:, i]
             min_pval = float(pvals.min())
             pvalores_dict[col] = min_pval
             if min_pval < 0.05:
                 variaveis_relevantes.append((col, min_pval))
             else:
                 variaveis_nrelevantes.append((col, min_pval))
-        except Exception as e:
+        except Exception:
             pvalores_dict[col] = None
             variaveis_nrelevantes.append((col, None))
 
-    # Avaliação
     criterios = []
     if r2_mcf is not None:
         status_r2 = "✅ adequado (> 0,2)" if r2_mcf > 0.2 else "❌ baixo (≤ 0,2)"
@@ -1072,6 +1079,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
