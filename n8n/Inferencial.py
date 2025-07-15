@@ -1891,34 +1891,30 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
     from scipy import stats
 
     if not coluna_x or not coluna_y:
-        return "❌ O teste 2 Proporções requer as colunas X (grupo) e Y (resultado binário).", None, None
+        return "❌ O teste 2 Proporções requer as colunas X (grupo) e Y (resultado binário).", None
 
     if coluna_x not in df.columns:
-        return f"❌ A coluna {coluna_x} não foi encontrada no arquivo.", None, None
+        return f"❌ A coluna {coluna_x} não foi encontrada no arquivo.", None
 
     if coluna_y not in df.columns:
-        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None, None
+        return f"❌ A coluna {coluna_y} não foi encontrada no arquivo.", None
 
     df_valid = df[[coluna_x, coluna_y]].dropna()
     grupos = df_valid[coluna_x].unique()
     if len(grupos) != 2:
-        return "❌ O teste 2 Proporções requer exatamente 2 grupos distintos na coluna X.", None, None
+        return "❌ O teste 2 Proporções requer exatamente 2 grupos distintos na coluna X.", None
 
-    # identificar os dois possíveis valores de Y
     valores_y = df_valid[coluna_y].unique()
     if len(valores_y) != 2:
-        return "❌ O teste 2 Proporções requer exatamente 2 categorias (ex: aprovado/reprovado) na coluna Y.", None, None
+        return "❌ O teste 2 Proporções requer exatamente 2 categorias (ex: aprovado/reprovado) na coluna Y.", None
 
     nivel_conf = 95.0
     alpha = 1 - (nivel_conf / 100)
     z = stats.norm.ppf(1 - alpha / 2)
 
-    # estrutura para armazenar resultados de cada hipótese (aprovado/reprovado)
     resultados = {}
-    graficos = {}
 
-    for i, valor_interesse in enumerate(valores_y):
-        # contagem por grupo e categoria
+    for valor_interesse in valores_y:
         contagem = {}
         proporcao = {}
         n = {}
@@ -1928,44 +1924,25 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
             contagem[g] = np.sum(sub == valor_interesse)
             proporcao[g] = contagem[g] / n[g] if n[g] > 0 else np.nan
             if n[g] < 5:
-                return f"❌ O grupo {g} requer ao menos 5 valores não nulos.", None, None
+                return f"❌ O grupo {g} requer ao menos 5 valores não nulos.", None
 
         g1, g2 = grupos
         p1, p2 = proporcao[g1], proporcao[g2]
         n1, n2 = n[g1], n[g2]
 
-        # cálculo estatístico - Z test
         p_pool = (contagem[g1] + contagem[g2]) / (n1 + n2)
         se = np.sqrt(p_pool * (1 - p_pool) * (1 / n1 + 1 / n2))
         z_stat = (p1 - p2) / se
         p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
 
-        # IC da diferença
         se_diff = np.sqrt(p1 * (1 - p1) / n1 + p2 * (1 - p2) / n2)
         diff = p1 - p2
         ic_lower = diff - z * se_diff
         ic_upper = diff + z * se_diff
 
-        # gráfico para esse valor de Y
-        plt.style.use('seaborn-v0_8-muted')
-        fig, ax = plt.subplots(figsize=(5, 4))
-        bars = ax.bar([0, 1], [p1, p2], color=['skyblue', 'lightgreen'], width=0.4)
-        yerrs = [
-            [p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)), p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2))],
-            [min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1, min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2],
-        ]
-        ax.errorbar([0, 1], [p1, p2], yerr=yerrs, fmt='o', color='black', capsize=5)
-        ax.set_xticks([0, 1])
-        ax.set_xticklabels([g1, g2])
-        ax.set_ylim(0, 1)
-        ax.set_ylabel(f"Proporção de {valor_interesse}")
-        ax.set_title(f"2 Proporções ({valor_interesse}) - IC {nivel_conf:.1f}%")
-        plt.tight_layout()
-        buf = BytesIO()
-        plt.savefig(buf, format='png')
-        plt.close(fig)
-        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
-        graficos[valor_interesse] = grafico_base64
+        # IC individuais
+        ic_g1 = [p1 - max(0, p1 - z * np.sqrt(p1 * (1 - p1) / n1)), min(1, p1 + z * np.sqrt(p1 * (1 - p1) / n1)) - p1]
+        ic_g2 = [p2 - max(0, p2 - z * np.sqrt(p2 * (1 - p2) / n2)), min(1, p2 + z * np.sqrt(p2 * (1 - p2) / n2)) - p2]
 
         resultados[valor_interesse] = {
             "g1": g1, "g2": g2,
@@ -1976,12 +1953,46 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
             "ic_lower": ic_lower,
             "ic_upper": ic_upper,
             "z_stat": z_stat,
-            "p_valor": p_valor
+            "p_valor": p_valor,
+            "ic_g1": ic_g1,
+            "ic_g2": ic_g2
         }
 
-    # relatório final
     v1, v2 = valores_y
     r1, r2 = resultados[v1], resultados[v2]
+
+    # GRÁFICO ÚNICO COM DOIS SUBPLOTS (APROVADOS E REPROVADOS)
+    plt.style.use('seaborn-v0_8-muted')
+    fig, axes = plt.subplots(2, 1, figsize=(6, 8))
+
+    # Gráfico 1 - v1
+    axes[0].bar([0, 1], [r1['p1'], r1['p2']], color=['skyblue', 'lightgreen'], width=0.4)
+    axes[0].errorbar([0, 1], [r1['p1'], r1['p2']],
+                     yerr=[[r1['ic_g1'][0], r1['ic_g2'][0]], [r1['ic_g1'][1], r1['ic_g2'][1]]],
+                     fmt='o', color='black', capsize=5)
+    axes[0].set_xticks([0, 1])
+    axes[0].set_xticklabels([r1['g1'], r1['g2']])
+    axes[0].set_ylim(0, 1)
+    axes[0].set_ylabel(f"Proporção de {v1}")
+    axes[0].set_title(f"Proporção de {v1} - IC {nivel_conf:.1f}%")
+
+    # Gráfico 2 - v2
+    axes[1].bar([0, 1], [r2['p1'], r2['p2']], color=['skyblue', 'lightgreen'], width=0.4)
+    axes[1].errorbar([0, 1], [r2['p1'], r2['p2']],
+                     yerr=[[r2['ic_g1'][0], r2['ic_g2'][0]], [r2['ic_g1'][1], r2['ic_g2'][1]]],
+                     fmt='o', color='black', capsize=5)
+    axes[1].set_xticks([0, 1])
+    axes[1].set_xticklabels([r2['g1'], r2['g2']])
+    axes[1].set_ylim(0, 1)
+    axes[1].set_ylabel(f"Proporção de {v2}")
+    axes[1].set_title(f"Proporção de {v2} - IC {nivel_conf:.1f}%")
+
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format='png')
+    plt.close(fig)
+    grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
     texto = f"""
 📊 **Análise – Teste de 2 Proporções: {v1} e {v2}**
 
@@ -2029,10 +2040,11 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
 
 ---
 
-> Foram gerados dois gráficos: um para cada hipótese (basta exibir ambos para o aluno comparar os cenários).
+> O gráfico abaixo apresenta, juntos, as proporções de {v1} e {v2} para os dois grupos, com intervalos de confiança.
 
 """
-    return texto.strip(), graficos[v1], graficos[v2]
+    return texto.strip(), grafico_base64
+
 
 
 
