@@ -984,7 +984,8 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         vif.append(1.0)
 
     # Previsão e acurácia
-    y_pred = res.predict().values.argmax(axis=1)
+    y_pred = res.predict().argmax(axis=1)
+
     acuracia = (y == y_pred).sum() / len(y)
 
     # Matriz de confusão
