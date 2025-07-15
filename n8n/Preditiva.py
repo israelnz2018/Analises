@@ -931,8 +931,8 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     import pandas as pd
     import statsmodels.api as sm
     from statsmodels.stats.outliers_influence import variance_inflation_factor
-    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
     import matplotlib.pyplot as plt
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
     from io import BytesIO
     import base64
     import numpy as np
@@ -947,21 +947,19 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    # Codificar Y como categoria e transformar em códigos numéricos
+    # Y como categoria
     y_categ = df_valid[coluna_y].astype("category")
     Y_labels = dict(enumerate(y_categ.cat.categories))
-    df_valid["Y_cod"] = y_categ.cat.codes
+    y = y_categ.cat.codes
 
-    # Preparar X (dummies para variáveis categóricas, mantendo só números)
-    X_raw = df_valid[lista_x].copy()
-    X_raw = pd.get_dummies(X_raw, drop_first=True)
-    X_raw.columns = [c.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_') for c in X_raw.columns]
-    X_raw.index = pd.RangeIndex(len(X_raw))
+    # X dummies
+    X = pd.get_dummies(df_valid[lista_x], drop_first=True)
+    X.columns = [c.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_') for c in X.columns]
+    X.index = pd.RangeIndex(len(X))
 
-    y = df_valid["Y_cod"]
-
+    # Ajusta o modelo MNLogit
     try:
-        model = sm.MNLogit(y, X_raw)
+        model = sm.MNLogit(y, X)
         res = model.fit(disp=0)
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
@@ -975,15 +973,16 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     # VIF
     vif = []
-    if X_raw.shape[1] > 1:
-        X_vif = sm.add_constant(X_raw)
+    if X.shape[1] > 1:
+        X_vif = sm.add_constant(X)
         for i in range(1, X_vif.shape[1]):
             vif.append(variance_inflation_factor(X_vif.values, i))
     else:
         vif.append(1.0)
 
     # Previsão e acurácia
-    y_pred = res.predict().argmax(axis=1)
+    probs = res.predict()
+    y_pred = probs.values.argmax(axis=1) if hasattr(probs, "values") else probs.argmax(axis=1)
     acuracia = (y == y_pred).sum() / len(y)
 
     # Matriz de confusão
@@ -996,27 +995,21 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # P-valores corretos para MNLogit
+    # P-valores (agora funciona)
     pvalores_dict = {}
     variaveis_relevantes = []
     variaveis_nrelevantes = []
-
-    if hasattr(res, "pvalues"):
-        # res.pvalues: DataFrame (categorias x variáveis)
-        for col in X_raw.columns:
-            try:
-                pvals_col = res.pvalues.loc[:, col]
-                min_pval = float(pvals_col.min())
-                pvalores_dict[col] = min_pval
-                if min_pval < 0.05:
-                    variaveis_relevantes.append((col, min_pval))
-                else:
-                    variaveis_nrelevantes.append((col, min_pval))
-            except Exception:
-                pvalores_dict[col] = None
-                variaveis_nrelevantes.append((col, None))
-    else:
-        for col in X_raw.columns:
+    # res.pvalues: DataFrame (n_classes-1 x n_coefs)
+    for i, col in enumerate(X.columns):
+        try:
+            pvals = res.pvalues.iloc[:, i]  # P-valor da variável para cada classe vs baseline
+            min_pval = float(pvals.min())
+            pvalores_dict[col] = min_pval
+            if min_pval < 0.05:
+                variaveis_relevantes.append((col, min_pval))
+            else:
+                variaveis_nrelevantes.append((col, min_pval))
+        except Exception as e:
             pvalores_dict[col] = None
             variaveis_nrelevantes.append((col, None))
 
@@ -1026,12 +1019,16 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         status_r2 = "✅ adequado (> 0,2)" if r2_mcf > 0.2 else "❌ baixo (≤ 0,2)"
         criterios.append(f"- R² de McFadden = {r2_mcf:.3f} {status_r2}")
     criterios.append(f"- Percentual de acerto = {acuracia*100:.2f}%")
-    for i, col in enumerate(X_raw.columns):
+    for i, col in enumerate(X.columns):
         pval = pvalores_dict.get(col)
-        pval_txt = f"{pval:.3f}".replace('.', ',') if pval is not None else "N/A"
-        status_pval = "✅ significativo (< 0,05)" if pval is not None and pval < 0.05 else "❌ não significativo (≥ 0,05)"
+        if pval is None:
+            pval_txt = "p-valor não disponível para esta variável"
+            status_pval = "Modelo não conseguiu estimar significância."
+        else:
+            pval_txt = f"p-valor = {pval:.3f}".replace('.', ',')
+            status_pval = "✅ significativo (< 0,05)" if pval < 0.05 else "❌ não significativo (≥ 0,05)"
         status_vif = "✅ adequado (< 10)" if vif[i] < 10 else "❌ alto (≥ 10)"
-        criterios.append(f"- {col}: p-valor = {pval_txt} {status_pval}, VIF = {vif[i]:.2f} {status_vif}")
+        criterios.append(f"- {col}: {pval_txt}. {status_pval}, VIF = {vif[i]:.2f} {status_vif}")
 
     houve_significativas = any(p is not None and p < 0.05 for p in pvalores_dict.values())
     validado = r2_mcf is not None and r2_mcf > 0.2 and houve_significativas
@@ -1075,6 +1072,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
