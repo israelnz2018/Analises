@@ -1002,10 +1002,9 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     for col in X_final.columns:
         try:
-            if isinstance(res.pvalues.index, pd.MultiIndex):
-                pvals_col = res.pvalues.loc[[i for i in res.pvalues.index if i[1] == col]]
-            else:
-                pvals_col = res.pvalues.filter(like=col, axis=0)
+            pvals_col = res.pvalues.xs(col, level=1, drop_level=False)
+         except KeyError:
+            pvals_col = res.pvalues.filter(like=col, axis=0)
 
             min_pval = float(pvals_col.min())
             pvalores_dict[col] = min_pval
