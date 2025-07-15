@@ -926,6 +926,9 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
 
+
+
+
 def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     import pandas as pd
     import statsmodels.api as sm
@@ -949,22 +952,15 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     # Codificar variável dependente
     Y = df_valid[coluna_y].astype("category")
-    Y_codes = Y.cat.codes
-    Y_codes = pd.Series(Y_codes.values, index=range(len(Y_codes)))  # <- CORREÇÃO CRÍTICA
+    Y_codes = pd.Series(Y.cat.codes.values, name="target", index=pd.RangeIndex(len(df_valid)))
     Y_labels = dict(enumerate(Y.cat.categories))
 
     # Preparar variáveis independentes
     X_raw = df_valid[lista_x].copy()
     X_raw.columns = [str(c) for c in X_raw.columns]
-    X_raw.index = range(len(X_raw))
-
-    # Convertê-las corretamente em variáveis numéricas (dummies para variáveis categóricas)
+    X_raw.index = pd.RangeIndex(len(X_raw))
     X_final = pd.get_dummies(X_raw, drop_first=True)
-
-    # Mapeamento original para nomes amigáveis
     nomes_originais = {c: c for c in X_final.columns}
-
-
 
     # Ajuste do modelo
     try:
@@ -1012,7 +1008,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         try:
             try:
                 pvals_col = res.pvalues.xs(col, level=1, drop_level=False)
-            except KeyError:
+            except:
                 pvals_col = res.pvalues.filter(like=col, axis=0)
 
             min_pval = float(pvals_col.min())
@@ -1086,7 +1082,6 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
-
 
 
 
