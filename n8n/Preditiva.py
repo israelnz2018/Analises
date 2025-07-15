@@ -954,8 +954,9 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     # Preparar variáveis independentes
     X_final = df_valid[lista_x].copy()
-    X_final.columns = [str(c) for c in lista_x]  # nomes seguros
-    nomes_originais = {str(c): c for c in lista_x}
+    X_final.columns = [str(c) for c in X_final.columns]
+    X_final.index = range(len(X_final))  # remove MultiIndex
+    nomes_originais = {str(c): c for c in X_final.columns}
 
     # Ajuste do modelo
     try:
