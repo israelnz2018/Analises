@@ -948,17 +948,22 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    # Variável dependente como categoria
+    # Transformar variável resposta em categoria
     df_valid[coluna_y] = df_valid[coluna_y].astype("category")
     Y_labels = dict(enumerate(df_valid[coluna_y].cat.categories))
 
-    # Criar dummies para variáveis categóricas
+    # Preparar variáveis X com nomes seguros
     X_raw = df_valid[lista_x].copy()
     X_dummies = pd.get_dummies(X_raw, drop_first=True)
-    df_modelo = pd.concat([df_valid[[coluna_y]], X_dummies], axis=1)
+    X_dummies.columns = [c.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_') for c in X_dummies.columns]
 
-    # Fórmula com todas as colunas dummies
-    formula = f"{coluna_y} ~ " + " + ".join(X_dummies.columns)
+    # Renomear coluna Y para evitar espaços/símbolos
+    y_seguro = coluna_y.replace(' ', '_').replace('(', '').replace(')', '').replace('-', '_')
+    df_modelo = pd.concat([df_valid[[coluna_y]], X_dummies], axis=1)
+    df_modelo = df_modelo.rename(columns={coluna_y: y_seguro})
+
+    # Fórmula segura
+    formula = f"{y_seguro} ~ " + " + ".join(X_dummies.columns)
 
     try:
         modelo = smf.mnlogit(formula, data=df_modelo)
@@ -968,7 +973,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     # R² de McFadden
     try:
-        modelo_nulo = smf.mnlogit(f"{coluna_y} ~ 1", data=df_modelo).fit(disp=0)
+        modelo_nulo = smf.mnlogit(f"{y_seguro} ~ 1", data=df_modelo).fit(disp=0)
         r2_mcf = 1 - res.llf / modelo_nulo.llf
     except:
         r2_mcf = None
@@ -983,7 +988,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         vif.append(1.0)
 
     # Previsões e acurácia
-    Y_true = df_modelo[coluna_y].cat.codes
+    Y_true = df_valid[coluna_y].cat.codes
     Y_pred = res.predict().values.argmax(axis=1)
     acuracia = (Y_true == Y_pred).sum() / len(Y_true)
 
@@ -1065,6 +1070,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 """.strip()
 
     return texto, grafico_base64
+
 
 
 
