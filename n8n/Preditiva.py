@@ -953,10 +953,16 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     Y_labels = dict(enumerate(Y.cat.categories))
 
     # Preparar variáveis independentes
-    X_final = df_valid[lista_x].copy()
-    X_final.columns = [str(c) for c in X_final.columns]
-    X_final.index = range(len(X_final))  # remove MultiIndex
-    nomes_originais = {str(c): c for c in X_final.columns}
+    X_raw = df_valid[lista_x].copy()
+    X_raw.columns = [str(c) for c in X_raw.columns]
+    X_raw.index = range(len(X_raw))
+
+    # Convertê-las corretamente em variáveis numéricas (dummies para variáveis categóricas)
+    X_final = pd.get_dummies(X_raw, drop_first=True)
+
+    # Mapeamento original para nomes amigáveis
+    nomes_originais = {c: c for c in X_final.columns}
+
 
     # Ajuste do modelo
     try:
