@@ -1742,6 +1742,12 @@ p-valor = {p_valor:.2f}
 
 
 def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_conf=None):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from scipy import stats
+
     if not coluna_y:
         return "❌ O intervalo de confiança da variância requer exatamente 1 coluna Y.", None
 
@@ -1765,14 +1771,19 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
     alpha = 1 - (nivel_conf / 100)
     n = len(y)
     s2 = np.var(y, ddof=1)
+    s = np.sqrt(s2)
 
+    # Intervalo de confiança da variância
     chi2_lower = stats.chi2.ppf(alpha / 2, df=n-1)
     chi2_upper = stats.chi2.ppf(1 - alpha / 2, df=n-1)
+    ic_lower_var = (n - 1) * s2 / chi2_upper
+    ic_upper_var = (n - 1) * s2 / chi2_lower
 
-    ic_lower = (n - 1) * s2 / chi2_upper
-    ic_upper = (n - 1) * s2 / chi2_lower
+    # Intervalo de confiança do desvio padrão
+    ic_lower_std = np.sqrt(ic_lower_var)
+    ic_upper_std = np.sqrt(ic_upper_var)
 
-    # normalidade
+    # Testes de normalidade
     ad = stats.anderson(y)
     sw_stat, sw_p = stats.shapiro(y)
     dp_stat, dp_p = stats.normaltest(y)
@@ -1790,16 +1801,20 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
 
     recomendacao = ""
     if not algum_normal:
-        recomendacao = "⚠️ Os dados não são normais. O intervalo de confiança da variância pode não ser confiável."
+        recomendacao = "⚠️ Os dados não são normais. Os intervalos podem não ser confiáveis."
 
     aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 2))
-    ax.bar(0, s2, color='skyblue', width=0.4, label='Variância amostra')
-    ax.errorbar(0, s2, yerr=[[s2 - ic_lower], [ic_upper - s2]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
-    ax.set_xticks([0])
-    ax.set_xticklabels([coluna_y])
-    ax.set_ylabel("Variância")
-    ax.set_title(f"Intervalo de Confiança da Variância ({nivel_conf:.1f}%)")
+    fig, ax = plt.subplots(figsize=(7, 2.5))
+    # Variância
+    ax.bar(0, s2, color='skyblue', width=0.4, label='Variância amostral')
+    ax.errorbar(0, s2, yerr=[[s2 - ic_lower_var], [ic_upper_var - s2]], fmt='o', color='black', capsize=5, label=f'IC Variância ({nivel_conf:.1f}%)')
+    # Desvio padrão
+    ax.bar(1, s, color='orange', width=0.4, label='Desvio padrão amostral')
+    ax.errorbar(1, s, yerr=[[s - ic_lower_std], [ic_upper_std - s]], fmt='o', color='black', capsize=5, label=f'IC Desvio Padrão ({nivel_conf:.1f}%)')
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(['Variância', 'Desvio padrão'])
+    ax.set_ylabel("Valor")
+    ax.set_title(f"Intervalo de Confiança ({nivel_conf:.1f}%) - Variância e Desvio Padrão")
     ax.legend()
     plt.tight_layout()
 
@@ -1809,26 +1824,32 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-📊 **Análise – Intervalo de Confiança da Variância**
+📊 **Análise – Intervalo de Confiança da Variância e do Desvio Padrão**
 
-🔹 **Descrição:**
-Coluna = {coluna_y}
-N = {n}
-Variância amostral = {s2:.2f}
+🔹 **Descrição:**  
+Coluna = **{coluna_y}**  
+N = **{n}**  
+Variância amostral = **{s2:.2f}**  
+Desvio padrão amostral = **{s:.2f}**
 
-🔎 **Intervalo de Confiança ({nivel_conf:.1f}%):**
-[{ic_lower:.2f}, {ic_upper:.2f}]
 
-🔎 **Testes de Normalidade:**
+🔎 **Intervalos de Confiança ({nivel_conf:.1f}%):**  
+- **Variância:** [{ic_lower_var:.2f}, {ic_upper_var:.2f}]  
+- **Desvio padrão:** [{ic_lower_std:.2f}, {ic_upper_std:.2f}]
+
+
+🔎 **Testes de Normalidade:**  
 {coluna_y}: {"✅ Os dados parecem ser normais." if algum_normal else "❌ Os dados não são normais."}
 
-🔎 **Conclusão:**
-O intervalo de confiança da variância foi calculado assumindo normalidade dos dados.
+
+🔎 **Conclusão:**  
+O intervalo de confiança da variância e do desvio padrão foi calculado assumindo normalidade dos dados.
 
 {recomendacao}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
