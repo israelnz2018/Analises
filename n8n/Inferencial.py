@@ -2197,9 +2197,17 @@ def analise_k_proporcoes(df: pd.DataFrame, lista_y):
 
 
 
-
-
 def analise_associacao(df: pd.DataFrame, coluna_y, coluna_x):
+    import pandas as pd
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import base64
+    from io import BytesIO
+    from scipy import stats
+
+    # Remove linhas totalmente vazias (todas as colunas NaN)
+    df = df.dropna(axis=0, how='all')
+
     # Validação inicial
     if not coluna_y or not coluna_x:
         return "❌ A análise de associação requer exatamente 1 coluna Y e 1 coluna X.", None
@@ -2207,8 +2215,12 @@ def analise_associacao(df: pd.DataFrame, coluna_y, coluna_x):
     if coluna_y not in df.columns or coluna_x not in df.columns:
         return "❌ As colunas informadas não foram encontradas no arquivo.", None
 
-    # Remoção de nulos
-    df_valid = df[[coluna_y, coluna_x]].dropna()
+    # Limpa espaços extras dos valores nas colunas de interesse
+    df[coluna_x] = df[coluna_x].astype(str).str.strip()
+    df[coluna_y] = df[coluna_y].astype(str).str.strip()
+
+    # Remove linhas com pelo menos uma coluna principal vazia (Y ou X)
+    df_valid = df[[coluna_x, coluna_y]].dropna()
     if df_valid.empty:
         return "❌ Não há dados suficientes após remoção de valores nulos.", None
 
@@ -2223,7 +2235,7 @@ def analise_associacao(df: pd.DataFrame, coluna_y, coluna_x):
     stat, p_valor, dof, expected = stats.chi2_contingency(table.values)
 
     # Gráfico - barras empilhadas por grupo X
-    aplicar_estilo_minitab()
+    plt.style.use('seaborn-v0_8-muted')
     ax = table.plot(kind="bar", stacked=True, figsize=(8,4), colormap="tab20")
     ax.set_ylabel("Frequência")
     ax.set_title("Distribuição de categorias Y por grupos X")
@@ -2258,8 +2270,8 @@ def analise_associacao(df: pd.DataFrame, coluna_y, coluna_x):
 🔎 **Conclusão:**
 {"✅ Com 95% de confiança, rejeitamos H0. Existe associação significativa entre as variáveis." if p_valor < 0.05 else "⚠️ Com 95% de confiança, não rejeitamos H0. Não há evidência significativa de associação entre as variáveis."}
 """
-
     return texto.strip(), grafico_base64
+
 
 def analise_quiquadrado_ajuste(df: pd.DataFrame, coluna_y, coluna_x):
     # Validação inicial
