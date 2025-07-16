@@ -930,46 +930,97 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     import pandas as pd
     import numpy as np
     import statsmodels.api as sm
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+    import matplotlib.pyplot as plt
+    from io import BytesIO
+    import base64
 
+    # Checagem básica
     if not coluna_y or not lista_x:
         return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
 
     try:
+        # Limpeza igual à RLO
         df = df[[coluna_y] + lista_x].copy()
         df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
         df.dropna(inplace=True)
-        debug_txt = ""
-        debug_txt += f"shape df depois dropna: {df.shape}\n"
+
+        # Converte variáveis X para numérico/código SE não forem numéricas
         for coluna in lista_x:
-            debug_txt += f"Coluna X {coluna}: dtype={df[coluna].dtype}, exemplo={df[coluna].iloc[:3].to_list()}\n"
             if not pd.api.types.is_numeric_dtype(df[coluna]):
                 df[coluna] = pd.Categorical(df[coluna]).codes
         df.dropna(inplace=True)
         if df.empty:
             return "❌ A análise falhou: após limpeza, os dados estão vazios.", None
 
+        # Y como código
         categorias_unicas = sorted(df[coluna_y].dropna().unique().tolist())
         df['Y_cod'] = pd.Categorical(df[coluna_y], categories=categorias_unicas).codes
         y = df['Y_cod']
         y_labels = categorias_unicas
         X = df[lista_x]
 
-        debug_txt += f"Y labels: {y_labels}\n"
-        debug_txt += f"Y cod: {y.iloc[:10].to_list()}\n"
-        debug_txt += f"X head:\n{X.head()}\n"
+        # Ajusta modelo nominal
+        modelo = sm.MNLogit(y, X)
+        resultado = modelo.fit(method='newton', disp=0)
 
+        coef = resultado.params
+        pvalores = resultado.pvalues
+        odds_ratios = np.exp(coef)
+
+        # Relatório p-valores por categoria
+        pvalores_txt = ""
+        for idx, categoria in enumerate(y_labels[1:]):
+            pvalores_txt += f"\nClasse '{categoria}' vs referência '{y_labels[0]}':"
+            for xname in X.columns:
+                pval = pvalores.iloc[idx][xname]
+                coefval = coef.iloc[idx][xname]
+                oratio = odds_ratios.iloc[idx][xname]
+                pvalores_txt += f"\n- {xname}: coef = {coefval:.3f}, OR = {oratio:.2f}, p = {pval:.4f} {'✅' if pval < 0.05 else '❌'}"
+            pvalores_txt += "\n"
+
+        # Previsão/acurácia
+        y_pred = resultado.predict(X).idxmax(axis=1)
+        acuracia = (y == y_pred).mean() * 100
+
+        # Matriz de confusão
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ConfusionMatrixDisplay.from_predictions(y, y_pred, display_labels=y_labels, cmap="Blues", ax=ax, colorbar=False)
+        ax.set_title("Matriz de Confusão – Regressão Logística Nominal")
+        plt.tight_layout()
+        buf = BytesIO()
+        plt.savefig(buf, format='png')
+        plt.close()
+        grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
+        # R² McFadden
         try:
-            modelo = sm.MNLogit(y, X)
-            resultado = modelo.fit(method='newton', disp=0)
-            debug_txt += "Modelo ajustado OK!\n"
-        except Exception as e:
-            debug_txt += f"Erro no ajuste do modelo: {str(e)}\n"
-            return debug_txt, None
+            null_model = sm.MNLogit(y, np.ones((len(y), 1))).fit(disp=0)
+            r2_mcf = 1 - resultado.llf / null_model.llf
+        except:
+            r2_mcf = None
 
-        return "OK", None
+        texto = f"""
+📊 **Análise – Regressão Logística Nominal**
+
+🔹 **Hipóteses do Modelo**
+- **H₀:** As variáveis independentes não afetam a chance de pertencer às diferentes categorias de {coluna_y}.
+- **H₁:** Pelo menos uma variável X influencia a chance de pertencer a alguma categoria de {coluna_y}.
+
+🔹 **Resumo do Modelo**
+- **Variável dependente (Y):** {coluna_y}
+- **Variáveis preditoras (X):** {', '.join(lista_x)}
+- **Categorias:** {', '.join(str(c) for c in y_labels)}
+- **Acurácia:** {acuracia:.2f}%
+- **R² de McFadden:** {r2_mcf:.3f} {('(aceitável)' if r2_mcf and r2_mcf > 0.2 else '(baixo)')}
+
+📌 **Coeficientes e Odds Ratios por categoria:**{pvalores_txt}
+"""
+        return texto.strip(), grafico_base64
 
     except Exception as e:
-        return f"Erro geral: {str(e)}", None
+        return f"❌ Erro ao ajustar o modelo: {str(e)}", None
+
 
 
 
