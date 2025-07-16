@@ -1202,7 +1202,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     from sklearn import tree as sktree
 
     fig, ax = plt.subplots(figsize=(18, 10))
-    sktree.plot_tree(
+    plot = sktree.plot_tree(
         model,
         feature_names=feature_names,
         class_names=class_names if tipo_modelo == "classificação" else None,
@@ -1214,13 +1214,18 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         label=None,
     )
 
-    # Ajusta cada nó folha: quebra textos muito longos e personaliza layout do box
+    total_amostras = len(df_folha)
+
     for idx, t in enumerate(ax.texts):
+        # Se for folha (nó final)
         if idx in folhas_info:
             folha = folhas_info[idx]
+            regra = folha['regras']
+            if len(regra) > 30:
+                regra = "\n".join(textwrap.wrap(regra, 30))
             t.set_text(
-                f"{folha['regras']}\n"
-                f"Decisão = {folha['classe']}\n"
+                f"Regra: {regra}\n"
+                f"Decisão: {folha['classe']}\n"
                 f"{folha['perc']:.0f}% | n = {folha['n']}"
             )
             t.set_fontsize(13)
@@ -1228,6 +1233,29 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
             t.set_color('#181818')
             t.set_ha('center')
             t.set_va('center')
+        else:
+            # Nó interno: ajusta texto didático
+            box_txt = t.get_text().split('\n')
+            # Primeira linha é a regra, as outras são irrelevantes para aluno
+            regra = box_txt[0]
+            if len(regra) > 30:
+                regra = "\n".join(textwrap.wrap(regra, 30))
+            # Tenta achar número de amostras (samples)
+            samples = ""
+            for x in box_txt:
+                if x.isdigit():
+                    samples = x
+            amostras = int(samples) if samples.isdigit() else 0
+            pct = f"{(amostras/total_amostras*100):.0f}%" if total_amostras > 0 else ""
+            maioria = box_txt[-1] if len(box_txt) > 0 else ""
+            t.set_text(
+                f"Regra: {regra}\n"
+                f"Samples: {amostras}\n"
+                f"% do total: {pct}\n"
+                f"Maioria: {maioria}"
+            )
+            t.set_fontsize(12)
+            t.set_color('#333')
 
     ax.set_title("Árvore de Decisão — regras resumidas, decisão e percentual nas folhas", fontsize=17, fontweight='bold', color='#222')
     plt.tight_layout(rect=[0, 0, 1, 0.97])
@@ -1266,6 +1294,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
