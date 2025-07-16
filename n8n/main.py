@@ -101,7 +101,7 @@ CONFIG_ANALISES = {
     "Bartlett": ["df", "lista_y", "subgrupo", "field_conf"],
     "Brown-Forsythe": ["df", "lista_y", "subgrupo", "field_conf"],
     "1 Intervalo de Confianca Variancia": ["df", "coluna_y", "field_conf"],
-    "1 Proporcao": ["df", "coluna_x", "field_conf"],
+    "1 Proporcao": ["df", "coluna_x", "field", "field_conf"],
     "2 Proporções": ["df", "coluna_x", "coluna_y"],
     "K Proporcoes": ["df", "lista_y"],
     "Qui-quadrado de Associação": ["df", "coluna_y", "coluna_x"],
