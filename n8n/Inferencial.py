@@ -1884,7 +1884,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None)
         else:
             conclusao = f"⚠️ Com {nivel_conf:.1f}% de confiança, não rejeitamos H0. Proporção observada ({p_hat:.2f}) não difere significativamente da referência ({p0:.2f})."
         resultados.append(f"""
-🔹 **Categoria: {categoria}**
+🔹 **Teste de Hipótese para a categoria: {categoria}**
 - N = {n}
 - Sucessos = {sucesso}
 - Proporção amostral = {p_hat:.2f}
@@ -1937,10 +1937,12 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None)
 
     texto = f"""
 📊 **Análise – Teste de 1 Proporção**
+
 {''.join(resultados)}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
