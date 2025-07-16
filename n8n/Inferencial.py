@@ -1831,6 +1831,13 @@ O intervalo de confiança da variância e do desvio padrão foi calculado assumi
 
 
 def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from scipy import stats
+    from io import BytesIO
+    import base64
+    from suporte import aplicar_estilo_minitab
+
     if not coluna_x:
         return "❌ O teste 1 Proporção requer exatamente 1 coluna X.", None
 
@@ -1855,33 +1862,27 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None)
     alpha = 1 - (nivel_conf / 100)
 
     categorias = x.value_counts()
+    if len(categorias) < 2:
+        return "❌ É necessário pelo menos 2 categorias para comparação.", None
+
+    cat_names = categorias.index.tolist()
+    props = (categorias / n).tolist()
+
+    z = stats.norm.ppf(1 - alpha / 2)
+
     resultados = []
-
-    # identifica a categoria com maior proporção
-    categoria_top = categorias.idxmax()
-    sucesso_top = categorias.max()
-    p_hat_top = sucesso_top / n
-
-    z = stats.norm.ppf(1 - alpha / 2)  # define z fora do loop para consistência
-
-    for categoria, sucesso in categorias.items():
+    for idx, (categoria, sucesso) in enumerate(categorias.items()):
         p_hat = sucesso / n
-
-        # intervalo de confiança
         se = np.sqrt(p_hat * (1 - p_hat) / n)
         ic_lower = max(0, p_hat - z * se)
         ic_upper = min(1, p_hat + z * se)
-
-        # teste de proporção
         se_h0 = np.sqrt(p0 * (1 - p0) / n)
         z_stat = (p_hat - p0) / se_h0
         p_valor = 2 * (1 - stats.norm.cdf(abs(z_stat)))
-
         if p_valor < alpha:
             conclusao = f"✅ Com {nivel_conf:.1f}% de confiança, rejeitamos H0. Proporção observada ({p_hat:.2f}) é estatisticamente diferente da referência ({p0:.2f})."
         else:
             conclusao = f"⚠️ Com {nivel_conf:.1f}% de confiança, não rejeitamos H0. Proporção observada ({p_hat:.2f}) não difere significativamente da referência ({p0:.2f})."
-
         resultados.append(f"""
 🔹 **Categoria: {categoria}**
 - N = {n}
@@ -1895,22 +1896,38 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None)
 {conclusao}
 """)
 
-    # gera gráfico apenas para a categoria com maior proporção
-    se_top = np.sqrt(p_hat_top * (1 - p_hat_top) / n)
-    ic_lower_top = max(0, p_hat_top - z * se_top)
-    ic_upper_top = min(1, p_hat_top + z * se_top)
-
+    # Geração dos dois gráficos juntos (um em cima do outro)
     aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.bar([0], [p_hat_top], color='skyblue', width=0.4, label=f'Proporção {categoria_top}')
-    ax.errorbar([0], [p_hat_top], yerr=[[p_hat_top - ic_lower_top], [ic_upper_top - p_hat_top]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
-    ax.axhline(p0, color='red', linestyle='--', label=f'Referência: {p0:.2f}')
-    ax.set_xticks([0])
-    ax.set_xticklabels([categoria_top])
-    ax.set_ylim(0, max(ic_upper_top * 1.2, p_hat_top * 1.2, p0 * 1.2))
-    ax.set_ylabel('Proporção')
-    ax.legend()
-    ax.set_title(f'Proporção {categoria_top} com IC {nivel_conf:.1f}%')
+    fig, axs = plt.subplots(2, 1, figsize=(7, 8))
+
+    for i, categoria in enumerate(cat_names):
+        p_hat = props[i]
+        se = np.sqrt(p_hat * (1 - p_hat) / n)
+        ic_lower = max(0, p_hat - z * se)
+        ic_upper = min(1, p_hat + z * se)
+
+        # barra principal
+        axs[i].bar([0], [p_hat], color='skyblue', width=0.4, label=f'Proporção {categoria}')
+        # intervalo de confiança
+        axs[i].errorbar([0], [p_hat], yerr=[[p_hat - ic_lower], [ic_upper - p_hat]], fmt='o', color='black', capsize=5, label=f'IC {nivel_conf:.1f}%')
+        # linha de referência
+        axs[i].axhline(p0, color='red', linestyle='--', label=f'Referência: {p0:.2f}')
+        axs[i].set_xticks([0])
+        axs[i].set_xticklabels([categoria])
+        axs[i].set_ylim(0, max(1, ic_upper * 1.2, p_hat * 1.2, p0 * 1.2))
+
+        # labels acima da barra
+        axs[i].text(0, p_hat + 0.05, f"{p_hat:.2f}", ha='center', va='bottom', fontsize=12, fontweight='bold')
+        axs[i].text(0, p0 + 0.02, f"Ref.: {p0:.2f}", ha='center', va='bottom', fontsize=11, color='red')
+
+        axs[i].set_ylabel('Proporção')
+        axs[i].set_title(f'Proporção {categoria} com IC {nivel_conf:.1f}%')
+
+        # remover legendas duplicadas
+        handles, labels_leg = axs[i].get_legend_handles_labels()
+        by_label = dict(zip(labels_leg, handles))
+        axs[i].legend(by_label.values(), by_label.keys(), loc='upper right')
+
     plt.tight_layout()
 
     buf = BytesIO()
@@ -1924,6 +1941,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None)
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
