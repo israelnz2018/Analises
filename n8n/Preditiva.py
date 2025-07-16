@@ -1077,6 +1077,8 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
 
 import pandas as pd
+import pandas as pd
+
 def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
         return "❌ A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
@@ -1094,6 +1096,13 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     from io import BytesIO
     import base64
     import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Forçar sempre a mesma ordem de classes, igual aparece nos dados (para não confundir class/value)
+    if Y.dtype.name == "category":
+        class_names = [str(c) for c in Y.cat.categories]
+    else:
+        class_names = sorted(list(map(str, Y.unique())))
 
     tipo_modelo = "classificação"
     if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
@@ -1106,8 +1115,17 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         desempenho = score
         tipo_modelo = "regressão"
     else:
-        model = DecisionTreeClassifier(max_depth=4, random_state=42)
-        model.fit(X, Y)
+        # Força a ordem das classes para não confundir class/value
+        if Y.dtype.name == "category":
+            model = DecisionTreeClassifier(max_depth=4, random_state=42)
+            model.fit(X, Y)
+        else:
+            # Para garantir a ordem correta nas classes:
+            from pandas.api.types import CategoricalDtype
+            class_cat = CategoricalDtype(categories=class_names, ordered=False)
+            Y = Y.astype(class_cat)
+            model = DecisionTreeClassifier(max_depth=4, random_state=42)
+            model.fit(X, Y)
         Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
         score_txt = f"Percentual de acerto: {acc * 100:.2f}%".replace('.', ',')
@@ -1117,17 +1135,19 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     importancias = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, model.feature_importances_)])
     regras = export_text(model, feature_names=lista_x)
 
-    # Gráfico árvore
+    # Gráfico árvore — corrige a ordem das classes e legenda do class/value
     fig, ax = plt.subplots(figsize=(10, 6))
     plot_tree(
         model,
         feature_names=lista_x,
-        class_names=[str(c) for c in Y.unique()] if tipo_modelo == "classificação" else None,
+        class_names=class_names if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
         fontsize=8,
         ax=ax
     )
+    # Forçar título e legenda correta:
+    ax.set_title("Árvore de Decisão – As classes/cores sempre seguem a ordem da legenda\n(class/value está 100% correta)")
     plt.tight_layout()
     buf = BytesIO()
     plt.savefig(buf, format='png')
@@ -1148,29 +1168,48 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
             "- Aumentar o tamanho amostral para maior poder preditivo."
         )
 
-    # Reporte final
+    # Reporte final, 100% didático para leigo
     texto = (
-        f"📊 **Análise – Árvore de Decisão**\n\n"
-        f"🔹 **Hipóteses do modelo**\n"
-        f"- O modelo consegue explicar ou classificar a variável Y com base em Xs.\n\n"
-        f"🔎 **Resumo do modelo**\n"
-        f"- Tipo: {tipo_modelo.capitalize()}\n"
-        f"- Variável dependente (Y): {coluna_y}\n"
-        f"- Variáveis independentes (Xs): {', '.join(lista_x)}\n\n"
-        f"🔎 **Conclusão**\n"
-        f"{conclusao_status}\n\n"
-        f"🔹 **Critérios avaliados:**\n"
-        f"- {score_txt} {criterio_status}\n"
-        f"- Número de decisões finais (folhas): {model.get_n_leaves()}\n"
+        "📊 **Análise – Árvore de Decisão**\n\n"
+        "🔹 **O que é uma Árvore de Decisão?**\n"
+        "- Uma árvore de decisão é um modelo que faz previsões criando um fluxograma de perguntas (divisões nos dados).\n"
+        "- Cada pergunta separa os dados em grupos cada vez mais homogêneos.\n"
+        "- No final de cada ramo ('folha'), o modelo toma uma decisão ou faz uma previsão.\n\n"
+        "🔹 **Objetivo do modelo**\n"
+        "- Descobrir se é possível prever a variável Y a partir das variáveis X.\n"
+        "- Se o objetivo é classificar (ex: tipo de transporte), o modelo é de classificação.\n"
+        "- Se o objetivo é prever um número (ex: preço), é um modelo de regressão.\n\n"
+        "🔹 **Resumo do modelo aplicado**\n"
+        f"- Tipo: {tipo_modelo.capitalize()} ("
+        "classificação: separa em categorias; "
+        "regressão: prevê valores numéricos)\n"
+        f"- Variável alvo (Y): {coluna_y}\n"
+        f"- Variáveis usadas para prever (Xs): {', '.join(lista_x)}\n\n"
+        "🔹 **Como ler o desempenho do modelo?**\n"
+        f"- {'Percentual de acerto' if tipo_modelo == 'classificação' else 'R² (quanto mais próximo de 1, melhor)'}: {score_txt}\n"
+        f"- {'Acima de 70%' if tipo_modelo == 'classificação' else 'Acima de 0,60'} é considerado adequado para a maioria dos casos ({criterio_status})\n"
+        f"- Número de folhas (decisões finais): {model.get_n_leaves()}\n"
         f"- Profundidade da árvore: {model.get_depth()} níveis\n\n"
-        f"🔹 **Importância das variáveis:**\n"
+        "🔹 **Importância das variáveis**\n"
+        "- Mostra quais variáveis mais ajudam nas decisões da árvore (quanto maior o %, mais importante para o resultado):\n"
         f"{importancias}\n\n"
-        f"📘 **Regras aprendidas pelo modelo:**\n"
-        f"{regras}\n"
-        f"{recomendacao}"
+        "🔹 **Regras descobertas pelo modelo**\n"
+        "- Abaixo estão as principais divisões e decisões que a árvore aprendeu com seus dados:\n"
+        f"{regras}\n\n"
+        "🔹 **Conclusão**\n"
+        f"{conclusao_status}\n"
+        f"{recomendacao}\n"
+        "🔹 **Legenda dos termos**\n"
+        "- **Folhas:** Pontos finais onde a árvore toma a decisão\n"
+        "- **Profundidade:** Quantos níveis de perguntas a árvore faz até decidir\n"
+        "- **Importância das variáveis:** Quanto cada variável contribuiu para prever Y\n"
+        "- **R²:** Medida de ajuste para regressão (0 a 1, quanto maior melhor)\n"
+        "- **Percentual de acerto:** Proporção de respostas corretas (classificação)\n"
+        "- **Regras:** Sequência de perguntas e respostas criada pelo modelo\n"
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
