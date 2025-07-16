@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware    
 import traceback   
 import os
-from fastapi import Form
+from fastapi import Form 
 import base64  
 import io
 import matplotlib.pyplot as plt
