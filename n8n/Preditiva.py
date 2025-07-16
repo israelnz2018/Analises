@@ -1090,15 +1090,14 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     Y = df_valid[coluna_y]
     X = df_valid[lista_x]
 
-    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, export_text, plot_tree
+    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, _tree
     from sklearn.metrics import accuracy_score, r2_score
     from io import BytesIO
     import base64
     import matplotlib.pyplot as plt
     import numpy as np
-    from collections import Counter
 
-    # Força ordem correta das classes (para não errar nos boxes do gráfico)
+    # Forçar sempre a mesma ordem de classes
     if Y.dtype.name == "category":
         class_names = [str(c) for c in Y.cat.categories]
     else:
@@ -1115,15 +1114,11 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         desempenho = score
         tipo_modelo = "regressão"
     else:
-        if Y.dtype.name == "category":
-            model = DecisionTreeClassifier(max_depth=4, random_state=42)
-            model.fit(X, Y)
-        else:
-            from pandas.api.types import CategoricalDtype
-            class_cat = CategoricalDtype(categories=class_names, ordered=False)
-            Y = Y.astype(class_cat)
-            model = DecisionTreeClassifier(max_depth=4, random_state=42)
-            model.fit(X, Y)
+        from pandas.api.types import CategoricalDtype
+        class_cat = CategoricalDtype(categories=class_names, ordered=False)
+        Y = Y.astype(class_cat)
+        model = DecisionTreeClassifier(max_depth=4, random_state=42)
+        model.fit(X, Y)
         Y_pred = model.predict(X)
         acc = accuracy_score(Y, Y_pred)
         score_txt = f"Percentual de acerto: {acc * 100:.2f}%".replace('.', ',')
@@ -1132,40 +1127,116 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
 
     importancias = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, model.feature_importances_)])
 
-    # Gráfico árvore — corrigido
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plot_tree(
+    # ====== NOVO: Pega as regras para cada folha ======
+    tree_ = model.tree_
+    feature_names = lista_x
+    n_leaves = model.get_n_leaves()
+
+    def get_rules_for_leaves(tree, feature_names):
+        """ Retorna dict: {nó folha: lista de condições (em português)} """
+        leaf_rules = {}
+        path = []
+        def recurse(node, conds):
+            if tree.feature[node] != _tree.TREE_UNDEFINED:
+                nome_feat = feature_names[tree.feature[node]]
+                limite = tree.threshold[node]
+                # Esquerda
+                cond_esq = conds + [f"{nome_feat} ≤ {limite:.2f}"]
+                recurse(tree.children_left[node], cond_esq)
+                # Direita
+                cond_dir = conds + [f"{nome_feat} > {limite:.2f}"]
+                recurse(tree.children_right[node], cond_dir)
+            else:
+                # Nó folha
+                leaf_rules[node] = conds
+        recurse(0, [])
+        return leaf_rules
+
+    leaf_rules_dict = get_rules_for_leaves(tree_, feature_names)
+    leaf_ids = model.apply(X)
+    df_folha = pd.DataFrame({
+        "folha": leaf_ids,
+        "classe": Y.values,
+        "index": X.index
+    })
+    # Adiciona valores das features para média (se quiser)
+    for feat in feature_names:
+        df_folha[feat] = X[feat].values
+
+    # Gera info das folhas: para o report e para o gráfico
+    folhas_info = {}
+    for folha, regras in leaf_rules_dict.items():
+        amostras = df_folha[df_folha.folha == folha]
+        n = len(amostras)
+        if n == 0:
+            continue
+        mais_classe = amostras['classe'].value_counts().idxmax()
+        perc = 100 * amostras['classe'].value_counts(normalize=True).max()
+        # Regra em português para print
+        regra_str = " e ".join(regras) if regras else "(sem divisão)"
+        folhas_info[folha] = {
+            "regras": regra_str,
+            "n": n,
+            "classe": mais_classe,
+            "perc": perc
+        }
+
+    # ========= GRÁFICO COM REGRAS NAS FOLHAS ==========
+    from sklearn import tree as sktree
+
+    # Criar labels especiais para folhas
+    node_labels = {}
+    for node_id in range(tree_.node_count):
+        if node_id in folhas_info:
+            f = folhas_info[node_id]
+            label = (
+                f"Regras:\n{f['regras']}\n"
+                f"n = {f['n']}\n"
+                f"Classe = {f['classe']} ({f['perc']:.0f}%)"
+            )
+            node_labels[node_id] = label
+        else:
+            node_labels[node_id] = None  # deixa None para não mudar splits internos
+
+    # Função para customizar texto de cada nó
+    def node_labeler(node_id):
+        return node_labels.get(node_id, None)
+
+    fig, ax = plt.subplots(figsize=(12, 7))
+    sktree.plot_tree(
         model,
-        feature_names=lista_x,
+        feature_names=feature_names,
         class_names=class_names if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
         fontsize=8,
-        ax=ax
+        ax=ax,
+        node_ids=True,
+        proportion=False,
+        label='none'
     )
-    ax.set_title("Árvore de Decisão (as classes/cores seguem a ordem da legenda)")
+    # Substitui o texto das folhas pelos nossos labels especiais
+    # OBS: O matplotlib não permite override direto via plot_tree, então fazemos via artista de texto
+    # SÓ altera texto em folhas
+    for i, t in enumerate(ax.texts):
+        if i in folhas_info:
+            t.set_text(node_labels[i])
+
+    ax.set_title("Árvore de Decisão (condições, classe e percentual nas folhas)")
     plt.tight_layout()
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # --------- Reporte prático ---------
-    # Calcula frases do tipo: para Renda ≈ X e Distancia ≈ Y, Z% preferem Classe
-    leaf_ids = model.apply(X)
-    leaf_counts = Counter(leaf_ids)
-    leaf_df = pd.DataFrame({'id_folha': leaf_ids, 'classe': Y, 'renda': X[lista_x[0]], 'distancia': X[lista_x[1]]})
-    resultados = []
-    for folha, count in leaf_counts.items():
-        dados_folha = leaf_df[leaf_df.id_folha == folha]
-        classe_mais = dados_folha['classe'].value_counts().idxmax()
-        perc = 100 * dados_folha['classe'].value_counts(normalize=True).max()
-        media_renda = dados_folha['renda'].mean()
-        media_distancia = dados_folha['distancia'].mean()
-        resultados.append(
-            f"- Para Renda ≈ {media_renda:.0f} e Distancia ≈ {media_distancia:.0f}: {perc:.0f}% preferem '{classe_mais}'"
+    # ===== REPORT ======
+    # Reporte prático e focado: regra + percentual + classe + n
+    linhas_report = []
+    for folha, info in folhas_info.items():
+        linhas_report.append(
+            f"- Se {info['regras']}: {info['perc']:.0f}% chance de ser '{info['classe']}' (n={info['n']})"
         )
-    regras_praticas = "\n".join(resultados)
+    regras_praticas = "\n".join(linhas_report)
 
     # Recomenda manter/remover variáveis com baixa importância
     variaveis_ruins = [nome for nome, imp in zip(lista_x, model.feature_importances_) if imp < 0.05]
@@ -1189,6 +1260,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
