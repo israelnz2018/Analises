@@ -1075,7 +1075,6 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
 
 
-
 import pandas as pd
 
 def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
@@ -1097,7 +1096,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    # Forçar ordem das classes sempre igual para legenda
+    # Força sempre a mesma ordem das classes para a legenda
     if Y.dtype.name == "category":
         class_names = [str(c) for c in Y.cat.categories]
     else:
@@ -1127,13 +1126,11 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
 
     importancias = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, model.feature_importances_)])
 
-    # ==== NOVO: REGRA RESUMIDA E INTERVALO ====
+    # ==== REGRA RESUMIDA E INTERVALO ====
     tree_ = model.tree_
     feature_names = lista_x
 
-    # Função para resumir condições em intervalos
     def resume_regras(condicoes):
-        # Ex: ["Renda ≤ 13500.00", "Renda > 9500.00"] → "Renda entre 9500.01 e 13500.00"
         var_lims = {}
         for cond in condicoes:
             if "≤" in cond:
@@ -1149,7 +1146,6 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
                 lim = float(lim.strip())
                 if var not in var_lims:
                     var_lims[var] = {"min": -np.inf, "max": np.inf}
-                # +0.01 para não colidir visualmente com o limite do <=
                 var_lims[var]["min"] = max(var_lims[var]["min"], lim + 0.01)
         regras = []
         for var, lims in var_lims.items():
@@ -1205,49 +1201,49 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
             "perc": perc
         }
 
-    # ========== GRÁFICO COM REGRA RESUMIDA ===========
+    # ==== GRÁFICO COM REGRA RESUMIDA E VISUAL BONITO ====
     from sklearn import tree as sktree
-    node_labels = {}
-    for node_id in range(tree_.node_count):
-        if node_id in folhas_info:
-            f = folhas_info[node_id]
-            label = (
-                f"{f['regras']}\n"
-                f"n = {f['n']}\n"
-                f"Classe = {f['classe']} ({f['perc']:.0f}%)"
-            )
-            node_labels[node_id] = label
-        else:
-            node_labels[node_id] = None
 
-    def node_labeler(node_id):
-        return node_labels.get(node_id, None)
-
-    fig, ax = plt.subplots(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=(14, 8))
+    # Cor de fundo suave
+    fig.patch.set_facecolor('#F7F9FA')
+    # Desenha a árvore normalmente
     sktree.plot_tree(
         model,
         feature_names=feature_names,
         class_names=class_names if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
-        fontsize=9,
+        fontsize=10,
         ax=ax,
-        node_ids=True,
         proportion=False,
-        label='none'
+        label=None,
     )
-    for i, t in enumerate(ax.texts):
-        if i in folhas_info:
-            t.set_text(node_labels[i])
 
-    ax.set_title("Árvore de Decisão — regras resumidas, classe e percentual nas folhas", fontsize=14)
-    plt.tight_layout()
+    # Ajusta cada nó folha com fonte maior, negrito e texto centralizado
+    for idx, t in enumerate(ax.texts):
+        if idx in folhas_info:
+            folha = folhas_info[idx]
+            t.set_text(
+                f"{folha['regras']}\n"
+                f"n = {folha['n']}\n"
+                f"Classe = {folha['classe']} ({folha['perc']:.0f}%)"
+            )
+            t.set_fontsize(12)
+            t.set_fontweight('bold')
+            t.set_color('#181818')
+            t.set_ha('center')
+            t.set_va('center')
+
+    ax.set_title("Árvore de Decisão — regras resumidas, classe e percentual nas folhas", fontsize=17, fontweight='bold', color='#222')
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # ===== REPORT (exatamente igual ao gráfico!) ======
+    # ===== REPORT =====
     linhas_report = []
     for folha, info in folhas_info.items():
         linhas_report.append(
@@ -1276,6 +1272,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
