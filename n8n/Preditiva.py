@@ -954,31 +954,22 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     y_labels = list(pd.Categorical(dados[coluna_y]).categories)
     X = dados[lista_x].astype(float)  # só numérico
 
-    # Ajustar modelo multinomial (sem add_constant)
+    # Ajustar modelo multinomial
     try:
         modelo = sm.MNLogit(y, X)
         resultado = modelo.fit(method='newton', disp=0)
     except Exception as e:
         return f"❌ Erro ao ajustar modelo: {str(e)}", None
 
-    # P-valores corretos (do teste de Wald)
     pvalores = resultado.pvalues
     coef = resultado.params
 
-    # Organizar p-valor das variáveis (para cada categoria de Y)
-    pvalores_txt = ""
-    # Lembre: colunas do pvalores são 0, 1, ... (cada classe extra); linhas são variáveis X
-    for idx, categoria in enumerate(y_labels[1:]):
-        pvalores_txt += f"\nClasse '{categoria}' vs referência '{y_labels[0]}':"
-        for xname in X.columns:
-            try:
-                pval = pvalores.loc[xname, idx]
-                coefval = coef.loc[xname, idx]
-                oratio = np.exp(coefval)
-                pvalores_txt += f"\n- {xname}: coef = {coefval:.3f}, OR = {oratio:.2f}, p = {pval:.4f} {'✅' if pval < 0.05 else '❌'}"
-            except Exception as err:
-                pvalores_txt += f"\n- {xname}: ERRO AO ACESSAR P-VALUE/COEF ({err})"
-        pvalores_txt += "\n"
+    # R² de McFadden
+    try:
+        null_model = sm.MNLogit(y, np.ones((len(y), 1))).fit(disp=0)
+        r2_mcf = 1 - resultado.llf / null_model.llf
+    except:
+        r2_mcf = None
 
     # Previsão e acurácia
     y_pred = resultado.predict(X).idxmax(axis=1)
@@ -994,25 +985,92 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # R² McFadden
-    try:
-        null_model = sm.MNLogit(y, np.ones((len(y), 1))).fit(disp=0)
-        r2_mcf = 1 - resultado.llf / null_model.llf
-    except:
-        r2_mcf = None
+    # Odds ratios e equações por classe
+    odds_texto = ""
+    eq_texto = ""
+    tem_significativo = False
 
-    # Relatório final
+    for idx, categoria in enumerate(y_labels[1:]):
+        eq = f"logit(p[{categoria}] / p[{y_labels[0]}]) = "
+        eq += " + ".join([f"{coef.loc[xname, idx]:.4f}·{xname}" for xname in X.columns])
+        eq = eq.replace("+ -", "- ")
+        eq_texto += f"\n  {eq}"
+    odds_texto += ""
+    for idx, categoria in enumerate(y_labels[1:]):
+        odds_texto += f"\nClasse '{categoria}' vs referência '{y_labels[0]}':"
+        for xname in X.columns:
+            coefval = coef.loc[xname, idx]
+            oratio = np.exp(coefval)
+            odds_interpret = (
+                f"{oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} aumenta em {((oratio-1)*100):.0f}%."
+                if oratio > 1.01 else
+                f"{oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} reduz em {((1-oratio)*100):.0f}%."
+                if oratio < 0.99 else
+                f"{oratio:.2f} → Cada 1 unidade a mais em {xname}, não há variação relevante na chance da categoria."
+            )
+            odds_texto += f"\n  {xname}: {odds_interpret}"
+
+    # p-valores detalhados e checagem de pelo menos um significativo
+    pvalores_detalhe = ""
+    for idx, categoria in enumerate(y_labels[1:]):
+        pvalores_detalhe += f"\n- Classe '{categoria}' vs '{y_labels[0]}':"
+        for xname in X.columns:
+            pval = pvalores.loc[xname, idx]
+            flag = "✅" if pval < 0.05 else "❌"
+            if pval < 0.05:
+                tem_significativo = True
+            pvalores_detalhe += f"\n  {xname}: p = {pval:.4f} {flag}"
+
+    # Itens críticos
+    valid_r2 = r2_mcf is not None and r2_mcf > 0.20
+    valid_acc = acuracia >= 70
+    valid_pred = tem_significativo
+
+    criticos = (
+        f"- R² de McFadden (> 0,20): {r2_mcf:.3f} {'✅' if valid_r2 else '❌'} (mede o ajuste geral do modelo)\n"
+        f"- Acurácia do modelo (> 70%): {acuracia:.2f}% {'✅' if valid_acc else '❌'}\n"
+        f"- Alguma preditora significativa (p < 0,05): {'✅' if valid_pred else '❌'}"
+    )
+
+    # Reporte final
     texto = f"""
-📊 **Análise – Regressão Logística Nominal (Estilo Minitab)**
+📊 **Análise – Regressão Logística Nominal**
 
-- Variável resposta (Y): {coluna_y}
-- Variáveis preditoras: {', '.join(lista_x)}
-- Acurácia do modelo: {acuracia:.2f}%
-- R² de McFadden: {r2_mcf:.3f} {('(aceitável)' if r2_mcf and r2_mcf > 0.2 else '(baixo)')}
-- P-valores dos coeficientes (Teste Wald) e Odds Ratio:{pvalores_txt}
+🔹 Hipóteses do Modelo
+
+- **H₀:** Nenhuma das variáveis independentes está associada à chance de pertencer a cada categoria de {coluna_y}.
+- **H₁:** Pelo menos uma variável está associada à chance de pertencer a alguma categoria de {coluna_y}.
+
+🔹 Resumo do Modelo
+
+- **Variável dependente (Y):** {coluna_y}
+- **Variáveis preditoras (X):** {', '.join(lista_x)}
+- **Equações estimadas:**
+{eq_texto}
+
+- **Odds Ratios (interpretação prática):**
+{odds_texto}
+
+🔎 **Resultados – Itens Críticos (Obrigatórios para validação do modelo)**
+{criticos}
+
+🔎 **Resultados – Itens Recomendados (Desejáveis)**
+{pvalores_detalhe}
+
+🟡 Matriz de confusão apresentada ao lado.
+
+🔎 **Conclusão Final**
+{"✅ Modelo validado para predição entre as classes." if valid_r2 and valid_acc and valid_pred else "❌ Modelo não validado."}
+
+🔹 Recomendações
+➡️ Para aprimorar o modelo:
+- Remova variáveis preditoras com p ≥ 0,05 na comparação de interesse.
+- Considere adicionar novas variáveis relevantes.
+- Aumente a amostra para maior robustez estatística.
     """.strip()
 
     return texto, grafico_base64
+
 
 
 
