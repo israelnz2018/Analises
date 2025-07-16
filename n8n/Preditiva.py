@@ -959,7 +959,6 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         y = df['Y_cod']
         y_labels = categorias_unicas
         X = df[lista_x]
-        X = sm.add_constant(X)  # Inclui intercepto
 
         # Modelo MNLogit
         modelo = sm.MNLogit(y, X)
