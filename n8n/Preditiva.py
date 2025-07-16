@@ -1097,7 +1097,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     import matplotlib.pyplot as plt
     import numpy as np
 
-    # Forçar sempre a mesma ordem de classes
+    # Forçar ordem das classes sempre igual para legenda
     if Y.dtype.name == "category":
         class_names = [str(c) for c in Y.cat.categories]
     else:
@@ -1127,15 +1127,43 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
 
     importancias = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, model.feature_importances_)])
 
-    # ====== NOVO: Pega as regras para cada folha ======
+    # ==== NOVO: REGRA RESUMIDA E INTERVALO ====
     tree_ = model.tree_
     feature_names = lista_x
-    n_leaves = model.get_n_leaves()
 
+    # Função para resumir condições em intervalos
+    def resume_regras(condicoes):
+        # Ex: ["Renda ≤ 13500.00", "Renda > 9500.00"] → "Renda entre 9500.01 e 13500.00"
+        var_lims = {}
+        for cond in condicoes:
+            if "≤" in cond:
+                var, lim = cond.split("≤")
+                var = var.strip()
+                lim = float(lim.strip())
+                if var not in var_lims:
+                    var_lims[var] = {"min": -np.inf, "max": np.inf}
+                var_lims[var]["max"] = min(var_lims[var]["max"], lim)
+            elif ">" in cond:
+                var, lim = cond.split(">")
+                var = var.strip()
+                lim = float(lim.strip())
+                if var not in var_lims:
+                    var_lims[var] = {"min": -np.inf, "max": np.inf}
+                # +0.01 para não colidir visualmente com o limite do <=
+                var_lims[var]["min"] = max(var_lims[var]["min"], lim + 0.01)
+        regras = []
+        for var, lims in var_lims.items():
+            if lims["min"] == -np.inf:
+                regras.append(f"{var} ≤ {lims['max']:.2f}")
+            elif lims["max"] == np.inf:
+                regras.append(f"{var} > {lims['min']:.2f}")
+            else:
+                regras.append(f"{var} entre {lims['min']:.2f} e {lims['max']:.2f}")
+        return " e ".join(regras) if regras else "(sem divisão)"
+
+    # Busca as regras simplificadas de cada folha
     def get_rules_for_leaves(tree, feature_names):
-        """ Retorna dict: {nó folha: lista de condições (em português)} """
         leaf_rules = {}
-        path = []
         def recurse(node, conds):
             if tree.feature[node] != _tree.TREE_UNDEFINED:
                 nome_feat = feature_names[tree.feature[node]]
@@ -1148,7 +1176,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
                 recurse(tree.children_right[node], cond_dir)
             else:
                 # Nó folha
-                leaf_rules[node] = conds
+                leaf_rules[node] = resume_regras(conds)
         recurse(0, [])
         return leaf_rules
 
@@ -1159,21 +1187,17 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         "classe": Y.values,
         "index": X.index
     })
-    # Adiciona valores das features para média (se quiser)
     for feat in feature_names:
         df_folha[feat] = X[feat].values
 
-    # Gera info das folhas: para o report e para o gráfico
     folhas_info = {}
-    for folha, regras in leaf_rules_dict.items():
+    for folha, regra_str in leaf_rules_dict.items():
         amostras = df_folha[df_folha.folha == folha]
         n = len(amostras)
         if n == 0:
             continue
         mais_classe = amostras['classe'].value_counts().idxmax()
         perc = 100 * amostras['classe'].value_counts(normalize=True).max()
-        # Regra em português para print
-        regra_str = " e ".join(regras) if regras else "(sem divisão)"
         folhas_info[folha] = {
             "regras": regra_str,
             "n": n,
@@ -1181,24 +1205,21 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
             "perc": perc
         }
 
-    # ========= GRÁFICO COM REGRAS NAS FOLHAS ==========
+    # ========== GRÁFICO COM REGRA RESUMIDA ===========
     from sklearn import tree as sktree
-
-    # Criar labels especiais para folhas
     node_labels = {}
     for node_id in range(tree_.node_count):
         if node_id in folhas_info:
             f = folhas_info[node_id]
             label = (
-                f"Regras:\n{f['regras']}\n"
+                f"{f['regras']}\n"
                 f"n = {f['n']}\n"
                 f"Classe = {f['classe']} ({f['perc']:.0f}%)"
             )
             node_labels[node_id] = label
         else:
-            node_labels[node_id] = None  # deixa None para não mudar splits internos
+            node_labels[node_id] = None
 
-    # Função para customizar texto de cada nó
     def node_labeler(node_id):
         return node_labels.get(node_id, None)
 
@@ -1209,28 +1230,24 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         class_names=class_names if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
-        fontsize=8,
+        fontsize=9,
         ax=ax,
         node_ids=True,
         proportion=False,
         label='none'
     )
-    # Substitui o texto das folhas pelos nossos labels especiais
-    # OBS: O matplotlib não permite override direto via plot_tree, então fazemos via artista de texto
-    # SÓ altera texto em folhas
     for i, t in enumerate(ax.texts):
         if i in folhas_info:
             t.set_text(node_labels[i])
 
-    ax.set_title("Árvore de Decisão (condições, classe e percentual nas folhas)")
+    ax.set_title("Árvore de Decisão — regras resumidas, classe e percentual nas folhas", fontsize=14)
     plt.tight_layout()
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # ===== REPORT ======
-    # Reporte prático e focado: regra + percentual + classe + n
+    # ===== REPORT (exatamente igual ao gráfico!) ======
     linhas_report = []
     for folha, info in folhas_info.items():
         linhas_report.append(
@@ -1238,7 +1255,6 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         )
     regras_praticas = "\n".join(linhas_report)
 
-    # Recomenda manter/remover variáveis com baixa importância
     variaveis_ruins = [nome for nome, imp in zip(lista_x, model.feature_importances_) if imp < 0.05]
     recomendacao = (
         "🔎 **Recomendação:**\n" +
@@ -1260,6 +1276,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
