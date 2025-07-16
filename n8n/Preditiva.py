@@ -935,43 +935,40 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     from io import BytesIO
     import base64
 
+    # Checagem básica
     if not coluna_y or not lista_x:
         return "❌ A regressão logística nominal requer 1 Y e pelo menos 1 X.", None
 
     try:
-        # Limpeza e pré-processamento igual à ordinal
+        # Limpeza igual à RLO
         df = df[[coluna_y] + lista_x].copy()
         df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
         df.dropna(inplace=True)
-        
-        # Trata variáveis X: converte tudo que não é numérico para categoria
+
+        # Converte variáveis X para numérico/código SE não forem numéricas
         for coluna in lista_x:
             if not pd.api.types.is_numeric_dtype(df[coluna]):
                 df[coluna] = pd.Categorical(df[coluna]).codes
-        
         df.dropna(inplace=True)
         if df.empty:
             return "❌ A análise falhou: após limpeza, os dados estão vazios.", None
 
-        # Y precisa ser numérico/categórico
+        # Y como código
         categorias_unicas = sorted(df[coluna_y].dropna().unique().tolist())
         df['Y_cod'] = pd.Categorical(df[coluna_y], categories=categorias_unicas).codes
         y = df['Y_cod']
         y_labels = categorias_unicas
         X = df[lista_x]
 
-        # Modelo MNLogit
+        # Ajusta modelo nominal
         modelo = sm.MNLogit(y, X)
         resultado = modelo.fit(method='newton', disp=0)
 
-        # Coeficientes e p-valores
         coef = resultado.params
         pvalores = resultado.pvalues
-
-        # Odds ratios para interpretação
         odds_ratios = np.exp(coef)
 
-        # P-valores por categoria
+        # Relatório p-valores por categoria
         pvalores_txt = ""
         for idx, categoria in enumerate(y_labels[1:]):
             pvalores_txt += f"\nClasse '{categoria}' vs referência '{y_labels[0]}':"
@@ -982,7 +979,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
                 pvalores_txt += f"\n- {xname}: coef = {coefval:.3f}, OR = {oratio:.2f}, p = {pval:.4f} {'✅' if pval < 0.05 else '❌'}"
             pvalores_txt += "\n"
 
-        # Previsão e acurácia
+        # Previsão/acurácia
         y_pred = resultado.predict(X).idxmax(axis=1)
         acuracia = (y == y_pred).mean() * 100
 
@@ -1023,6 +1020,8 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
+
+
 
 
 
