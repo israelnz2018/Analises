@@ -925,81 +925,80 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
 
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
-
 def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     import pandas as pd
     import numpy as np
     import statsmodels.api as sm
 
-    debug_txt = ""
+    debug = "=== DEBUG REG LOG NOMINAL ===\n"
     try:
-        # DEBUG 1: Mostra todas as colunas do DataFrame inicial
-        debug_txt += f"[DEBUG] Colunas no df original: {df.columns.tolist()}\n"
+        debug += f"df.columns INICIAL: {df.columns.tolist()}\n"
+        debug += f"coluna_y: {coluna_y}\n"
+        debug += f"lista_x: {lista_x}\n"
 
-        # DEBUG 2: Mostra o que recebeu como coluna_y e lista_x
-        debug_txt += f"[DEBUG] coluna_y recebido: {coluna_y}\n"
-        debug_txt += f"[DEBUG] lista_x recebida: {lista_x}\n"
-
-        # DEBUG 3: Checa se todas as colunas existem
+        # Checa se todas as colunas existem
         colunas_necessarias = [coluna_y] + lista_x
-        colunas_faltando = [c for c in colunas_necessarias if c not in df.columns]
+        colunas_disponiveis = df.columns.tolist()
+        colunas_faltando = [c for c in colunas_necessarias if c not in colunas_disponiveis]
+        debug += f"colunas_necessarias: {colunas_necessarias}\n"
         if colunas_faltando:
-            debug_txt += f"[DEBUG] ❌ Coluna(s) não encontrada(s): {colunas_faltando}\n"
-            return debug_txt, None
+            debug += f"❌ FALTAM AS COLUNAS: {colunas_faltando}\n"
+            debug += f"colunas_disponiveis: {colunas_disponiveis}\n"
+            return debug, None
 
-        # DEBUG 4: Antes da limpeza
-        debug_txt += f"[DEBUG] Primeiras linhas antes da limpeza:\n{df.head().to_string()}\n"
+        debug += "df.head() ANTES DA LIMPEZA:\n" + df.head().to_string() + "\n"
+        debug += f"Ordem das colunas ANTES: {df.columns.tolist()}\n"
 
-        df = df[[coluna_y] + lista_x].copy()
+        # Seleciona as colunas na ordem esperada
+        df = df.loc[:, colunas_necessarias].copy()
+        debug += f"Ordem das colunas APÓS SELEÇÃO: {df.columns.tolist()}\n"
+        debug += "df.head() APÓS SELEÇÃO:\n" + df.head().to_string() + "\n"
+
         df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
         df.dropna(inplace=True)
+        debug += f"Shape após dropna: {df.shape}\n"
+        debug += "df.head() APÓS DROPNA:\n" + df.head().to_string() + "\n"
 
-        # DEBUG 5: Depois da limpeza
-        debug_txt += f"[DEBUG] Shape após dropna: {df.shape}\n"
-        debug_txt += f"[DEBUG] Primeiras linhas após limpeza:\n{df.head().to_string()}\n"
-
-        # DEBUG 6: Tipos das colunas X e exemplos
+        # Converte X para numérico/código se necessário
         for coluna in lista_x:
-            debug_txt += f"[DEBUG] Coluna X: '{coluna}' | dtype: {df[coluna].dtype} | exemplos: {df[coluna].unique()[:5]}\n"
+            debug += f"Coluna {coluna} antes conversão: dtype={df[coluna].dtype}, exemplos={df[coluna].unique()[:5]}\n"
             if not pd.api.types.is_numeric_dtype(df[coluna]):
                 df[coluna] = pd.Categorical(df[coluna]).codes
-                debug_txt += f"[DEBUG] '{coluna}' convertido para códigos: {df[coluna].unique()[:5]}\n"
+                debug += f"Coluna {coluna} APÓS conversão para códigos: dtype={df[coluna].dtype}, exemplos={df[coluna].unique()[:5]}\n"
 
-        # DEBUG 7: Após conversão/codificação
-        debug_txt += f"[DEBUG] Tipos finais das colunas X: {df[lista_x].dtypes.to_dict()}\n"
+        debug += "Tipos finais das colunas X: " + str(df[lista_x].dtypes.to_dict()) + "\n"
+        debug += f"df.head() FINAL X:\n{df[lista_x].head().to_string()}\n"
 
         if df.empty:
-            debug_txt += "[DEBUG] ❌ DataFrame vazio após limpeza.\n"
-            return debug_txt, None
+            debug += "❌ DataFrame vazio após limpeza.\n"
+            return debug, None
 
-        # DEBUG 8: Y codificação
+        # Codifica Y
         categorias_unicas = sorted(df[coluna_y].dropna().unique().tolist())
-        debug_txt += f"[DEBUG] Categorias únicas em Y: {categorias_unicas}\n"
+        debug += f"categorias_unicas de Y: {categorias_unicas}\n"
         df['Y_cod'] = pd.Categorical(df[coluna_y], categories=categorias_unicas).codes
         y = df['Y_cod']
-        y_labels = categorias_unicas
+        debug += f"Y codificados: {y.tolist()}\n"
+        debug += f"df['Y_cod'].head():\n{df['Y_cod'].head().to_string()}\n"
         X = df[lista_x]
-        debug_txt += f"[DEBUG] y codificados: {y.tolist()}\n"
-        debug_txt += f"[DEBUG] X head:\n{X.head().to_string()}\n"
+        debug += f"X.head() FINAL:\n{X.head().to_string()}\n"
 
-        # DEBUG 9: Ajustando o modelo
+        # Tentativa de ajuste do modelo
         try:
+            debug += "Chamando MNLogit...\n"
             modelo = sm.MNLogit(y, X)
             resultado = modelo.fit(method='newton', disp=0)
-            debug_txt += "[DEBUG] Modelo ajustado OK!\n"
+            debug += "Modelo ajustado OK!\n"
         except Exception as e:
-            debug_txt += f"[DEBUG] ❌ Erro no ajuste do modelo: {str(e)}\n"
-            return debug_txt, None
+            debug += f"❌ ERRO no ajuste do modelo: {str(e)}\n"
+            return debug, None
 
-        debug_txt += "[DEBUG] FIM - Nenhum erro detectado!\n"
-        return debug_txt, None
+        debug += "=== FIM DEBUG ===\n"
+        return debug, None
 
     except Exception as e:
-        debug_txt += f"[DEBUG] ❌ Erro geral: {str(e)}\n"
-        return debug_txt, None
-
-
-
+        debug += f"❌ ERRO GERAL: {str(e)}\n"
+        return debug, None
 
 
 
