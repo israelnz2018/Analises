@@ -1803,25 +1803,43 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
     if not algum_normal:
         recomendacao = "⚠️ Os dados não são normais. Os intervalos podem não ser confiáveis."
 
-    aplicar_estilo_minitab()
-    fig, ax = plt.subplots(figsize=(7, 2.5))
+   aplicar_estilo_minitab()
+    fig, ax = plt.subplots(figsize=(7, 3))
+
+    # Espaço maior entre as barras
+    positions = [0, 2.5]
+    width = 0.6
+
     # Variância
-    ax.bar(0, s2, color='skyblue', width=0.4, label='Variância amostral')
-    ax.errorbar(0, s2, yerr=[[s2 - ic_lower_var], [ic_upper_var - s2]], fmt='o', color='black', capsize=5, label=f'IC Variância ({nivel_conf:.1f}%)')
+    ax.bar(positions[0], s2, color='skyblue', width=width, label='Variância amostral', zorder=2)
+    ax.errorbar(positions[0], s2, yerr=[[s2 - ic_lower_var], [ic_upper_var - s2]], fmt='o', color='black',
+                capsize=6, markersize=6, label='IC Variância (95%)', zorder=3)
+
     # Desvio padrão
-    ax.bar(1, s, color='orange', width=0.4, label='Desvio padrão amostral')
-    ax.errorbar(1, s, yerr=[[s - ic_lower_std], [ic_upper_std - s]], fmt='o', color='black', capsize=5, label=f'IC Desvio Padrão ({nivel_conf:.1f}%)')
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels(['Variância', 'Desvio padrão'])
-    ax.set_ylabel("Valor")
-    ax.set_title(f"Intervalo de Confiança ({nivel_conf:.1f}%) - Variância e Desvio Padrão")
-    ax.legend()
-    plt.tight_layout()
+    ax.bar(positions[1], s, color='orange', width=width, label='Desvio padrão amostral', zorder=2)
+    ax.errorbar(positions[1], s, yerr=[[s - ic_lower_std], [ic_upper_std - s]], fmt='^', color='black',
+                capsize=6, markersize=6, label='IC Desvio Padrão (95%)', zorder=3)
+
+    # X-ticks e labels
+    ax.set_xticks(positions)
+    ax.set_xticklabels(['Variância', 'Desvio padrão'], fontsize=10)
+    ax.set_ylabel("Valor", fontsize=10)
+    ax.set_title("IC (95%) – Variância e Desvio Padrão", fontsize=12, pad=12)
+
+    # Valores numéricos acima das barras
+    ax.text(positions[0], s2 + (ax.get_ylim()[1] * 0.03), f"{s2:.2f}", ha='center', va='bottom', fontsize=10, fontweight='bold')
+    ax.text(positions[1], s + (ax.get_ylim()[1] * 0.03), f"{s:.2f}", ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+    # Legenda pequena no canto superior direito, fora do gráfico
+    ax.legend(loc='upper right', fontsize=9, frameon=False, bbox_to_anchor=(1.01, 1.02))
+
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # deixa espaço pro título
 
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+
 
     texto = f"""
 📊 **Análise – Intervalo de Confiança da Variância e do Desvio Padrão**
