@@ -1114,32 +1114,6 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
     except Exception as e:
         return f"❌ Erro ao executar o teste Friedman: {str(e)}", None
 
-    # Normalidade dos resíduos
-    dados_matrix = np.array(grupos).T
-    residuos = dados_matrix - np.mean(dados_matrix, axis=1, keepdims=True)
-    residuos_flat = residuos.flatten()
-
-    ad = stats.anderson(residuos_flat)
-    sw_stat, sw_p = stats.shapiro(residuos_flat)
-    dp_stat, dp_p = stats.normaltest(residuos_flat)
-
-    ad_crit = ad.critical_values
-    ad_sig = list(ad.significance_level)
-    if 5 in ad_sig:
-        idx = ad_sig.index(5)
-        ad_normal = ad.statistic < ad_crit[idx]
-    else:
-        ad_normal = False
-    sw_normal = sw_p > 0.05
-    dp_normal = dp_p > 0.05
-
-    normalidade_residuos = "✅ Os resíduos podem ser considerados normais." if ad_normal or sw_normal or dp_normal else "⚠ Os resíduos não seguem distribuição normal."
-
-    # Recomendação
-    recomendacao = ""
-    if ad_normal and sw_normal and dp_normal:
-        recomendacao = "⚠ Observação: Como os resíduos apresentaram indícios de normalidade, recomenda-se considerar o uso do teste paramétrico ANOVA Repeated Measures, caso os pressupostos sejam atendidos."
-
     # Gráfico
     aplicar_estilo_minitab()
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -1171,17 +1145,11 @@ def analise_friedman_pareado(df: pd.DataFrame, lista_y: list, subgrupo=None, fie
 - p-valor = {p_valor:.4f}
 - Nível de confiança = {confidence:.1f}%
 
-🔎 **Normalidade dos resíduos (Anderson-Darling, Shapiro-Wilk, D’Agostino-Pearson):**
-- {normalidade_residuos}
-
-{recomendacao}
-
 🔎 **Conclusão:**
 {"✅ Com {:.1f}% de confiança, podemos rejeitar a hipótese conservadora. Logo, há diferenças estatisticamente significativas entre as medianas dos grupos.".format(confidence) if p_valor < alpha else "⚠ Com {:.1f}% de confiança, não podemos rejeitar a hipótese conservadora. Logo, não há diferenças estatisticamente significativas entre as medianas dos grupos.".format(confidence)}
 """
-
-
     return texto.strip(), grafico_base64
+
 
 def analise_1_intervalo_interquartilico(df: pd.DataFrame, coluna_y, field_conf=None):
     if not coluna_y:
@@ -1578,12 +1546,6 @@ def analise_bartlett(df: pd.DataFrame, lista_y: list, subgrupo=None, field_conf=
 
     stat, p_valor = stats.bartlett(*grupos)
 
-    # recomendação se todos normais
-    if all(normalidades.values()):
-        recomendacao = "⚠️ Todos os grupos parecem ser normais. Recomenda-se utilizar o teste paramétrico equivalente para maior precisão."
-    else:
-        recomendacao = ""
-
     aplicar_estilo_minitab()
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 
@@ -1621,11 +1583,10 @@ p-valor = {p_valor:.2f}
 
 🔎 **Conclusão:**
 {"Com " + str(int(confidence)) + "% de confiança, rejeitamos a hipótese conservadora. Logo, há diferença estatisticamente significativa entre as variâncias dos grupos." if p_valor < alpha else "Com " + str(int(confidence)) + "% de confiança, não rejeitamos H0. Não há diferença significativa entre as variâncias dos grupos."}
-
-{recomendacao}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
