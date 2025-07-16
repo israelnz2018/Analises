@@ -1917,7 +1917,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None)
         axs[i].set_ylim(0, max(1, ic_upper * 1.2, p_hat * 1.2, p0 * 1.2))
 
         # labels acima da barra
-        axs[i].text(0, p_hat + 0.05, f"{p_hat:.2f}", ha='center', va='bottom', fontsize=12, fontweight='bold')
+        
         axs[i].text(0, p0 + 0.02, f"Ref.: {p0:.2f}", ha='center', va='bottom', fontsize=11, color='red')
 
         axs[i].set_ylabel('Proporção')
