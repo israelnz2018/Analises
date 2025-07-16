@@ -1200,9 +1200,8 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     # ==== GRÁFICO COM REGRA RESUMIDA E VISUAL BONITO ====
     from sklearn import tree as sktree
 
-    fig, ax = plt.subplots(figsize=(14, 8))
+    fig, ax = plt.subplots(figsize=(16, 8))
     fig.patch.set_facecolor('#F7F9FA')
-    # Define largura e altura fixa para cada box (nó)
     sktree.plot_tree(
         model,
         feature_names=feature_names,
@@ -1213,12 +1212,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         ax=ax,
         proportion=False,
         label=None,
-        boxstyle="round,pad=0.5",
     )
-    # Ajusta manualmente todos os boxes dos nós para terem mesmo tamanho
-    for patch in ax.patches:
-        patch.set_width(2.7)
-        patch.set_height(1.0)
 
     # Ajusta cada nó folha com fonte maior, negrito e texto centralizado
     for idx, t in enumerate(ax.texts):
@@ -1272,8 +1266,6 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     return texto.strip(), grafico_base64
-
-
 
 
 
