@@ -1201,27 +1201,35 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     # ==== GRÁFICO COM REGRA RESUMIDA E VISUAL BONITO ====
     from sklearn import tree as sktree
 
-    fig, ax = plt.subplots(figsize=(18, 10))  # Tamanho maior para visualização melhor
+    fig, ax = plt.subplots(figsize=(18, 10))
     sktree.plot_tree(
         model,
         feature_names=feature_names,
         class_names=class_names if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
-        fontsize=10,
+        fontsize=11,
         ax=ax,
         proportion=True,
         label=None,
     )
 
-    # Ajusta cada nó folha: quebra textos muito longos
-    for t in ax.texts:
-        if len(t.get_text()) > 35:
-            txt = "\n".join(textwrap.wrap(t.get_text(), 30))
-            t.set_text(txt)
-            t.set_fontsize(9)
+    # Ajusta cada nó folha: quebra textos muito longos e personaliza layout do box
+    for idx, t in enumerate(ax.texts):
+        if idx in folhas_info:
+            folha = folhas_info[idx]
+            t.set_text(
+                f"{folha['regras']}\n"
+                f"Decisão = {folha['classe']}\n"
+                f"{folha['perc']:.0f}% | n = {folha['n']}"
+            )
+            t.set_fontsize(13)
+            t.set_fontweight('bold')
+            t.set_color('#181818')
+            t.set_ha('center')
+            t.set_va('center')
 
-    ax.set_title("Árvore de Decisão — regras resumidas, classe e percentual nas folhas", fontsize=17, fontweight='bold', color='#222')
+    ax.set_title("Árvore de Decisão — regras resumidas, decisão e percentual nas folhas", fontsize=17, fontweight='bold', color='#222')
     plt.tight_layout(rect=[0, 0, 1, 0.97])
 
     buf = BytesIO()
@@ -1258,7 +1266,6 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     return texto.strip(), grafico_base64
-
 
 
 
