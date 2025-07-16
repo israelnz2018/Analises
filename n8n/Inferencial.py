@@ -366,7 +366,6 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_
     import matplotlib.pyplot as plt
     import base64
     from io import BytesIO
-    from suporte import aplicar_estilo_minitab
 
     ys = [c for c in lista_y if c not in ["", "Subgrupo"]]
     x = subgrupo if subgrupo and subgrupo in df.columns else None
@@ -389,21 +388,33 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_
         if df_valid[x].nunique() < 2:
             return "❌ O One way ANOVA requer pelo menos 2 grupos distintos na coluna Subgrupo.", None
         grupos = [grupo[1].values for grupo in df_valid.groupby(x)[y_col]]
+        nome_grupos = [str(nome) for nome, _ in df_valid.groupby(x)]
     else:
         grupos = []
+        nome_grupos = []
         for y_col in ys:
             grupo = df[y_col].dropna().values
             if len(grupo) > 0:
                 grupos.append(grupo)
+                nome_grupos.append(y_col)
         if len(grupos) < 2:
             return "❌ O One way ANOVA requer pelo menos 2 colunas Y com dados.", None
 
     # 🔎 Estatísticas ANOVA
     f_stat, p_valor = stats.f_oneway(*grupos)
 
-    # 🔎 Testes de normalidade (Anderson-Darling, Shapiro-Wilk, Kolmogorov-Smirnov)
-    concatenado = np.concatenate(grupos)
-    residuos = concatenado - np.mean(concatenado)
+    # 🔎 Teste de homogeneidade de variâncias (Levene)
+    stat_levene, p_levene = stats.levene(*grupos)
+    homocedasticidade = p_levene > alpha
+    if homocedasticidade:
+        texto_levene = "✅ As variâncias dos grupos podem ser consideradas homogêneas (Levene)."
+        recomendacao_levene = ""
+    else:
+        texto_levene = "❌ As variâncias dos grupos não são homogêneas (Levene)."
+        recomendacao_levene = "\n⚠️ Não é recomendado usar o One Way ANOVA. Recomenda-se o teste não paramétrico de Kruskal-Wallis para comparação entre grupos."
+
+    # 🔎 Testes de normalidade dos resíduos
+    residuos = np.concatenate([grupo - np.mean(grupo) for grupo in grupos])
 
     ad_stat, ad_crit, ad_sig = stats.anderson(residuos)
     ad_pass = ad_stat < ad_crit[list(ad_sig).index(5)] if 5 in ad_sig else False
@@ -414,7 +425,32 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_
     ks_stat, ks_p = stats.kstest(residuos, 'norm', args=(np.mean(residuos), np.std(residuos)))
     ks_pass = ks_p > alpha
 
-    normalidade_geral = ad_pass or sw_pass or ks_pass
+    normalidade_residuos = ad_pass or sw_pass or ks_pass
+
+    # 🔎 Testes de normalidade dos dados originais (para cada grupo)
+    normal_dados = False
+    for grupo in grupos:
+        ad = stats.anderson(grupo)
+        ad_crit = ad.critical_values
+        ad_sig = list(ad.significance_level)
+        ad_normal = ad.statistic < ad_crit[ad_sig.index(5)] if 5 in ad_sig else False
+
+        sw_stat, sw_p = stats.shapiro(grupo)
+        sw_normal = sw_p > alpha
+
+        ks_stat, ks_p = stats.kstest(grupo, 'norm', args=(np.mean(grupo), np.std(grupo)))
+        ks_normal = ks_p > alpha
+
+        if ad_normal or sw_normal or ks_normal:
+            normal_dados = True
+            break
+
+    if normal_dados:
+        normalidade_dados_texto = "✅ Os dados originais podem ser considerados normais."
+        recomendacao_kw = ""
+    else:
+        normalidade_dados_texto = "❌ Os dados originais não são normais."
+        recomendacao_kw = "\n⚠️ Recomenda-se considerar o teste não paramétrico de Kruskal-Wallis para comparação entre grupos."
 
     # 🔎 Conclusão
     if p_valor < alpha:
@@ -435,22 +471,28 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_
 - p-valor = {p_valor:.4f}
 - Nível de confiança = {confidence:.1f}%
 
-🔎 **Testes de Normalidade (Anderson-Darling, Shapiro-Wilk, Kolmogorov-Smirnov):**
-- Resíduos: {"✅ Podem ser considerados normais" if normalidade_geral else "❌ Podem não ser normais"}
+🔎 **Homogeneidade de Variâncias (Levene):**
+- {texto_levene}{recomendacao_levene}
+
+🔎 **Testes de Normalidade dos Dados Originais (Anderson-Darling, Shapiro-Wilk, Kolmogorov-Smirnov):**
+- Dados: {normalidade_dados_texto}{recomendacao_kw}
+
+🔎 **Testes de Normalidade dos Resíduos (Anderson-Darling, Shapiro-Wilk, Kolmogorov-Smirnov):**
+- Resíduos: {"✅ Podem ser considerados normais" if normalidade_residuos else "❌ Podem não ser normais"}
 
 🔎 **Conclusão:**
 {conclusao}
 """.strip()
 
     # 🔷 Gráfico
-    aplicar_estilo_minitab()
+    plt.style.use('seaborn-v0_8-muted')
     fig, ax = plt.subplots(figsize=(6, 4))
     if x:
         df_valid.boxplot(column=y_col, by=x, ax=ax, grid=False)
         medias = df_valid.groupby(x)[y_col].mean()
         ax.plot(range(1, len(medias) + 1), medias.values, color='blue', marker='o', linestyle='-', label='Médias')
     else:
-        ax.boxplot(grupos, labels=ys)
+        ax.boxplot(grupos, labels=nome_grupos)
         medias = [np.mean(g) for g in grupos]
         ax.plot(range(1, len(medias) + 1), medias, color='blue', marker='o', linestyle='-', label='Médias')
 
@@ -467,6 +509,7 @@ def analise_one_way_anova(df: pd.DataFrame, lista_y: list, subgrupo=None, field_
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     return texto, grafico_base64
+
 
 
 
