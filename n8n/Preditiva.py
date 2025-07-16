@@ -1072,15 +1072,14 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     return texto, grafico_base64
 
 
-
-
-
 import pandas as pd
+import numpy as np
 
 def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
         return "❌ A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
 
+    # Filtra dados válidos
     cols = [coluna_y] + lista_x
     df_valid = df[cols].dropna()
     if len(df_valid) < len(lista_x) + 5:
@@ -1089,21 +1088,16 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     Y = df_valid[coluna_y]
     X = df_valid[lista_x]
 
-    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, _tree
+    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, export_text, plot_tree
     from sklearn.metrics import accuracy_score, r2_score
     from io import BytesIO
     import base64
     import matplotlib.pyplot as plt
-    import numpy as np
-
-    # Força sempre a mesma ordem das classes para a legenda
-    if Y.dtype.name == "category":
-        class_names = [str(c) for c in Y.cat.categories]
-    else:
-        class_names = sorted(list(map(str, Y.unique())))
 
     tipo_modelo = "classificação"
-    if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
+    is_reg = pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10
+
+    if is_reg:
         model = DecisionTreeRegressor(max_depth=4, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
@@ -1113,9 +1107,6 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         desempenho = score
         tipo_modelo = "regressão"
     else:
-        from pandas.api.types import CategoricalDtype
-        class_cat = CategoricalDtype(categories=class_names, ordered=False)
-        Y = Y.astype(class_cat)
         model = DecisionTreeClassifier(max_depth=4, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
@@ -1125,153 +1116,76 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         desempenho = acc
 
     importancias = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, model.feature_importances_)])
+    regras = export_text(model, feature_names=lista_x)
 
-    # ==== REGRA RESUMIDA E INTERVALO ====
-    tree_ = model.tree_
-    feature_names = lista_x
-
-    def resume_regras(condicoes):
-        var_lims = {}
-        for cond in condicoes:
-            if "≤" in cond:
-                var, lim = cond.split("≤")
-                var = var.strip()
-                lim = float(lim.strip())
-                if var not in var_lims:
-                    var_lims[var] = {"min": -np.inf, "max": np.inf}
-                var_lims[var]["max"] = min(var_lims[var]["max"], lim)
-            elif ">" in cond:
-                var, lim = cond.split(">")
-                var = var.strip()
-                lim = float(lim.strip())
-                if var not in var_lims:
-                    var_lims[var] = {"min": -np.inf, "max": np.inf}
-                var_lims[var]["min"] = max(var_lims[var]["min"], lim + 0.01)
-        regras = []
-        for var, lims in var_lims.items():
-            if lims["min"] == -np.inf:
-                regras.append(f"{var} ≤ {lims['max']:.2f}")
-            elif lims["max"] == np.inf:
-                regras.append(f"{var} > {lims['min']:.2f}")
-            else:
-                regras.append(f"{var} entre {lims['min']:.2f} e {lims['max']:.2f}")
-        return " e ".join(regras) if regras else "(sem divisão)"
-
-    # Busca as regras simplificadas de cada folha
-    def get_rules_for_leaves(tree, feature_names):
-        leaf_rules = {}
-        def recurse(node, conds):
-            if tree.feature[node] != _tree.TREE_UNDEFINED:
-                nome_feat = feature_names[tree.feature[node]]
-                limite = tree.threshold[node]
-                # Esquerda
-                cond_esq = conds + [f"{nome_feat} ≤ {limite:.2f}"]
-                recurse(tree.children_left[node], cond_esq)
-                # Direita
-                cond_dir = conds + [f"{nome_feat} > {limite:.2f}"]
-                recurse(tree.children_right[node], cond_dir)
-            else:
-                # Nó folha
-                leaf_rules[node] = resume_regras(conds)
-        recurse(0, [])
-        return leaf_rules
-
-    leaf_rules_dict = get_rules_for_leaves(tree_, feature_names)
-    leaf_ids = model.apply(X)
-    df_folha = pd.DataFrame({
-        "folha": leaf_ids,
-        "classe": Y.values,
-        "index": X.index
-    })
-    for feat in feature_names:
-        df_folha[feat] = X[feat].values
-
-    folhas_info = {}
-    for folha, regra_str in leaf_rules_dict.items():
-        amostras = df_folha[df_folha.folha == folha]
-        n = len(amostras)
-        if n == 0:
-            continue
-        mais_classe = amostras['classe'].value_counts().idxmax()
-        perc = 100 * amostras['classe'].value_counts(normalize=True).max()
-        folhas_info[folha] = {
-            "regras": regra_str,
-            "n": n,
-            "classe": mais_classe,
-            "perc": perc
-        }
-
-    # ==== GRÁFICO COM REGRA RESUMIDA E VISUAL BONITO ====
-    from sklearn import tree as sktree
-
+    # ---- PLOT ÁRVORE COM BOXES DO MESMO TAMANHO E FOLHAS NEGRITO ----
     fig, ax = plt.subplots(figsize=(14, 8))
-    # Cor de fundo suave
-    fig.patch.set_facecolor('#F7F9FA')
-    # Desenha a árvore normalmente
-    sktree.plot_tree(
+
+    # Gera árvore normalmente
+    plot_tree(
         model,
-        feature_names=feature_names,
-        class_names=class_names if tipo_modelo == "classificação" else None,
+        feature_names=lista_x,
+        class_names=[str(c) for c in Y.unique()] if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
         fontsize=10,
-        ax=ax,
-        proportion=False,
-        label=None,
+        ax=ax
     )
+    plt.title("Árvore de Decisão — regras resumidas, classe e percentual nas folhas", fontsize=18, weight='bold', pad=20)
 
-    # Ajusta cada nó folha com fonte maior, negrito e texto centralizado
-    for idx, t in enumerate(ax.texts):
-        if idx in folhas_info:
-            folha = folhas_info[idx]
-            t.set_text(
-                f"{folha['regras']}\n"
-                f"n = {folha['n']}\n"
-                f"Classe = {folha['classe']} ({folha['perc']:.0f}%)"
-            )
-            t.set_fontsize(12)
-            t.set_fontweight('bold')
-            t.set_color('#181818')
-            t.set_ha('center')
-            t.set_va('center')
+    # Ajusta largura dos boxes
+    box_width = 0.22
+    for bbox in ax.patches:
+        x0, y0 = bbox.get_xy()
+        bbox.set_width(box_width)
+        bbox.set_x(x0 - (box_width - bbox.get_width()) / 2)
 
-    ax.set_title("Árvore de Decisão — regras resumidas, classe e percentual nas folhas", fontsize=17, fontweight='bold', color='#222')
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    # Coloca negrito só nas folhas finais (textos com "Classe =" ou "class =")
+    for txt in ax.texts:
+        if ("Classe =" in txt.get_text()) or ("class =" in txt.get_text()):
+            txt.set_fontweight('bold')
+            txt.set_fontsize(12)
+        else:
+            txt.set_fontweight('normal')
+            txt.set_fontsize(10)
 
+    plt.tight_layout()
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # ===== REPORT =====
-    linhas_report = []
-    for folha, info in folhas_info.items():
-        linhas_report.append(
-            f"- Se {info['regras']}: {info['perc']:.0f}% chance de ser '{info['classe']}' (n={info['n']})"
-        )
-    regras_praticas = "\n".join(linhas_report)
+    # ---- REPORT FINAL ----
+    validado = (tipo_modelo == "regressão" and desempenho >= 0.6) or (tipo_modelo == "classificação" and desempenho >= 0.7)
+    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
 
-    variaveis_ruins = [nome for nome, imp in zip(lista_x, model.feature_importances_) if imp < 0.05]
-    recomendacao = (
-        "🔎 **Recomendação:**\n" +
-        ("Remova a(s) variável(is): " + ", ".join(variaveis_ruins) + " (baixo poder preditivo)." if variaveis_ruins else "Mantenha todas as variáveis — todas são relevantes para o modelo.") +
-        "\n"
-    )
+    recomendacao = ""
+    if not validado:
+        recomendacao = (
+            "\n🔎 **Observação / Recomendação**\n➡️ O modelo não foi validado. Considere:\n"
+            "- Ajustar parâmetros do modelo (ex: max_depth).\n"
+            "- Adicionar variáveis relevantes.\n"
+            "- Aumentar o tamanho amostral para maior poder preditivo."
+        )
 
     texto = (
-        "📊 **Análise – Árvore de Decisão**\n\n"
-        "🔹 Critérios avaliados:\n"
-        f"- {score_txt} — {criterio_status} (mínimo esperado: {'70%' if tipo_modelo == 'classificação' else '0,6'})\n"
-        f"- Profundidade da árvore: {model.get_depth()} níveis\n"
-        f"- Número de folhas (decisões finais): {model.get_n_leaves()}\n"
-        f"- Importância das variáveis: {importancias}\n\n"
-        "🔹 Decisões do modelo:\n"
-        f"{regras_praticas}\n\n"
+        f"📊 **Análise – Árvore de Decisão**\n\n"
+        f"🔹 Resumo do modelo\n"
+        f"- Tipo: {tipo_modelo.capitalize()}\n"
+        f"- Variável dependente (Y): {coluna_y}\n"
+        f"- Variáveis independentes (Xs): {', '.join(lista_x)}\n\n"
+        f"🔎 Critérios avaliados:\n"
+        f"- {score_txt} {criterio_status}\n"
+        f"- Número de folhas: {model.get_n_leaves()}\n"
+        f"- Profundidade da árvore: {model.get_depth()} níveis\n\n"
+        f"🔹 Importância das variáveis:\n"
+        f"{importancias}\n\n"
+        f"{conclusao_status}\n"
         f"{recomendacao}"
-        f"🔹 Resultado final: {'✅ Modelo validado.' if desempenho >= (0.7 if tipo_modelo == 'classificação' else 0.6) else '❌ Modelo não validado.'}"
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
