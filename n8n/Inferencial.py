@@ -1830,8 +1830,7 @@ O intervalo de confiança da variância e do desvio padrão foi calculado assumi
 
 
 
-
-def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
+def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None):
     if not coluna_x:
         return "❌ O teste 1 Proporção requer exatamente 1 coluna X.", None
 
@@ -1843,12 +1842,13 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
     if len(x) < 5:
         return "❌ O teste requer ao menos 5 valores não nulos.", None
 
+    # Proporção de referência escolhida pelo aluno (ex: 0.5)
     try:
-        p0 = float(field_conf) if field_conf else 0.5
+        p0 = float(field) if field is not None else 0.5
         if not (0 < p0 < 1):
             return "❌ A proporção de referência deve estar entre 0 e 1 (ex.: 0.5).", None
     except:
-        return "❌ Valor de referência inválido. Informe um número como 0.5 no campo Field.", None
+        return "❌ Valor de referência inválido. Informe um número como 0.5 no campo.", None
 
     n = len(x)
     nivel_conf = 95.0
@@ -1924,6 +1924,7 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field_conf=None):
 """
 
     return texto.strip(), grafico_base64
+
 
 
 def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
