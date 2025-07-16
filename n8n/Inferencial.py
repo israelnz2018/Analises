@@ -1803,10 +1803,10 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
     if not algum_normal:
         recomendacao = "⚠️ Os dados não são normais. Os intervalos podem não ser confiáveis."
 
-   aplicar_estilo_minitab()
+    # Gráfico aprimorado
+    plt.style.use('seaborn-v0_8-muted')
     fig, ax = plt.subplots(figsize=(7, 3))
 
-    # Espaço maior entre as barras
     positions = [0, 2.5]
     width = 0.6
 
@@ -1840,7 +1840,6 @@ def analise_1_intervalo_confianca_variancia(df: pd.DataFrame, coluna_y, field_co
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-
     texto = f"""
 📊 **Análise – Intervalo de Confiança da Variância e do Desvio Padrão**
 
@@ -1867,6 +1866,7 @@ O intervalo de confiança da variância e do desvio padrão foi calculado assumi
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
