@@ -936,8 +936,6 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     from io import BytesIO
     import base64
 
-    debug_txt = ""
-
     # Checagem simples
     if not coluna_y or not lista_x:
         return "❌ Precisa de 1 Y e pelo menos 1 X", None
@@ -967,34 +965,19 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     pvalores = resultado.pvalues
     coef = resultado.params
 
-    debug_txt += "\n[DEBUG] Estrutura de pvalores: "
-    debug_txt += f"columns={getattr(pvalores,'columns',None)} | index={getattr(pvalores,'index',None)} | shape={getattr(pvalores,'shape',None)}\n"
-    debug_txt += f"[DEBUG] pvalores head:\n{pvalores.head().to_string()}\n"
-
-    debug_txt += "\n[DEBUG] Estrutura de coef:\n"
-    debug_txt += f"columns={getattr(coef,'columns',None)} | index={getattr(coef,'index',None)} | shape={getattr(coef,'shape',None)}\n"
-    debug_txt += f"[DEBUG] coef head:\n{coef.head().to_string()}\n"
-
     # Organizar p-valor das variáveis (para cada categoria de Y)
-    pvalores_txt = debug_txt
+    pvalores_txt = ""
+    # Lembre: colunas do pvalores são 0, 1, ... (cada classe extra); linhas são variáveis X
     for idx, categoria in enumerate(y_labels[1:]):
         pvalores_txt += f"\nClasse '{categoria}' vs referência '{y_labels[0]}':"
         for xname in X.columns:
             try:
-                # Acesso padrão: pvalores[xname].iloc[idx]
-                pval = pvalores[xname].iloc[idx]
-                coefval = coef[xname].iloc[idx]
+                pval = pvalores.loc[xname, idx]
+                coefval = coef.loc[xname, idx]
                 oratio = np.exp(coefval)
                 pvalores_txt += f"\n- {xname}: coef = {coefval:.3f}, OR = {oratio:.2f}, p = {pval:.4f} {'✅' if pval < 0.05 else '❌'}"
             except Exception as err:
-                # Tenta outros acessos alternativos para debug
-                try:
-                    pval = pvalores.iloc[idx][xname]
-                    coefval = coef.iloc[idx][xname]
-                    oratio = np.exp(coefval)
-                    pvalores_txt += f"\n- {xname}: [Acesso alternativo] coef = {coefval:.3f}, OR = {oratio:.2f}, p = {pval:.4f}"
-                except Exception as err2:
-                    pvalores_txt += f"\n- {xname}: ERRO AO ACESSAR P-VALUE/COEF ({err} | {err2})"
+                pvalores_txt += f"\n- {xname}: ERRO AO ACESSAR P-VALUE/COEF ({err})"
         pvalores_txt += "\n"
 
     # Previsão e acurácia
@@ -1026,13 +1009,10 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 - Variáveis preditoras: {', '.join(lista_x)}
 - Acurácia do modelo: {acuracia:.2f}%
 - R² de McFadden: {r2_mcf:.3f} {('(aceitável)' if r2_mcf and r2_mcf > 0.2 else '(baixo)')}
-- P-valores dos coeficientes (Teste Wald) e Odds Ratio:
-{pvalores_txt}
+- P-valores dos coeficientes (Teste Wald) e Odds Ratio:{pvalores_txt}
     """.strip()
 
     return texto, grafico_base64
-
-
 
 
 
