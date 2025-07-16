@@ -1091,6 +1091,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     import base64
     import matplotlib.pyplot as plt
     import numpy as np
+    import textwrap
 
     # Força sempre a mesma ordem das classes para a legenda
     if Y.dtype.name == "category":
@@ -1200,8 +1201,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     # ==== GRÁFICO COM REGRA RESUMIDA E VISUAL BONITO ====
     from sklearn import tree as sktree
 
-    fig, ax = plt.subplots(figsize=(16, 8))
-    fig.patch.set_facecolor('#F7F9FA')
+    fig, ax = plt.subplots(figsize=(18, 10))  # Tamanho maior para visualização melhor
     sktree.plot_tree(
         model,
         feature_names=feature_names,
@@ -1210,24 +1210,16 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         rounded=True,
         fontsize=10,
         ax=ax,
-        proportion=False,
+        proportion=True,
         label=None,
     )
 
-    # Ajusta cada nó folha com fonte maior, negrito e texto centralizado
-    for idx, t in enumerate(ax.texts):
-        if idx in folhas_info:
-            folha = folhas_info[idx]
-            t.set_text(
-                f"{folha['regras']}\n"
-                f"n = {folha['n']}\n"
-                f"Classe = {folha['classe']} ({folha['perc']:.0f}%)"
-            )
-            t.set_fontsize(12)
-            t.set_fontweight('bold')
-            t.set_color('#181818')
-            t.set_ha('center')
-            t.set_va('center')
+    # Ajusta cada nó folha: quebra textos muito longos
+    for t in ax.texts:
+        if len(t.get_text()) > 35:
+            txt = "\n".join(textwrap.wrap(t.get_text(), 30))
+            t.set_text(txt)
+            t.set_fontsize(9)
 
     ax.set_title("Árvore de Decisão — regras resumidas, classe e percentual nas folhas", fontsize=17, fontweight='bold', color='#222')
     plt.tight_layout(rect=[0, 0, 1, 0.97])
@@ -1266,6 +1258,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
