@@ -1198,33 +1198,33 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
             "perc": perc
         }
 
-    # ==== GRÁFICO COM REGRA RESUMIDA E VISUAL BONITO ====
     from sklearn import tree as sktree
 
     fig, ax = plt.subplots(figsize=(18, 10))
-    plot = sktree.plot_tree(
+    _ = sktree.plot_tree(
         model,
         feature_names=feature_names,
         class_names=class_names if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
-        fontsize=11,
+        fontsize=12,
         ax=ax,
         proportion=True,
         label=None,
     )
 
-    total_amostras = len(df_folha)
+    total_amostras = df_folha.shape[0]
 
     for idx, t in enumerate(ax.texts):
-        # Se for folha (nó final)
+        # Checa se é folha/final
         if idx in folhas_info:
             folha = folhas_info[idx]
             regra = folha['regras']
-            if len(regra) > 30:
-                regra = "\n".join(textwrap.wrap(regra, 30))
+            # Controla a largura máxima de cada linha (~35 caracteres)
+            if len(regra) > 35:
+                regra = "\n".join(textwrap.wrap(regra, 35))
             t.set_text(
-                f"Regra: {regra}\n"
+                f"{regra}\n"
                 f"Decisão: {folha['classe']}\n"
                 f"{folha['perc']:.0f}% | n = {folha['n']}"
             )
@@ -1234,23 +1234,23 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
             t.set_ha('center')
             t.set_va('center')
         else:
-            # Nó interno: ajusta texto didático
+            # Nó intermediário
             box_txt = t.get_text().split('\n')
-            # Primeira linha é a regra, as outras são irrelevantes para aluno
+            # Regra principal
             regra = box_txt[0]
-            if len(regra) > 30:
-                regra = "\n".join(textwrap.wrap(regra, 30))
-            # Tenta achar número de amostras (samples)
-            samples = ""
-            for x in box_txt:
-                if x.isdigit():
-                    samples = x
-            amostras = int(samples) if samples.isdigit() else 0
-            pct = f"{(amostras/total_amostras*100):.0f}%" if total_amostras > 0 else ""
+            if len(regra) > 35:
+                regra = "\n".join(textwrap.wrap(regra, 35))
+            # Busca o valor real de amostras (samples) do scikit
+            samples = 0
+            for linha in box_txt:
+                if linha.strip().isdigit():
+                    samples = int(linha.strip())
+            pct = f"{(samples/total_amostras*100):.0f}%" if total_amostras > 0 else "0%"
+            # Classe majoritária
             maioria = box_txt[-1] if len(box_txt) > 0 else ""
             t.set_text(
-                f"Regra: {regra}\n"
-                f"Samples: {amostras}\n"
+                f"{regra}\n"
+                f"Amostras: {samples}\n"
                 f"% do total: {pct}\n"
                 f"Maioria: {maioria}"
             )
@@ -1294,6 +1294,7 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
