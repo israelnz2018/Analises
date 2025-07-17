@@ -2060,15 +2060,13 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
     texto = f"""
 📊 **Análise – Teste de 2 Proporções: {v1} e {v2}**
 
----
-
-### 1️⃣ Hipótese para {v1}
+1️⃣ Hipótese para {v1}
 - H₀: A proporção de {v1} é igual nos grupos {r1['g1']} e {r1['g2']}.
 - H₁: A proporção de {v1} é diferente nos grupos {r1['g1']} e {r1['g2']}.
 
 **Resumo dos dados:**
 | Grupo | Total | {v1} | Proporção {v1} |
-|-------|-------|------|----------------|
+
 | {r1['g1']} | {r1['n1']} | {r1['cont1']} | {r1['p1']:.2f} |
 | {r1['g2']} | {r1['n2']} | {r1['cont2']} | {r1['p2']:.2f} |
 
@@ -2081,15 +2079,14 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
 **Conclusão:**  
 {"✅ Rejeitamos H₀: diferença significativa." if r1['p_valor'] < alpha else "⚠️ Não rejeitamos H₀: não há diferença significativa."}
 
----
 
-### 2️⃣ Hipótese para {v2}
+2️⃣ Hipótese para {v2}
 - H₀: A proporção de {v2} é igual nos grupos {r2['g1']} e {r2['g2']}.
 - H₁: A proporção de {v2} é diferente nos grupos {r2['g1']} e {r2['g2']}.
 
 **Resumo dos dados:**
 | Grupo | Total | {v2} | Proporção {v2} |
-|-------|-------|------|----------------|
+
 | {r2['g1']} | {r2['n1']} | {r2['cont1']} | {r2['p1']:.2f} |
 | {r2['g2']} | {r2['n2']} | {r2['cont2']} | {r2['p2']:.2f} |
 
@@ -2102,7 +2099,6 @@ def analise_2_proporcoes(df: pd.DataFrame, coluna_x, coluna_y):
 **Conclusão:**  
 {"✅ Rejeitamos H₀: diferença significativa." if r2['p_valor'] < alpha else "⚠️ Não rejeitamos H₀: não há diferença significativa."}
 
----
 
 > O gráfico abaixo apresenta, juntos, as proporções de {v1} e {v2} para os dois grupos, com intervalos de confiança.
 
