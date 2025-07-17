@@ -1386,10 +1386,8 @@ def analise_random_forest(df: pd.DataFrame, coluna_y, lista_x):
 
 
 
-
 import pandas as pd
 def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=None):
-    import pandas as pd
     import numpy as np
     import matplotlib.pyplot as plt
     from io import BytesIO
@@ -1397,10 +1395,13 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     from datetime import datetime
     import locale
     from sklearn.linear_model import LinearRegression
+    from pandas.tseries.offsets import MonthEnd, Day, Week, YearEnd
 
+    # Função do seu projeto para padronizar o gráfico
+    from suporte import aplicar_estilo_minitab
     aplicar_estilo_minitab()
 
-    # Configura locale BR para casas decimais
+    # Locale BR para formatar números
     try:
         locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
     except:
@@ -1427,17 +1428,17 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
                 return pd.to_datetime(mes_str, errors='coerce', dayfirst=False, infer_datetime_format=True)
 
         df_valid['DataConvertida'] = df_valid[Data].apply(converter_mes)
-
         if df_valid['DataConvertida'].isnull().any():
             return "❌ Existem datas inválidas ou em formato não reconhecido. Use abreviações corretas como Jan, Fev, etc.", None
 
         df_valid = df_valid.sort_values(by='DataConvertida')
-        index = textos_originais
-
+        index = df_valid[Data].tolist()
+        datas_convertidas = df_valid['DataConvertida'].tolist()
     else:
         df_valid = df[[coluna_y]].dropna()
         df_valid = df_valid.reset_index()
         index = df_valid.index.values.tolist()
+        datas_convertidas = None
 
     if len(df_valid) < 10:
         return "❌ A série temporal requer pelo menos 10 observações.", None
@@ -1450,16 +1451,47 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     modelo.fit(X, Y)
     previsao_fit = modelo.predict(X)
 
-    horizonte = int(field) if field and str(field).isdigit() else 5
+    horizonte = int(field) if field and str(field).isdigit() and int(field) > 0 else 0
     X_future = np.arange(len(Y), len(Y)+horizonte).reshape(-1,1)
-    previsao_future = modelo.predict(X_future)
+    previsao_future = modelo.predict(X_future) if horizonte > 0 else []
+
+    # Cria rótulos futuros automáticos
+    index_futuro = []
+    if horizonte > 0:
+        if Data and Data in df.columns and datas_convertidas is not None:
+            ult_data = datas_convertidas[-1]
+            # Detecta o intervalo dominante
+            if len(datas_convertidas) > 1:
+                diff = pd.Series(datas_convertidas).diff().mode()[0]
+            else:
+                diff = pd.Timedelta(days=30)
+            for i in range(horizonte):
+                if pd.Timedelta(days=360) < diff < pd.Timedelta(days=370):
+                    nova_data = ult_data + YearEnd(i+1)
+                    label = nova_data.strftime('%Y')
+                elif pd.Timedelta(days=27) < diff < pd.Timedelta(days=32):
+                    nova_data = ult_data + MonthEnd(i+1)
+                    label = nova_data.strftime('%b/%Y')
+                elif pd.Timedelta(days=6) < diff < pd.Timedelta(days=8):
+                    nova_data = ult_data + Week(i+1)
+                    label = f"Sem {nova_data.strftime('%U')}/{nova_data.year}"
+                elif diff == pd.Timedelta(days=1):
+                    nova_data = ult_data + Day(i+1)
+                    label = nova_data.strftime('%d/%m/%Y')
+                else:
+                    nova_data = ult_data + Day(i+1)
+                    label = nova_data.strftime('%d/%m/%Y')
+                index_futuro.append(label)
+        else:
+            index_futuro = [f'Futuro {i+1}' for i in range(horizonte)]
+
+    index_completo = list(index) + index_futuro
 
     # Medidas de acurácia
     mape = np.mean(np.abs((Y - previsao_fit) / Y)) * 100
     mad = np.mean(np.abs(Y - previsao_fit))
     msd = np.mean((Y - previsao_fit)**2)
 
-    # Classificação MAPE
     if mape < 10:
         mape_status = "Excelente"
     elif mape < 20:
@@ -1469,24 +1501,24 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     else:
         mape_status = "Ruim"
 
-    # Comparação MAD e MSD
     media_y = np.mean(Y)
     mad_status = "baixo" if mad < media_y * 0.1 else "alto"
     msd_status = "baixo" if msd < media_y * 0.1 else "alto"
 
-    # Formatação BR
-    previsao_texto = ", ".join([f"{p:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') for p in previsao_future])
+    previsao_texto = ", ".join([f"{p:,.2f}".replace(',', 'v').replace('.', ',').replace('v', '.') for p in previsao_future]) if horizonte > 0 else ""
 
     # Gráfico
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(index, Y, label='Real', color='black')
     ax.plot(index, previsao_fit, label='Ajuste Linear', color='red')
-    ax.plot(range(len(Y), len(Y)+horizonte), previsao_future, 'g--', label='Previsão')
+    if horizonte > 0:
+        ax.plot(index_completo[len(Y):], previsao_future, 'g--', label='Previsão')
     ax.set_title("📊 Análise – Tendência Linear", fontsize=18, fontweight='bold')
     ax.set_ylabel("Valor", fontsize=16, fontweight='bold')
     ax.set_xlabel("Período", fontsize=16, fontweight='bold')
     ax.legend()
-    plt.xticks(rotation=45)
+    ax.set_xticks(index_completo)
+    ax.set_xticklabels(index_completo, rotation=45)
     plt.tight_layout()
 
     buf = BytesIO()
@@ -1500,7 +1532,7 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
         + f"MAPE: {mape:,.2f} – {mape_status} (o erro percentual médio está {mape_status.lower()})\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + f"MAD: {mad:,.2f} – {mad_status.capitalize()} (comparado à média de {media_y:,.2f})\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + f"MSD: {msd:,.2f} – {msd_status.capitalize()} (comparado à média de {media_y:,.2f})\n".replace(',', 'v').replace('.', ',').replace('v', '.')
-        + f"Previsão para os próximos {horizonte} períodos: {previsao_texto}\n"
+        + (f"Previsão para os próximos {horizonte} períodos: {previsao_texto}\n" if horizonte > 0 else "")
         + "\n**Conclusão:**\n"
         + f"{'✅ ' if mape_status != 'Ruim' else ''}Modelo ajustado. Existe uma tendência {'decrescente' if modelo.coef_[0]<0 else 'crescente'}, indicando variação média de {abs(modelo.coef_[0]):,.2f} unidades por período.\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + "Observação: modelo ajustado significa que foi calculado, mas os erros estão altos, indicando baixa precisão para previsão exata.\n"
@@ -1510,6 +1542,7 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     )
 
     return texto.strip(), grafico_base64
+
 
 
 
