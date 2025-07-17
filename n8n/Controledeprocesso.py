@@ -159,7 +159,8 @@ def analise_carta_imr(df, coluna_y):
     plt.tight_layout()
 
     # 🔷 REPORT – Individual
-    texto_I = f"📊 **Carta I ({nome_coluna_y})**\n"
+    texto_I = f"📊 **Carta de Controle X̄-R — Monitoramento Individual e Amplitude de {nome_coluna_y}**\n\n"
+    texto_I = f"📊 **Carta Individual**\n"
     texto_I += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_I:
         pontos = ", ".join([f"Linha {linha}: {valor:.2f}" for linha, valor in crit1_flag_I])
@@ -186,7 +187,7 @@ def analise_carta_imr(df, coluna_y):
         texto_I += "🔎 **Conclusão:** Processo está estável.\n"
 
     # 🔷 REPORT – MR
-    texto_MR = f"📊 **Carta MR**\n"
+    texto_MR = f"📊 **Carta de Amplitude (MR)**\n"
     texto_MR += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_MR:
         pontos = ", ".join([f"Linha {linha}: {valor:.2f}" for linha, valor in crit1_flag_MR])
@@ -396,7 +397,8 @@ def analise_carta_xbarra_r(df, coluna_y, subgrupo):
     plt.tight_layout()
 
     # Report – Xbarra
-    texto_X = f"📊 **Carta X̄ ({nome_coluna_y})**\n"
+    texto_X = f"📊 **Carta de Controle X̄-R — Monitoramento da Média e Amplitude de {nome_coluna_y}**\n\n"
+    texto_X = f"📊 **Carta das Médias (X̄)**\n"
     texto_X += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_X:
         pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_X])
@@ -423,7 +425,7 @@ def analise_carta_xbarra_r(df, coluna_y, subgrupo):
         texto_X += "🔎 **Conclusão:** Processo está estável.\n"
 
     # Report – R
-    texto_R = f"📊 **Carta R**\n"
+    texto_R = f"📊 **Carta de Amplitude (R)**\n"
     texto_R += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_R:
         pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_R])
@@ -634,7 +636,8 @@ def analise_carta_xbarra_s(df, coluna_y, subgrupo):
     plt.tight_layout()
 
     # Report – Xbarra
-    texto_X = f"📊 **Carta X̄ ({nome_coluna_y})**\n"
+    texto_X = f"📊 **Carta de Controle X̄-S — Monitoramento da Média e Desvio Padrão de {nome_coluna_y}**\n\n"
+    texto_X = f"📊 **Carta de Médias (X̄)**\n"
     texto_X += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_X:
         pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_X])
@@ -661,7 +664,7 @@ def analise_carta_xbarra_s(df, coluna_y, subgrupo):
         texto_X += "🔎 **Conclusão:** Processo está estável.\n"
 
     # Report – S
-    texto_S = f"📊 **Carta S**\n"
+    texto_S = f"📊 **Carta de Desvio Padrão(S)**\n"
     texto_S += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_S:
         pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_S])
