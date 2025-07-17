@@ -1393,15 +1393,14 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     from io import BytesIO
     import base64
     from datetime import datetime
-    import locale
-    from sklearn.linear_model import LinearRegression
     from pandas.tseries.offsets import MonthEnd, Day, Week, YearEnd
+    from sklearn.linear_model import LinearRegression
+    import locale
 
-    # Função do seu projeto para padronizar o gráfico
+    # Padronização visual
     from suporte import aplicar_estilo_minitab
     aplicar_estilo_minitab()
 
-    # Locale BR para formatar números
     try:
         locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
     except:
@@ -1410,22 +1409,27 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     if not coluna_y or coluna_y not in df.columns:
         return "❌ A Tendência Linear requer 1 coluna Y (série temporal).", None
 
+    # Lê datas se existir
     if Data and Data in df.columns:
         df_valid = df[[Data, coluna_y]].dropna()
-        textos_originais = df_valid[Data].tolist()
+        orig_labels = df_valid[Data].tolist()
 
-        meses_pt = {'jan':1, 'fev':2, 'mar':3, 'abr':4, 'mai':5, 'jun':6,
-                    'jul':7, 'ago':8, 'set':9, 'out':10, 'nov':11, 'dez':12}
-        meses_en = {'jan':1, 'feb':2, 'mar':3, 'apr':4, 'may':5, 'jun':6,
-                    'jul':7, 'aug':8, 'sep':9, 'oct':10, 'nov':11, 'dec':12}
+        # Funções auxiliares para meses
+        meses_pt = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+        meses_en = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 
         def converter_mes(mes_str):
-            mes_lower = str(mes_str).strip().lower()[:3]
-            mes_num = meses_pt.get(mes_lower) or meses_en.get(mes_lower)
-            if mes_num:
-                return datetime(datetime.now().year, mes_num, 1)
-            else:
-                return pd.to_datetime(mes_str, errors='coerce', dayfirst=False, infer_datetime_format=True)
+            m = str(mes_str).strip()
+            if m[:3].lower() in meses_pt:
+                mes = meses_pt.index(m[:3].lower())+1
+                return datetime(datetime.now().year, mes, 1)
+            elif m[:3].lower() in meses_en:
+                mes = meses_en.index(m[:3].lower())+1
+                return datetime(datetime.now().year, mes, 1)
+            try:
+                return pd.to_datetime(m, errors='coerce', dayfirst=False, infer_datetime_format=True)
+            except:
+                return pd.NaT
 
         df_valid['DataConvertida'] = df_valid[Data].apply(converter_mes)
         if df_valid['DataConvertida'].isnull().any():
@@ -1435,8 +1439,7 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
         index = df_valid[Data].tolist()
         datas_convertidas = df_valid['DataConvertida'].tolist()
     else:
-        df_valid = df[[coluna_y]].dropna()
-        df_valid = df_valid.reset_index()
+        df_valid = df[[coluna_y]].dropna().reset_index()
         index = df_valid.index.values.tolist()
         datas_convertidas = None
 
@@ -1446,7 +1449,7 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     Y = df_valid[coluna_y].values
     X = np.arange(len(Y)).reshape(-1,1)
 
-    # Modelo de tendência linear
+    # Modelo
     modelo = LinearRegression()
     modelo.fit(X, Y)
     previsao_fit = modelo.predict(X)
@@ -1455,33 +1458,58 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     X_future = np.arange(len(Y), len(Y)+horizonte).reshape(-1,1)
     previsao_future = modelo.predict(X_future) if horizonte > 0 else []
 
-    # Cria rótulos futuros automáticos
+    # Geração de labels futuros (previsão)
     index_futuro = []
     if horizonte > 0:
+        # Se há coluna de data, usar o mesmo padrão do aluno
         if Data and Data in df.columns and datas_convertidas is not None:
             ult_data = datas_convertidas[-1]
-            # Detecta o intervalo dominante
+            # Descobre o tipo de periodicidade
             if len(datas_convertidas) > 1:
                 diff = pd.Series(datas_convertidas).diff().mode()[0]
             else:
                 diff = pd.Timedelta(days=30)
-            for i in range(horizonte):
-                if pd.Timedelta(days=360) < diff < pd.Timedelta(days=370):
-                    nova_data = ult_data + YearEnd(i+1)
+            # Detecta padrão de input do aluno
+            exemplo = str(index[-1])
+            so_mes = (exemplo[:3].lower() in meses_pt + meses_en) and ("/" not in exemplo) and (not any(c.isdigit() for c in exemplo))
+            so_ano = exemplo.isdigit() and len(exemplo) == 4
+            so_dia = len(exemplo.split("/")) == 3
+            mes_ano = ("/" in exemplo) and (len(exemplo.split("/"))==2)
+            # idioma: pt se mês "fev" ou "dez", en se "feb" ou "dec"
+            idioma = "pt" if exemplo[:3].lower() in meses_pt else "en"
+            meses_lista = meses_pt if idioma=="pt" else meses_en
+
+            for i in range(1, horizonte+1):
+                if pd.Timedelta(days=360) < diff < pd.Timedelta(days=370) or so_ano:
+                    nova_data = ult_data + YearEnd(i)
                     label = nova_data.strftime('%Y')
-                elif pd.Timedelta(days=27) < diff < pd.Timedelta(days=32):
-                    nova_data = ult_data + MonthEnd(i+1)
-                    label = nova_data.strftime('%b/%Y')
+                elif pd.Timedelta(days=27) < diff < pd.Timedelta(days=32) or so_mes or mes_ano:
+                    mes_index = (ult_data.month-1+i)%12
+                    ano = ult_data.year + ((ult_data.month-1+i)//12)
+                    nome_mes = meses_lista[mes_index].capitalize()
+                    if so_mes:
+                        label = nome_mes
+                    elif mes_ano:
+                        # Mesmo separador usado pelo aluno
+                        sep = "/" if "/" in exemplo else "-"
+                        if idioma == "pt":
+                            label = f"{nome_mes}{sep}{ano}"
+                        else:
+                            label = f"{nome_mes}{sep}{ano}"
+                    else:
+                        label = nome_mes
+                    nova_data = datetime(ano, mes_index+1, 1)
                 elif pd.Timedelta(days=6) < diff < pd.Timedelta(days=8):
-                    nova_data = ult_data + Week(i+1)
+                    nova_data = ult_data + Week(i)
                     label = f"Sem {nova_data.strftime('%U')}/{nova_data.year}"
-                elif diff == pd.Timedelta(days=1):
-                    nova_data = ult_data + Day(i+1)
+                elif diff == pd.Timedelta(days=1) or so_dia:
+                    nova_data = ult_data + Day(i)
                     label = nova_data.strftime('%d/%m/%Y')
                 else:
-                    nova_data = ult_data + Day(i+1)
+                    nova_data = ult_data + Day(i)
                     label = nova_data.strftime('%d/%m/%Y')
                 index_futuro.append(label)
+                ult_data = nova_data  # avança sempre!
         else:
             index_futuro = [f'Futuro {i+1}' for i in range(horizonte)]
 
@@ -1513,12 +1541,12 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     ax.plot(index, previsao_fit, label='Ajuste Linear', color='red')
     if horizonte > 0:
         ax.plot(index_completo[len(Y):], previsao_future, 'g--', label='Previsão')
-    ax.set_title("📊 Análise – Tendência Linear", fontsize=18, fontweight='bold')
+    ax.set_title("Análise – Tendência Linear", fontsize=18, fontweight='bold')
     ax.set_ylabel("Valor", fontsize=16, fontweight='bold')
     ax.set_xlabel("Período", fontsize=16, fontweight='bold')
     ax.legend()
     ax.set_xticks(index_completo)
-    ax.set_xticklabels(index_completo, rotation=45)
+    ax.set_xticklabels(index_completo, rotation=45, fontsize=12)
     plt.tight_layout()
 
     buf = BytesIO()
@@ -1527,7 +1555,7 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = (
-        "📊 **Análise – Tendência Linear**\n"
+        "📈 **Análise – Tendência Linear**\n"
         + f"Equação do Modelo: Yt = {modelo.intercept_:,.2f} – {abs(modelo.coef_[0]):,.2f} * t\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + f"MAPE: {mape:,.2f} – {mape_status} (o erro percentual médio está {mape_status.lower()})\n".replace(',', 'v').replace('.', ',').replace('v', '.')
         + f"MAD: {mad:,.2f} – {mad_status.capitalize()} (comparado à média de {media_y:,.2f})\n".replace(',', 'v').replace('.', ',').replace('v', '.')
@@ -1542,8 +1570,6 @@ def analise_tendencia_linear(df: pd.DataFrame, coluna_y: str, Data=None, field=N
     )
 
     return texto.strip(), grafico_base64
-
-
 
 
 
