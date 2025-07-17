@@ -1858,7 +1858,15 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None)
         return "❌ Valor de referência inválido. Informe um número como 0.5 no campo.", None
 
     n = len(x)
-    nivel_conf = 95.0
+
+    # Ajuste: usa field_conf se informado, senão padrão 95%
+    try:
+        nivel_conf = float(field_conf) if field_conf not in [None, ""] else 95.0
+        if not (50 < nivel_conf < 100):
+            return "❌ O nível de confiança deve ser entre 50 e 100 (ex.: 95).", None
+    except:
+        return "❌ Valor de confiança inválido. Informe um número como 95 no campo.", None
+
     alpha = 1 - (nivel_conf / 100)
 
     categorias = x.value_counts()
@@ -1917,7 +1925,6 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None)
         axs[i].set_ylim(0, max(1, ic_upper * 1.2, p_hat * 1.2, p0 * 1.2))
 
         # labels acima da barra
-        
         axs[i].text(0, p0 + 0.02, f"Ref.: {p0:.2f}", ha='center', va='bottom', fontsize=11, color='red')
 
         axs[i].set_ylabel('Proporção')
@@ -1936,12 +1943,13 @@ def analise_1_proporcao(df: pd.DataFrame, coluna_x, field=None, field_conf=None)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
     texto = f"""
-📊 **Análise – Teste de 1 Proporção**
+📊 **Análise – Teste de 1 Proporção** (Nível de confiança: {nivel_conf:.1f}%)
 
 {''.join(resultados)}
 """
 
     return texto.strip(), grafico_base64
+
 
 
 
