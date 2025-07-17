@@ -1214,15 +1214,18 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     total_amostras = df_folha.shape[0]
+    n_nodes = model.tree_.node_count
+
+    # Função para limitar tamanho da linha do texto
+    def wrap_txt(txt, width=28):
+        return "\n".join(textwrap.wrap(txt, width=width))
 
     for idx, t in enumerate(ax.texts):
-        # Checa se é folha/final
+        # Verifica se é folha
         if idx in folhas_info:
             folha = folhas_info[idx]
             regra = folha['regras']
-            # Controla a largura máxima de cada linha (~35 caracteres)
-            if len(regra) > 35:
-                regra = "\n".join(textwrap.wrap(regra, 35))
+            regra = wrap_txt(regra, 28)
             t.set_text(
                 f"{regra}\n"
                 f"Decisão: {folha['classe']}\n"
@@ -1234,28 +1237,20 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
             t.set_ha('center')
             t.set_va('center')
         else:
-            # Nó intermediário
-            box_txt = t.get_text().split('\n')
-            # Regra principal
-            regra = box_txt[0]
-            if len(regra) > 35:
-                regra = "\n".join(textwrap.wrap(regra, 35))
-            # Busca o valor real de amostras (samples) do scikit
-            samples = 0
-            for linha in box_txt:
-                if linha.strip().isdigit():
-                    samples = int(linha.strip())
-            pct = f"{(samples/total_amostras*100):.0f}%" if total_amostras > 0 else "0%"
-            # Classe majoritária
-            maioria = box_txt[-1] if len(box_txt) > 0 else ""
+            # Pega informações diretas da árvore
+            amostras = int(model.tree_.n_node_samples[idx])
+            pct = f"{(amostras/total_amostras*100):.0f}%" if total_amostras > 0 else "0%"
+            split_rule = t.get_text().split("\n")[0]
+            split_rule = wrap_txt(split_rule, 28)
             t.set_text(
-                f"{regra}\n"
-                f"Amostras: {samples}\n"
-                f"% do total: {pct}\n"
-                f"Maioria: {maioria}"
+                f"{split_rule}\n"
+                f"Amostras: {amostras}\n"
+                f"% do total: {pct}"
             )
             t.set_fontsize(12)
             t.set_color('#333')
+            t.set_ha('center')
+            t.set_va('center')
 
     ax.set_title("Árvore de Decisão — regras resumidas, decisão e percentual nas folhas", fontsize=17, fontweight='bold', color='#222')
     plt.tight_layout(rect=[0, 0, 1, 0.97])
@@ -1294,8 +1289,6 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     )
 
     return texto.strip(), grafico_base64
-
-
 
 
 
