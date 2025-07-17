@@ -525,156 +525,147 @@ def analise_regressao_cubica(df: pd.DataFrame, coluna_y, coluna_x):
     return texto.strip(), grafico_base64
 
 def analise_regressao_linear_multipla(df, coluna_y, lista_x):
+    import pandas as pd
+    import numpy as np
+    import statsmodels.api as sm
+    import matplotlib.pyplot as plt
+    from sklearn.linear_model import LinearRegression
+    from sklearn.metrics import r2_score
+    from statsmodels.stats.outliers_influence import variance_inflation_factor
+    from scipy import stats
+    from io import BytesIO
+    import base64
+
+    # Validação inicial
     if not coluna_y or not lista_x:
         return "❌ A regressão linear múltipla requer 1 Y e pelo menos 1 X.", None
 
     for col in [coluna_y] + lista_x:
         if col not in df.columns:
-            return f"❌ Coluna {col} não encontrada no arquivo.", None
+            return f"❌ Coluna '{col}' não encontrada no conjunto de dados.", None
 
     df_valid = df[[coluna_y] + lista_x].dropna()
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
+    # Preparação dos dados
     Y = df_valid[coluna_y].values
-    X_final = pd.get_dummies(df_valid[lista_x], drop_first=True)
-    x_cols_final = X_final.columns.tolist()
-    X_values = X_final.values
-    n, p_full = X_values.shape
+    X = pd.get_dummies(df_valid[lista_x], drop_first=True)
+    X_cols = X.columns.tolist()
+    X_values = X.values
+    n, p = X_values.shape
 
-    from sklearn.linear_model import LinearRegression
-    from sklearn.metrics import r2_score
-    from statsmodels.stats.outliers_influence import variance_inflation_factor
-    import statsmodels.api as sm
-    from itertools import combinations
-    import matplotlib.pyplot as plt
-    from io import BytesIO
-    import base64
-    import numpy as np
-    from scipy import stats
+    # Regressão com statsmodels
+    X_sm = sm.add_constant(X)
+    model = sm.OLS(Y, X_sm).fit()
+    Y_pred = model.predict(X_sm)
 
-    def calcular_modelo(X_sub, cols_sub):
-        model = LinearRegression().fit(X_sub, Y)
-        Y_pred = model.predict(X_sub)
-        r2 = r2_score(Y, Y_pred)
-        r2_adj = 1 - (1 - r2) * (n - 1) / (n - X_sub.shape[1] - 1)
+    # Métricas
+    r2 = model.rsquared
+    r2_adj = model.rsquared_adj
+    p_global = model.f_pvalue
+    p_individuais = model.pvalues[1:]
+    coeficientes = model.params[1:]
+    intercepto = model.params[0]
 
-        # R² preditivo (Leave-One-Out)
-        erros = []
-        for i in range(n):
-            Xi = np.delete(X_sub, i, axis=0)
-            Yi = np.delete(Y, i)
-            m_lo = LinearRegression().fit(Xi, Yi)
-            y_lo = m_lo.predict(X_sub[i].reshape(1, -1))[0]
-            erros.append((Y[i] - y_lo) ** 2)
-        ss_res_pred = np.sum(erros)
-        ss_tot = np.sum((Y - np.mean(Y)) ** 2)
-        r2_pred = 1 - ss_res_pred / ss_tot
+    # R² preditivo (Leave-One-Out)
+    r2_pred = 1 - np.sum([
+        (Y[i] - LinearRegression().fit(np.delete(X_values, i, axis=0), np.delete(Y, i)).predict(X_values[i].reshape(1, -1))[0]) ** 2
+        for i in range(n)
+    ]) / np.sum((Y - np.mean(Y)) ** 2)
 
-        # VIF
-        vif = []
-        if X_sub.shape[1] > 1:
-            X_sm = sm.add_constant(X_sub)
-            for i in range(1, X_sm.shape[1]):
-                vif.append(variance_inflation_factor(X_sm, i))
-        else:
-            vif.append(1.0)
+    # Cp de Mallows
+    mse_full = np.sum((Y - Y_pred) ** 2) / (n - p - 1)
+    cp = (np.sum((Y - Y_pred) ** 2) / mse_full) - (n - 2 * (p + 1))
 
-        # Mallows Cp
-        resid = Y - Y_pred
-        mse_full = np.sum((Y - LinearRegression().fit(X_values, Y).predict(X_values)) ** 2) / (n - p_full - 1)
-        cp = (np.sum(resid ** 2) / mse_full) - (n - 2 * (X_sub.shape[1] + 1))
+    # VIF
+    vif_list = [variance_inflation_factor(X_values, i) for i in range(p)]
 
-        # Durbin-Watson
-        dw = sm.stats.stattools.durbin_watson(resid)
+    # Resíduos
+    residuos = Y - Y_pred
+    dw = sm.stats.stattools.durbin_watson(residuos)
+    media_residuos = np.mean(residuos)
+    p_normalidade = stats.shapiro(residuos).pvalue
+    p_heterocedasticidade = sm.stats.diagnostic.het_breuschpagan(residuos, X_sm)[1]
 
-        # p-valor do modelo (F-test)
-        ss_res = np.sum((Y - Y_pred) ** 2)
-        msr = (ss_tot - ss_res) / X_sub.shape[1]
-        mse = ss_res / (n - X_sub.shape[1] - 1)
-        f_stat = msr / mse
-        p_valor_modelo = 1 - stats.f.cdf(f_stat, X_sub.shape[1], n - X_sub.shape[1] - 1)
-
-        return {
-            "cols": cols_sub,
-            "model": model,
-            "r2": r2,
-            "r2_adj": r2_adj,
-            "r2_pred": r2_pred,
-            "vif": vif,
-            "cp": cp,
-            "dw": dw,
-            "p_valor_modelo": p_valor_modelo,
-            "Y_pred": Y_pred
-        }
-
-    # ➔ Modelo completo com todas as preditoras
-    modelo_completo = calcular_modelo(X_values, x_cols_final)
-
+    # Gráfico dos resíduos
     fig, ax = plt.subplots(figsize=(6, 4))
-    ax.scatter(modelo_completo["Y_pred"], Y - modelo_completo["Y_pred"], color='black')
+    ax.scatter(Y_pred, residuos, color='black')
     ax.axhline(0, color='red', linestyle='--')
     ax.set_xlabel("Valores preditos")
     ax.set_ylabel("Resíduos")
     ax.set_title("Resíduos vs Valores Preditos")
     plt.tight_layout()
-
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Equação
-    coef_str = " + ".join([f"{coef:.2f}·{col}" for coef, col in zip(modelo_completo["model"].coef_, modelo_completo["cols"])])
-    equacao = f"Y = {modelo_completo['model'].intercept_:.2f} + {coef_str}"
+    # Equação do modelo
+    equacao = f"{coluna_y} = {intercepto:.2f} + " + " + ".join(
+        [f"{coef:.2f}·{col}" for coef, col in zip(coeficientes, X_cols)]
+    )
 
-    # Diagnóstico
-    conclusao = []
-    if modelo_completo['r2_pred'] > 0.5:
-        conclusao.append("✅ Modelo validado (R² preditivo adequado).")
-    else:
-        conclusao.append("⚠ Modelo não validado (R² preditivo baixo).")
+    # Strings de resultados
+    p_ind_str = " | ".join([f"{col} = {pval:.4f}" for col, pval in zip(X_cols, p_individuais)])
+    vif_str = " | ".join([f"{col} = {v:.2f}" for col, v in zip(X_cols, vif_list)])
 
-    if all(v < 10 for v in modelo_completo['vif']):
-        conclusao.append("✅ Sem multicolinearidade severa (VIF < 10).")
-    else:
-        conclusao.append("⚠ Multicolinearidade identificada (VIF ≥ 10). VIF acima de 10 indica alta correlação entre preditoras.")
+    # Critérios obrigatórios (para predição)
+    criticos = [
+        f"R² preditivo (mínimo 0,50): {r2_pred:.3f} {'✅' if r2_pred >= 0.5 else '❌'}",
+        f"p-valor global do modelo (< 0,05): {p_global:.4f} {'✅' if p_global < 0.05 else '❌'}",
+        f"Durbin-Watson - Independência do resíduos (entre 1,5 e 2,5): {dw:.3f} {'✅' if 1.5 <= dw <= 2.5 else '❌'}"
+    ]
 
-    if abs(modelo_completo["cp"] - (len(modelo_completo["cols"]) + 1)) < 2:
-        conclusao.append("✅ Cp dentro do esperado (Cp ≈ p+1 indica modelo sem viés).")
-    else:
-        conclusao.append("⚠ Cp elevado, modelo pode estar superajustado (Cp muito maior que p+1).")
+    # Critérios recomendados
+    recomendados = [
+        f"p-valores individuais (< 0,05): {p_ind_str} {'✅' if all(p < 0.05 for p in p_individuais) else '⚠️'}",
+        f"R² e R² ajustado: {r2:.3f} | {r2_adj:.3f} ✅",
+        f"Δ R² ajustado vs R² preditivo (< 0,05): {abs(r2_adj - r2_pred):.3f} {'✅' if abs(r2_adj - r2_pred) < 0.05 else '⚠️'}",
+        f"Cp de Mallows ≈ p+1: {cp:.2f} {'✅' if abs(cp - (p + 1)) <= 1 else '⚠️'}",
+        f"Normalidade dos resíduos (p > 0,05): {p_normalidade:.4f} {'✅' if p_normalidade > 0.05 else '⚠️'}",
+        f"Homocedasticidade dos resíduos (p > 0,05): {p_heterocedasticidade:.4f} {'✅' if p_heterocedasticidade > 0.05 else '⚠️'}",
+        f"Média dos resíduos ≈ 0: {media_residuos:.4f} ✅",
+        f"VIFs (< 10 desejado): {vif_str} {'✅' if all(v < 10 for v in vif_list) else '⚠️'}"
+    ]
 
-    if 1.5 < modelo_completo["dw"] < 2.5:
-        conclusao.append("✅ Sem autocorrelação nos resíduos (Durbin-Watson entre 1.5 e 2.5).")
-    else:
-        conclusao.append("⚠ Autocorrelação identificada nos resíduos (DW fora do ideal). DW <1.5 indica autocorrelação positiva; >2.5 negativa.")
+    # Conclusão
+    modelo_valido = (
+        r2_pred >= 0.5 and
+        p_global < 0.05 and
+        1.5 <= dw <= 2.5
+    )
+    conclusao = "✅ Modelo validado para fins preditivos (uso matemático)." if modelo_valido else "❌ Modelo não validado."
 
+    # Geração do texto final
     texto = f"""
 📊 **Análise – Regressão Linear Múltipla**
 
-🔹 **Hipóteses do modelo**
-- **H₀:** Não há relação linear entre {', '.join(lista_x)} e {coluna_y}
-- **H₁:** Existe relação linear entre {', '.join(lista_x)} e {coluna_y}
+🔹 **Hipóteses do Modelo**
 
-🔎 **Resumo do modelo**
-- Y: {coluna_y}
-- Xs: {', '.join(modelo_completo['cols'])}
-- Equação: {equacao}
-- R²: {modelo_completo['r2']:.3f}
-- R² ajustado: {modelo_completo['r2_adj']:.3f}
-- R² preditivo: {modelo_completo['r2_pred']:.3f}
-- p-valor do modelo: {modelo_completo['p_valor_modelo']:.4f}
-- Mallows Cp: {modelo_completo['cp']:.3f}
-- Durbin-Watson: {modelo_completo['dw']:.3f}
-- VIFs: {', '.join([f"{c}={v:.2f}" for c, v in zip(modelo_completo['cols'], modelo_completo['vif'])])}
+- **H₀:** Não há relação linear significativa entre pelo menos uma das variáveis independentes ({', '.join(lista_x)}) com a variável resposta ({coluna_y}).
+- **H₁:** Existe relação linear significativa entre pelo menos uma das variáveis independentes ({', '.join(lista_x)}) com {coluna_y}.
 
-🔎 **Conclusão**
-{chr(10).join(conclusao)}
+
+🔹 **Resumo do Modelo**
+
+- **Variável dependente (Y):** {coluna_y}  
+- **Variáveis preditoras (X):** {', '.join(lista_x)}  
+- **Equação estimada:**  
+  {equacao}
+
+🔎 **Resultados – Itens Críticos (Obrigatórios para predição matemática)**  
+{chr(10).join(['- ' + linha for linha in criticos])}
+
+🟡 **Resultados – Itens Recomendados (Desejáveis)**  
+{chr(10).join(['- ' + linha for linha in recomendados])}
+
+
+🔎 **Conclusão Final**  
+{conclusao}
 """.strip()
 
     return texto, grafico_base64
-
 
 
 
@@ -685,13 +676,13 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
 
     for col in [coluna_y] + lista_x:
         if col not in df.columns:
-            return f"❌ Coluna {col} não encontrada no arquivo.", None
+            return f"❌ Coluna '{col}' não encontrada no conjunto de dados.", None
 
     df_valid = df[[coluna_y] + lista_x].dropna()
     if len(df_valid) < len(lista_x) + 3:
         return "❌ O modelo requer mais dados válidos.", None
 
-    # Mapeamento automático do Y categórico
+    # Codificação da variável Y
     classes = df_valid[coluna_y].unique()
     if len(classes) != 2:
         return "❌ A variável Y deve conter exatamente 2 categorias distintas para regressão logística binária.", None
@@ -714,18 +705,17 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     Y_pred_prob = model.predict(X_sm)
     Y_pred_class = (Y_pred_prob >= 0.5).astype(int)
 
+    # Métricas do modelo
     ll_null = sm.Logit(Y, np.ones((len(Y), 1))).fit(disp=0).llf
     ll_model = model.llf
     r2_mcf = 1 - ll_model / ll_null
-
-    vif = []
-    for i in range(1, X_sm.shape[1]):
-        vif.append(variance_inflation_factor(X_sm.values, i))
-
     auc = roc_auc_score(Y, Y_pred_prob)
     cm = confusion_matrix(Y, Y_pred_class)
     acerto = (cm.diagonal().sum()) / cm.sum()
+    vif = [variance_inflation_factor(X_sm.values, i) for i in range(1, X_sm.shape[1])]
+    odds_ratios = np.exp(model.params[1:])
 
+    # Gráfico (ROC se mais de uma preditora, curva logística se uma)
     fig, ax = plt.subplots(figsize=(6, 4))
     if len(x_cols_final) == 1:
         X_plot = np.linspace(X_final.iloc[:, 0].min(), X_final.iloc[:, 0].max(), 100)
@@ -753,60 +743,64 @@ def analise_regressao_logistica_binaria(df, coluna_y, lista_x):
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    linhas = []
-    for name, coef, pval in zip(['Const'] + x_cols_final, model.params, model.pvalues):
-        linhas.append(f"- {name}: coef={coef:.4f}, p-valor={pval:.4f}")
-    linhas.append(f"- R² de McFadden: {r2_mcf:.4f}")
-    linhas.append(f"- AUC: {auc:.4f}")
-    linhas.append(f"- Percentual de acerto: {acerto*100:.2f}%")
-    linhas.append("- VIFs: " + ", ".join([f"{c}={v:.2f}" for c, v in zip(x_cols_final, vif)]))
+    # Verificação de validade (critérios obrigatórios)
+    validado = (r2_mcf > 0.2) and (auc > 0.7) and any(p < 0.05 for p in model.pvalues[1:])
+    conclusao = "✅ Modelo validado para fins preditivos." if validado else "❌ Modelo não validado."
 
-    # Modelo de reporte completo com conclusão antes da recomendação
-    validado = (r2_mcf > 0.2) and (auc > 0.7) and all(v < 10 for v in vif) and any(p < 0.05 for p in model.pvalues[1:])
-
-    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
-
-    criterios = []
-    criterios.append(f"- R² de McFadden = {r2_mcf:.4f} {'✅ adequado (>0.2)' if r2_mcf > 0.2 else '❌ baixo (<=0.2)'}")
-    criterios.append(f"- AUC = {auc:.4f} {'✅ adequado (>0.7)' if auc > 0.7 else '❌ baixo (<=0.7)'}")
-    criterios.append(f"- Percentual de acerto = {acerto*100:.2f}%")
-    for name, pval in zip(x_cols_final, model.pvalues[1:]):
-        criterios.append(f"- p-valor {name} = {pval:.4f} {'✅ significativo (<0.05)' if pval < 0.05 else '❌ não significativo (>=0.05)'}")
-    for c, v in zip(x_cols_final, vif):
-        criterios.append(f"- VIF {c} = {v:.2f} {'✅ adequado (<10)' if v < 10 else '❌ alto (>=10)'}")
-
-    recomendacao = ""
-    if not validado:
-        recomendacao = """
-🔎 **Observação / Recomendação**
-➡️ O modelo não foi validado. Considere:
-- Remover preditoras não significativas (p >= 0.05).
-- Adicionar variáveis ou categorias.
-- Aumentar o tamanho amostral para maior poder estatístico.
-""".strip()
-
+    # Construção do relatório
     texto = f"""
 📊 **Análise – Regressão Logística Binária**
 
-🔹 **Hipóteses do modelo**
-- H₀: Nenhuma variável está associada à probabilidade do evento
-- H₁: Pelo menos uma variável está associada à probabilidade do evento
+🔹 **Hipóteses do Modelo**
 
-🔎 **Resumo do modelo**
-- Variável dependente (Y): {coluna_y}
-- Variáveis independentes (Xs): {', '.join(x_cols_final)}
-{chr(10).join(linhas)}
+- **H₀:** Nenhuma das variáveis independentes está associada à probabilidade do evento ({coluna_y}).  
+- **H₁:** Pelo menos uma variável está associada à probabilidade do evento ({coluna_y}).
 
-🔎 **Conclusão**
-{conclusao_status}
+🔹 **Resumo do Modelo**
 
-🔹 **Critérios avaliados:**
-{chr(10).join(criterios)}
+- **Variável dependente (Y):** {coluna_y}  
+- **Variáveis preditoras (X):** {', '.join(x_cols_final)}  
+- **Equação estimada:**  
+  log(p / (1 – p)) = {model.params[0]:.4f} {' '.join([f"+ {coef:.4f}·{col}" for coef, col in zip(model.params[1:], x_cols_final)])}
 
-{recomendacao}
-""".strip()
+- **Odds Ratios (interpretação prática):**
+""" + "\n".join([
+        f"  {col}: {odds:.2f} → " +
+        (f"Para cada 1 unidade a mais de {col}, a chance do evento {'aumenta' if odds > 1 else 'diminui'} em {abs((odds - 1) * 100):.0f}%, mantendo-se as demais constantes."
+         if round(odds, 2) != 1 else
+         f"Para cada 1 unidade a mais de {col}, não há variação relevante na chance do evento.")
+        for col, odds in zip(x_cols_final, odds_ratios)
+    ]) + f"""
 
-    return texto, grafico_base64
+🔎 **Resultados – Itens Críticos (Obrigatórios para predição)**  
+- R² de McFadden (> 0,20): {r2_mcf:.4f} ✅ (mede o ajuste geral do modelo)  
+- AUC (> 0,70): {auc:.4f} ✅ (mede a capacidade do modelo em distinguir entre casos com e sem {coluna_y})  
+- Alguma preditora significativa (p < 0,05): {'✅' if any(p < 0.05 for p in model.pvalues[1:]) else '❌'}
+
+🟡 **Resultados – Itens Recomendados (Desejáveis)**  
+- Percentual de acerto (> 70%): {acerto * 100:.2f}% {'✅' if acerto >= 0.7 else '⚠️'}  
+""" + "\n".join([
+        f"- p-valor {col} = {p:.4f} {'✅' if p < 0.05 else '❌'}"
+        for col, p in zip(x_cols_final, model.pvalues[1:])
+    ]) + "\n" + "\n".join([
+        f"- VIF {col} = {v:.2f} {'✅' if v < 10 else '⚠️'} (mede colinearidade entre variáveis)"
+        for col, v in zip(x_cols_final, vif)
+    ]) + f"""
+
+🔎 **Conclusão Final**  
+{conclusao}
+
+""" + ("""
+🔹 **Recomendações**  
+➡️ O modelo não foi validado. Para melhorá-lo:  
+- Remova variáveis com p ≥ 0,05  
+- Adicione outras variáveis relevantes  
+- Tente usar mais dados para obter resultados mais confiáveis
+""" if not validado else "")
+
+    return texto.strip(), grafico_base64
+
+
 
 
 
@@ -835,7 +829,7 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         from io import BytesIO
         import base64
 
-        # Selecionar e limpar dados
+        # Limpeza dos dados
         df = df[[coluna_y] + lista_x].copy()
         df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
         df.dropna(inplace=True)
@@ -850,70 +844,69 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         df[coluna_y] = pd.Categorical(df[coluna_y], categories=categorias_unicas, ordered=True)
 
         y = df[coluna_y]
-        X = df[lista_x]  # NÃO adicionar constante para OrderedModel
+        X = df[lista_x]
 
         model = OrderedModel(y, X, distr='logit')
         result = model.fit(method='bfgs', disp=False)
 
         odds_ratios = np.exp(result.params)
         pvalores = result.pvalues
-
-        # Conclusão e validação
         validado = all(p < 0.05 for p in pvalores)
 
-        conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
-
-        # Reporte
-        texto_resultado = f"""
+        texto = f"""
 📊 **Análise – Regressão Logística Ordinal**
 
-🔹 **Hipóteses do modelo**
-- H₀: Não há relação entre as variáveis independentes e a ordem das categorias
-- H₁: Pelo menos uma variável independente está associada à ordem das categorias
+🔹 **Hipóteses do Modelo**
 
-🔎 **Resumo do modelo**
-- Variável dependente (Y): {coluna_y}
-- Variáveis independentes (Xs): {', '.join(lista_x)}
-- Categorias (ordem): {' < '.join(categorias_unicas)}
+- **H₀:** Não há relação entre as variáveis independentes e a ordem das categorias da variável {coluna_y}.  
+- **H₁:** Pelo menos uma variável está associada à ordem das categorias.
+
+🔹 **Resumo do Modelo**
+
+- **Variável dependente (Y):** {coluna_y}  
+- **Variáveis preditoras (X):** {', '.join(lista_x)}  
+- **Categorias ordenadas:** {' < '.join(categorias_unicas)}
 
 📌 **Parâmetros estimados:**
 """
         for param, val in result.params.items():
-            texto_resultado += f"- {param}: {val:.2f} (p = {pvalores[param]:.3f})\n"
+            texto += f"- {param}: {val:.2f} (p = {pvalores[param]:.3f})\n"
 
-        texto_resultado += "\n💡 **Odds Ratios:**\n"
-        for param, val in odds_ratios.items():
-            texto_resultado += f"- {param}: {val:.2f}\n"
+        texto += "\n💡 **Odds Ratios (interpretação prática):**\n"
+        for param, odds in odds_ratios.items():
+            if round(odds, 2) == 1:
+                texto += f"- {param}: {odds:.2f} → Cada unidade a mais não altera significativamente a chance de mudança de categoria.\n"
+            elif odds > 1:
+                texto += f"- {param}: {odds:.2f} → Cada unidade a mais aumenta a chance de estar em uma categoria superior em {((odds - 1) * 100):.0f}%.\n"
+            else:
+                texto += f"- {param}: {odds:.2f} → Cada unidade a mais reduz a chance de estar em uma categoria superior em {((1 - odds) * 100):.0f}%.\n"
 
-        # VIF
-        texto_resultado += "\n📉 **VIF (Multicolinearidade):**\n"
-        X_vif = df[lista_x]
-        X_vif_const = sm.add_constant(X_vif)
-        for i in range(1, X_vif_const.shape[1]):
-            vif_val = variance_inflation_factor(X_vif_const.values, i)
-            status_vif = "✅ adequado (<10)" if vif_val < 10 else "❌ alto (>=10)"
-            texto_resultado += f"- {X_vif_const.columns[i]}: {vif_val:.2f} {status_vif}\n"
+        texto += "\n📉 **VIF (Multicolinearidade):**\n"
+        X_vif = sm.add_constant(df[lista_x])
+        for i in range(1, X_vif.shape[1]):
+            v = variance_inflation_factor(X_vif.values, i)
+            status_vif = "✅ adequado (<10)" if v < 10 else "❌ alto (≥10)"
+            texto += f"- {X_vif.columns[i]}: {v:.2f} {status_vif} (mede correlação entre variáveis)\n"
 
-        # Conclusão
-        texto_resultado += f"\n🔎 **Conclusão**\n{conclusao_status}\n"
-
-        # Critérios avaliados
-        texto_resultado += "\n🔹 **Critérios avaliados:**\n"
+        texto += f"\n🔎 **Resultados – Itens Críticos (Obrigatórios para predição)**\n"
         for param, pval in pvalores.items():
-            status = "✅ significativo (<0,05)" if pval < 0.05 else "❌ não significativo (>=0,05)"
-            texto_resultado += f"- p-valor {param}: {pval:.3f} {status}\n"
+            status = "✅ significativo (< 0,05)" if pval < 0.05 else "❌ não significativo (≥ 0,05)"
+            texto += f"- p-valor {param}: {pval:.3f} {status}\n"
 
-        # Recomendação
+        texto += f"\n🔎 **Conclusão Final**\n"
+        texto += "✅ **Modelo validado para fins preditivos.**\n" if validado else "❌ **Modelo não validado.**\n"
+
+        # Recomendação (somente se houver variáveis não significativas)
         if not validado:
-            texto_resultado += """
-🔎 **Observação / Recomendação**
-➡️ O modelo não foi validado. Considere:
-- Remover variáveis não significativas.
-- Adicionar variáveis ou categorias relevantes.
-- Aumentar o tamanho amostral para maior poder estatístico.
+            texto += """
+🔹 **Recomendações**
+➡️ O modelo não foi validado. Para melhorá-lo:
+- Remova variáveis com p ≥ 0,05;
+- Adicione novas variáveis relevantes;
+- Aumente o número de observações (amostra).
 """.strip()
 
-        # Gráfico de boxplot para visualização
+        # Gráfico ilustrativo
         fig, ax = plt.subplots(figsize=(8, 4))
         df.boxplot(column=lista_x[0], by=coluna_y, ax=ax, grid=False)
         plt.suptitle('')
@@ -922,17 +915,16 @@ def analise_regressao_logistica_ordinal(df, coluna_y, lista_x):
         plt.ylabel(lista_x[0])
         plt.tight_layout()
 
-        buffer = BytesIO()
-        plt.savefig(buffer, format="png")
-        buffer.seek(0)
-        imagem_base64 = base64.b64encode(buffer.read()).decode("utf-8")
+        buf = BytesIO()
+        plt.savefig(buf, format="png")
+        buf.seek(0)
+        imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close()
 
-        return texto_resultado.strip(), imagem_base64
+        return texto.strip(), imagem_base64
 
     except Exception as e:
         return f"❌ Erro ao ajustar o modelo: {str(e)}", None
-
 
 
 def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
@@ -962,31 +954,22 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     y_labels = list(pd.Categorical(dados[coluna_y]).categories)
     X = dados[lista_x].astype(float)  # só numérico
 
-    # Ajustar modelo multinomial (sem add_constant)
+    # Ajustar modelo multinomial
     try:
         modelo = sm.MNLogit(y, X)
         resultado = modelo.fit(method='newton', disp=0)
     except Exception as e:
         return f"❌ Erro ao ajustar modelo: {str(e)}", None
 
-    # P-valores corretos (do teste de Wald)
     pvalores = resultado.pvalues
     coef = resultado.params
 
-    # Organizar p-valor das variáveis (para cada categoria de Y)
-    pvalores_txt = ""
-    # Lembre: colunas do pvalores são 0, 1, ... (cada classe extra); linhas são variáveis X
-    for idx, categoria in enumerate(y_labels[1:]):
-        pvalores_txt += f"\nClasse '{categoria}' vs referência '{y_labels[0]}':"
-        for xname in X.columns:
-            try:
-                pval = pvalores.loc[xname, idx]
-                coefval = coef.loc[xname, idx]
-                oratio = np.exp(coefval)
-                pvalores_txt += f"\n- {xname}: coef = {coefval:.3f}, OR = {oratio:.2f}, p = {pval:.4f} {'✅' if pval < 0.05 else '❌'}"
-            except Exception as err:
-                pvalores_txt += f"\n- {xname}: ERRO AO ACESSAR P-VALUE/COEF ({err})"
-        pvalores_txt += "\n"
+    # R² de McFadden
+    try:
+        null_model = sm.MNLogit(y, np.ones((len(y), 1))).fit(disp=0)
+        r2_mcf = 1 - resultado.llf / null_model.llf
+    except:
+        r2_mcf = None
 
     # Previsão e acurácia
     y_pred = resultado.predict(X).idxmax(axis=1)
@@ -1002,40 +985,94 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # R² McFadden
-    try:
-        null_model = sm.MNLogit(y, np.ones((len(y), 1))).fit(disp=0)
-        r2_mcf = 1 - resultado.llf / null_model.llf
-    except:
-        r2_mcf = None
+    # Odds ratios e equações por classe
+    odds_texto = ""
+    eq_texto = ""
+    tem_significativo = False
 
-    # Relatório final
+    for idx, categoria in enumerate(y_labels[1:]):
+        eq = f"logit(p[{categoria}] / p[{y_labels[0]}]) = "
+        eq += " + ".join([f"{coef.loc[xname, idx]:.4f}·{xname}" for xname in X.columns])
+        eq = eq.replace("+ -", "- ")
+        eq_texto += f"\n  {eq}"
+    odds_texto += ""
+    for idx, categoria in enumerate(y_labels[1:]):
+        odds_texto += f"\nClasse '{categoria}' vs referência '{y_labels[0]}':"
+        for xname in X.columns:
+            coefval = coef.loc[xname, idx]
+            oratio = np.exp(coefval)
+            odds_interpret = (
+                f"{oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} aumenta em {((oratio-1)*100):.0f}%."
+                if oratio > 1.01 else
+                f"{oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} reduz em {((1-oratio)*100):.0f}%."
+                if oratio < 0.99 else
+                f"{oratio:.2f} → Cada 1 unidade a mais em {xname}, não há variação relevante na chance da categoria."
+            )
+            odds_texto += f"\n  {xname}: {odds_interpret}"
+
+    # p-valores detalhados e checagem de pelo menos um significativo
+    pvalores_detalhe = ""
+    for idx, categoria in enumerate(y_labels[1:]):
+        pvalores_detalhe += f"\n- Classe '{categoria}' vs '{y_labels[0]}':"
+        for xname in X.columns:
+            pval = pvalores.loc[xname, idx]
+            flag = "✅" if pval < 0.05 else "❌"
+            if pval < 0.05:
+                tem_significativo = True
+            pvalores_detalhe += f"\n  {xname}: p = {pval:.4f} {flag}"
+
+    # Itens críticos
+    valid_r2 = r2_mcf is not None and r2_mcf > 0.20
+    valid_acc = acuracia >= 70
+    valid_pred = tem_significativo
+
+    criticos = (
+        f"- R² de McFadden (> 0,20): {r2_mcf:.3f} {'✅' if valid_r2 else '❌'} (mede o ajuste geral do modelo)\n"
+        f"- Acurácia do modelo (> 70%): {acuracia:.2f}% {'✅' if valid_acc else '❌'}\n"
+        f"- Alguma preditora significativa (p < 0,05): {'✅' if valid_pred else '❌'}"
+    )
+
+    # Reporte final
     texto = f"""
-📊 **Análise – Regressão Logística Nominal (Estilo Minitab)**
+📊 **Análise – Regressão Logística Nominal**
 
-- Variável resposta (Y): {coluna_y}
-- Variáveis preditoras: {', '.join(lista_x)}
-- Acurácia do modelo: {acuracia:.2f}%
-- R² de McFadden: {r2_mcf:.3f} {('(aceitável)' if r2_mcf and r2_mcf > 0.2 else '(baixo)')}
-- P-valores dos coeficientes (Teste Wald) e Odds Ratio:{pvalores_txt}
+🔹 Hipóteses do Modelo
+
+- **H₀:** Nenhuma das variáveis independentes está associada à chance de pertencer a cada categoria de {coluna_y}.
+- **H₁:** Pelo menos uma variável está associada à chance de pertencer a alguma categoria de {coluna_y}.
+
+🔹 Resumo do Modelo
+
+- **Variável dependente (Y):** {coluna_y}
+- **Variáveis preditoras (X):** {', '.join(lista_x)}
+- **Equações estimadas:**
+{eq_texto}
+
+- **Odds Ratios (interpretação prática):**
+{odds_texto}
+
+🔎 **Resultados – Itens Críticos (Obrigatórios para validação do modelo)**
+{criticos}
+
+🔎 **Resultados – Itens Recomendados (Desejáveis)**
+{pvalores_detalhe}
+
+🟡 Matriz de confusão apresentada ao lado.
+
+🔎 **Conclusão Final**
+{"✅ Modelo validado para predição entre as classes." if valid_r2 and valid_acc and valid_pred else "❌ Modelo não validado."}
+
+🔹 Recomendações
+➡️ Para aprimorar o modelo:
+- Remova variáveis preditoras com p ≥ 0,05 na comparação de interesse.
+- Considere adicionar novas variáveis relevantes.
+- Aumente a amostra para maior robustez estatística.
     """.strip()
 
     return texto, grafico_base64
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 import pandas as pd
+
 def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     if not coluna_y or not lista_x or len(lista_x) == 0:
         return "❌ A árvore de decisão requer 1 coluna Y e pelo menos 1 X.", None
@@ -1048,11 +1085,19 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
     Y = df_valid[coluna_y]
     X = df_valid[lista_x]
 
-    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, export_text, plot_tree
+    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, _tree
     from sklearn.metrics import accuracy_score, r2_score
     from io import BytesIO
     import base64
     import matplotlib.pyplot as plt
+    import numpy as np
+    import textwrap
+
+    # Força sempre a mesma ordem das classes para a legenda
+    if Y.dtype.name == "category":
+        class_names = [str(c) for c in Y.cat.categories]
+    else:
+        class_names = sorted(list(map(str, Y.unique())))
 
     tipo_modelo = "classificação"
     if pd.api.types.is_numeric_dtype(Y) and len(Y.unique()) > 10:
@@ -1065,6 +1110,9 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         desempenho = score
         tipo_modelo = "regressão"
     else:
+        from pandas.api.types import CategoricalDtype
+        class_cat = CategoricalDtype(categories=class_names, ordered=False)
+        Y = Y.astype(class_cat)
         model = DecisionTreeClassifier(max_depth=4, random_state=42)
         model.fit(X, Y)
         Y_pred = model.predict(X)
@@ -1074,59 +1122,170 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
         desempenho = acc
 
     importancias = ", ".join([f"{c} = {v * 100:.1f}%" for c, v in zip(lista_x, model.feature_importances_)])
-    regras = export_text(model, feature_names=lista_x)
 
-    # Gráfico árvore
-    fig, ax = plt.subplots(figsize=(10, 6))
-    plot_tree(
+    # ==== REGRA RESUMIDA E INTERVALO ====
+    tree_ = model.tree_
+    feature_names = lista_x
+
+    def resume_regras(condicoes):
+        var_lims = {}
+        for cond in condicoes:
+            if "≤" in cond:
+                var, lim = cond.split("≤")
+                var = var.strip()
+                lim = float(lim.strip())
+                if var not in var_lims:
+                    var_lims[var] = {"min": -np.inf, "max": np.inf}
+                var_lims[var]["max"] = min(var_lims[var]["max"], lim)
+            elif ">" in cond:
+                var, lim = cond.split(">")
+                var = var.strip()
+                lim = float(lim.strip())
+                if var not in var_lims:
+                    var_lims[var] = {"min": -np.inf, "max": np.inf}
+                var_lims[var]["min"] = max(var_lims[var]["min"], lim + 0.01)
+        regras = []
+        for var, lims in var_lims.items():
+            if lims["min"] == -np.inf:
+                regras.append(f"{var} ≤ {lims['max']:.2f}")
+            elif lims["max"] == np.inf:
+                regras.append(f"{var} > {lims['min']:.2f}")
+            else:
+                regras.append(f"{var} entre {lims['min']:.2f} e {lims['max']:.2f}")
+        return " e ".join(regras) if regras else "(sem divisão)"
+
+    # Busca as regras simplificadas de cada folha
+    def get_rules_for_leaves(tree, feature_names):
+        leaf_rules = {}
+        def recurse(node, conds):
+            if tree.feature[node] != _tree.TREE_UNDEFINED:
+                nome_feat = feature_names[tree.feature[node]]
+                limite = tree.threshold[node]
+                # Esquerda
+                cond_esq = conds + [f"{nome_feat} ≤ {limite:.2f}"]
+                recurse(tree.children_left[node], cond_esq)
+                # Direita
+                cond_dir = conds + [f"{nome_feat} > {limite:.2f}"]
+                recurse(tree.children_right[node], cond_dir)
+            else:
+                # Nó folha
+                leaf_rules[node] = resume_regras(conds)
+        recurse(0, [])
+        return leaf_rules
+
+    leaf_rules_dict = get_rules_for_leaves(tree_, feature_names)
+    leaf_ids = model.apply(X)
+    df_folha = pd.DataFrame({
+        "folha": leaf_ids,
+        "classe": Y.values,
+        "index": X.index
+    })
+    for feat in feature_names:
+        df_folha[feat] = X[feat].values
+
+    folhas_info = {}
+    for folha, regra_str in leaf_rules_dict.items():
+        amostras = df_folha[df_folha.folha == folha]
+        n = len(amostras)
+        if n == 0:
+            continue
+        mais_classe = amostras['classe'].value_counts().idxmax()
+        perc = 100 * amostras['classe'].value_counts(normalize=True).max()
+        folhas_info[folha] = {
+            "regras": regra_str,
+            "n": n,
+            "classe": mais_classe,
+            "perc": perc
+        }
+
+    from sklearn import tree as sktree
+
+    fig, ax = plt.subplots(figsize=(18, 10))
+    _ = sktree.plot_tree(
         model,
-        feature_names=lista_x,
-        class_names=[str(c) for c in Y.unique()] if tipo_modelo == "classificação" else None,
+        feature_names=feature_names,
+        class_names=class_names if tipo_modelo == "classificação" else None,
         filled=True,
         rounded=True,
-        fontsize=8,
-        ax=ax
+        fontsize=12,
+        ax=ax,
+        proportion=True,
+        label=None,
     )
-    plt.tight_layout()
+
+    total_amostras = df_folha.shape[0]
+    n_nodes = model.tree_.node_count
+
+    # Função para limitar tamanho da linha do texto
+    def wrap_txt(txt, width=28):
+        return "\n".join(textwrap.wrap(txt, width=width))
+
+    for idx, t in enumerate(ax.texts):
+        # Verifica se é folha
+        if idx in folhas_info:
+            folha = folhas_info[idx]
+            regra = folha['regras']
+            regra = wrap_txt(regra, 28)
+            t.set_text(
+                f"{regra}\n"
+                f"Decisão: {folha['classe']}\n"
+                f"{folha['perc']:.0f}% | n = {folha['n']}"
+            )
+            t.set_fontsize(12)
+            t.set_fontweight('normal')
+            t.set_color('#181818')
+            t.set_ha('center')
+            t.set_va('center')
+        else:
+            # Pega informações diretas da árvore
+            amostras = int(model.tree_.n_node_samples[idx])
+            pct = f"{(amostras/total_amostras*100):.0f}%" if total_amostras > 0 else "0%"
+            split_rule = t.get_text().split("\n")[0]
+            split_rule = wrap_txt(split_rule, 28)
+            t.set_text(
+                f"{split_rule}\n"
+                f"Amostras: {amostras}\n"
+                f"% do total: {pct}"
+            )
+            t.set_fontsize(11)
+            t.set_color('#333')
+            t.set_ha('center')
+            t.set_va('center')
+
+    ax.set_title("Árvore de Decisão — Decisão e percentual nas folhas", fontsize=18, fontweight='bold', color='#222')
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close(fig)
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Conclusão
-    validado = (tipo_modelo == "regressão" and desempenho >= 0.6) or (tipo_modelo == "classificação" and desempenho >= 0.7)
-    conclusao_status = "✅ **Modelo validado.**" if validado else "❌ **Modelo não validado.**"
-
-    # Recomendação
-    recomendacao = ""
-    if not validado:
-        recomendacao = (
-            "\n🔎 **Observação / Recomendação**\n➡️ O modelo não foi validado. Considere:\n"
-            "- Ajustar parâmetros do modelo (ex: max_depth).\n"
-            "- Adicionar variáveis relevantes.\n"
-            "- Aumentar o tamanho amostral para maior poder preditivo."
+    # ===== REPORT =====
+    linhas_report = []
+    for folha, info in folhas_info.items():
+        linhas_report.append(
+            f"- Se {info['regras']}: {info['perc']:.0f}% chance de ser '{info['classe']}' (n={info['n']})"
         )
+    regras_praticas = "\n".join(linhas_report)
 
-    # Reporte final
+    variaveis_ruins = [nome for nome, imp in zip(lista_x, model.feature_importances_) if imp < 0.05]
+    recomendacao = (
+        "🔎 **Recomendação:**\n" +
+        ("Remova a(s) variável(is): " + ", ".join(variaveis_ruins) + " (baixo poder preditivo)." if variaveis_ruins else "Mantenha todas as variáveis — todas são relevantes para o modelo.") +
+        "\n"
+    )
+
     texto = (
-        f"📊 **Análise – Árvore de Decisão**\n\n"
-        f"🔹 **Hipóteses do modelo**\n"
-        f"- O modelo consegue explicar ou classificar a variável Y com base em Xs.\n\n"
-        f"🔎 **Resumo do modelo**\n"
-        f"- Tipo: {tipo_modelo.capitalize()}\n"
-        f"- Variável dependente (Y): {coluna_y}\n"
-        f"- Variáveis independentes (Xs): {', '.join(lista_x)}\n\n"
-        f"🔎 **Conclusão**\n"
-        f"{conclusao_status}\n\n"
-        f"🔹 **Critérios avaliados:**\n"
-        f"- {score_txt} {criterio_status}\n"
-        f"- Número de decisões finais (folhas): {model.get_n_leaves()}\n"
-        f"- Profundidade da árvore: {model.get_depth()} níveis\n\n"
-        f"🔹 **Importância das variáveis:**\n"
-        f"{importancias}\n\n"
-        f"📘 **Regras aprendidas pelo modelo:**\n"
-        f"{regras}\n"
+        "📊 **Análise – Árvore de Decisão**\n\n"
+        "🔹 Critérios avaliados:\n"
+        f"- {score_txt} — {criterio_status} (mínimo esperado: {'70%' if tipo_modelo == 'classificação' else '0,6'})\n"
+        f"- Profundidade da árvore: {model.get_depth()} níveis\n"
+        f"- Número de folhas (decisões finais): {model.get_n_leaves()}\n"
+        f"- Importância das variáveis: {importancias}\n\n"
+        "🔹 Decisões do modelo:\n"
+        f"{regras_praticas}\n\n"
         f"{recomendacao}"
+        f"🔹 Resultado final: {'✅ Modelo validado.' if desempenho >= (0.7 if tipo_modelo == 'classificação' else 0.6) else '❌ Modelo não validado.'}"
     )
 
     return texto.strip(), grafico_base64
