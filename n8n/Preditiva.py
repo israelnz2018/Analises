@@ -1231,8 +1231,8 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
                 f"Decisão: {folha['classe']}\n"
                 f"{folha['perc']:.0f}% | n = {folha['n']}"
             )
-            t.set_fontsize(13)
-            t.set_fontweight('bold')
+            t.set_fontsize(12)
+            t.set_fontweight('normal')
             t.set_color('#181818')
             t.set_ha('center')
             t.set_va('center')
@@ -1247,12 +1247,12 @@ def analise_arvore_decisao(df: pd.DataFrame, coluna_y, lista_x):
                 f"Amostras: {amostras}\n"
                 f"% do total: {pct}"
             )
-            t.set_fontsize(12)
+            t.set_fontsize(11)
             t.set_color('#333')
             t.set_ha('center')
             t.set_va('center')
 
-    ax.set_title("Árvore de Decisão — regras resumidas, decisão e percentual nas folhas", fontsize=17, fontweight='bold', color='#222')
+    ax.set_title("Árvore de Decisão — Decisão e percentual nas folhas", fontsize=18, fontweight='bold', color='#222')
     plt.tight_layout(rect=[0, 0, 1, 0.97])
 
     buf = BytesIO()
