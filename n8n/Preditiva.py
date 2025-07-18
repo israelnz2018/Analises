@@ -975,17 +975,42 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
     y_pred = resultado.predict(X).idxmax(axis=1)
     acuracia = (y == y_pred).mean() * 100
 
-    # Matriz de confusão
+    # Matriz de confusão (valores)
+    matriz = confusion_matrix(y, y_pred)
+    matriz_df = pd.DataFrame(matriz, index=y_labels, columns=y_labels)
+
+    # Matriz de confusão (gráfico traduzido)
     fig, ax = plt.subplots(figsize=(6, 4))
-    ConfusionMatrixDisplay.from_predictions(y, y_pred, display_labels=y_labels, cmap="Blues", ax=ax, colorbar=False)
-    ax.set_title("Matriz de Confusão – Regressão Logística Nominal")
+    disp = ConfusionMatrixDisplay(confusion_matrix=matriz, display_labels=y_labels)
+    disp.plot(ax=ax, cmap="Blues", colorbar=False)
+    ax.set_xlabel('Classe Prevista', fontsize=12)
+    ax.set_ylabel('Classe Real', fontsize=12)
+    ax.set_title('Matriz de Confusão – Regressão Logística Nominal', fontsize=14)
     plt.tight_layout()
     buf = BytesIO()
     plt.savefig(buf, format='png')
     plt.close()
     grafico_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
 
-    # Odds ratios e equações por classe
+    # Resumo didático da matriz
+    matriz_texto = "\n**Resumo da matriz de confusão:**"
+    for i, classe in enumerate(y_labels):
+        total_real = matriz[i].sum()
+        acertos = matriz[i, i]
+        erros = total_real - acertos
+        linha = f"- {classe}: {total_real} casos reais | "
+        if acertos > 0:
+            linha += f"{acertos} acertos"
+        if erros > 0:
+            err_str = []
+            for j, prev_classe in enumerate(y_labels):
+                if j != i and matriz[i, j] > 0:
+                    err_str.append(f"{matriz[i, j]} previsto como '{prev_classe}'")
+            if err_str:
+                linha += f" | {', '.join(err_str)}"
+        matriz_texto += "\n" + linha
+
+    # Odds ratios e equações por classe — mostra só quando p < 0.05
     odds_texto = ""
     eq_texto = ""
     tem_significativo = False
@@ -1001,24 +1026,25 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         for xname in X.columns:
             coefval = coef.loc[xname, idx]
             oratio = np.exp(coefval)
-            odds_interpret = (
-                f"{oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} aumenta em {((oratio-1)*100):.0f}%."
-                if oratio > 1.01 else
-                f"{oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} reduz em {((1-oratio)*100):.0f}%."
-                if oratio < 0.99 else
-                f"{oratio:.2f} → Cada 1 unidade a mais em {xname}, não há variação relevante na chance da categoria."
-            )
-            odds_texto += f"\n  {xname}: {odds_interpret}"
+            pval = pvalores.loc[xname, idx]
+            if pval < 0.05:
+                tem_significativo = True
+                if oratio > 1.01:
+                    odds_texto += f"\n  {xname}: {oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} aumenta em {((oratio-1)*100):.0f}%."
+                elif oratio < 0.99:
+                    odds_texto += f"\n  {xname}: {oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} reduz em {((1-oratio)*100):.0f}%."
+                else:
+                    odds_texto += f"\n  {xname}: {oratio:.2f} → Cada 1 unidade a mais em {xname}, não há variação relevante na chance da categoria."
+            else:
+                odds_texto += f"\n  {xname}: {oratio:.2f} → Sem efeito estatístico significativo (p = {pval:.3f})"
 
-    # p-valores detalhados e checagem de pelo menos um significativo
+    # p-valores detalhados
     pvalores_detalhe = ""
     for idx, categoria in enumerate(y_labels[1:]):
         pvalores_detalhe += f"\n- Classe '{categoria}' vs '{y_labels[0]}':"
         for xname in X.columns:
             pval = pvalores.loc[xname, idx]
             flag = "✅" if pval < 0.05 else "❌"
-            if pval < 0.05:
-                tem_significativo = True
             pvalores_detalhe += f"\n  {xname}: p = {pval:.4f} {flag}"
 
     # Itens críticos
@@ -1031,6 +1057,22 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         f"- Acurácia do modelo (> 70%): {acuracia:.2f}% {'✅' if valid_acc else '❌'}\n"
         f"- Alguma preditora significativa (p < 0,05): {'✅' if valid_pred else '❌'}"
     )
+
+    # Recomendações condicionais
+    recomendacoes = ""
+    remover_vars = []
+    for idx, categoria in enumerate(y_labels[1:]):
+        for xname in X.columns:
+            pval = pvalores.loc[xname, idx]
+            if pval >= 0.05:
+                remover_vars.append(xname)
+    remover_vars = list(set(remover_vars))
+    if remover_vars:
+        recomendacoes += f"- Remova variáveis preditoras sem significância estatística (p ≥ 0,05): {', '.join(remover_vars)}.\n"
+    if not (valid_r2 and valid_acc and valid_pred):
+        recomendacoes += "- Considere adicionar novas variáveis relevantes ao modelo.\n"
+    if dados.shape[0] < 30 or not valid_r2:
+        recomendacoes += "- Aumente a amostra para maior robustez estatística."
 
     # Reporte final
     texto = f"""
@@ -1057,19 +1099,17 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
 🔎 **Resultados – Itens Recomendados (Desejáveis)**
 {pvalores_detalhe}
 
-🟡 Matriz de confusão apresentada ao lado.
+{matriz_texto}
 
 🔎 **Conclusão Final**
 {"✅ Modelo validado para predição entre as classes." if valid_r2 and valid_acc and valid_pred else "❌ Modelo não validado."}
 
 🔹 Recomendações
-➡️ Para aprimorar o modelo:
-- Remova variáveis preditoras com p ≥ 0,05 na comparação de interesse.
-- Considere adicionar novas variáveis relevantes.
-- Aumente a amostra para maior robustez estatística.
+{recomendacoes if recomendacoes else "- Nenhuma recomendação específica. O modelo está adequado para o conjunto de dados atual."}
     """.strip()
 
     return texto, grafico_base64
+
 
 import pandas as pd
 
