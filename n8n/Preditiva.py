@@ -1020,7 +1020,7 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
         eq += " + ".join([f"{coef.loc[xname, idx]:.4f}·{xname}" for xname in X.columns])
         eq = eq.replace("+ -", "- ")
         eq_texto += f"\n  {eq}"
-    odds_texto += ""
+        odds_texto = ""
     for idx, categoria in enumerate(y_labels[1:]):
         odds_texto += f"\nClasse '{categoria}' vs referência '{y_labels[0]}':"
         for xname in X.columns:
@@ -1030,13 +1030,14 @@ def analise_regressao_logistica_nominal(df, coluna_y, lista_x):
             if pval < 0.05:
                 tem_significativo = True
                 if oratio > 1.01:
-                    odds_texto += f"\n  {xname}: {oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} aumenta em {((oratio-1)*100):.0f}%."
+                    odds_texto += f"\n  {xname}: {oratio:.2f} → Aumentar {xname} aumenta em {((oratio-1)*100):.0f}% a chance de {categoria} em relação à {y_labels[0]}."
                 elif oratio < 0.99:
-                    odds_texto += f"\n  {xname}: {oratio:.2f} → Cada 1 unidade a mais em {xname}, a chance de {categoria} reduz em {((1-oratio)*100):.0f}%."
+                    odds_texto += f"\n  {xname}: {oratio:.2f} → Aumentar {xname} reduz em {((1-oratio)*100):.0f}% a chance de {categoria} em relação à {y_labels[0]}."
                 else:
-                    odds_texto += f"\n  {xname}: {oratio:.2f} → Cada 1 unidade a mais em {xname}, não há variação relevante na chance da categoria."
+                    odds_texto += f"\n  {xname}: {oratio:.2f} → Aumentar {xname} não muda a chance de escolher {categoria} em relação à {y_labels[0]}."
             else:
                 odds_texto += f"\n  {xname}: {oratio:.2f} → Sem efeito estatístico significativo (p = {pval:.3f})"
+
 
     # p-valores detalhados
     pvalores_detalhe = ""
