@@ -640,20 +640,20 @@ def analise_carta_xbarra_s(df, coluna_y, subgrupo):
     texto_X = f"📊 **Carta de Médias (X̄)**\n"
     texto_X += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_X:
-        pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_X])
+        pontos = ", ".join([f"Linha {linha}: {valor:.2f}" for linha, valor in crit1_flag_X])
         texto_X += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
     else:
         texto_X += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
 
     if crit2_X:
         linhas = ", ".join([str(l) for l in linhas_crit2_X])
-        texto_X += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+        texto_X += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Linha {linhas})\n"
     else:
         texto_X += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
 
     if crit3_X:
         linhas = ", ".join([str(l) for l in linhas_crit3_X])
-        texto_X += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+        texto_X += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Linha {linhas})\n"
     else:
         texto_X += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
 
@@ -667,20 +667,20 @@ def analise_carta_xbarra_s(df, coluna_y, subgrupo):
     texto_S = f"📊 **Carta de Desvio Padrão(S)**\n"
     texto_S += "🔎 **Critérios avaliados:**\n"
     if crit1_flag_S:
-        pontos = ", ".join([f"Subgrupo {linha}: {valor:.2f}" for linha, valor in crit1_flag_S])
+        pontos = ", ".join([f"Linha {linha}: {valor:.2f}" for linha, valor in crit1_flag_S])
         texto_S += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
     else:
         texto_S += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
 
     if crit2_S:
         linhas = ", ".join([str(l) for l in linhas_crit2_S])
-        texto_S += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+        texto_S += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto_S += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
 
     if crit3_S:
         linhas = ", ".join([str(l) for l in linhas_crit3_S])
-        texto_S += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+        texto_S += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto_S += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
 
@@ -830,20 +830,20 @@ def analise_carta_p(df, coluna_y, subgrupo):
     texto += "🔎 **Critérios avaliados:**\n"
 
     if crit1_flag:
-        pontos = ", ".join([f"Subgrupo {linha}: {valor:.4f}" for linha, valor in crit1_flag])
+        pontos = ", ".join([f"Linha {linha}: {valor:.4f}" for linha, valor in crit1_flag])
         texto += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
     else:
         texto += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
 
     if crit2:
         linhas = ", ".join([str(l) for l in linhas_crit2])
-        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
 
     if crit3:
         linhas = ", ".join([str(l) for l in linhas_crit3])
-        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
 
@@ -1004,20 +1004,20 @@ def analise_carta_np(df, coluna_y, subgrupo):
     texto += "🔎 **Critérios avaliados:**\n"
 
     if crit1_flag:
-        pontos = ", ".join([f"Subgrupo {linha}: {valor:.0f}" for linha, valor in crit1_flag])
+        pontos = ", ".join([f"Linha {linha}: {valor:.0f}" for linha, valor in crit1_flag])
         texto += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
     else:
         texto += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
 
     if crit2:
         linhas = ", ".join([str(l) for l in linhas_crit2])
-        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
 
     if crit3:
         linhas = ", ".join([str(l) for l in linhas_crit3])
-        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
 
@@ -1163,20 +1163,20 @@ def analise_carta_c(df, coluna_y):
     texto += "🔎 **Critérios avaliados:**\n"
 
     if crit1_flag:
-        pontos = ", ".join([f"Subgrupo {linha}: {valor:.0f}" for linha, valor in crit1_flag])
+        pontos = ", ".join([f"Linha {linha}: {valor:.0f}" for linha, valor in crit1_flag])
         texto += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
     else:
         texto += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
 
     if crit2:
         linhas = ", ".join([str(l) for l in linhas_crit2])
-        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
 
     if crit3:
         linhas = ", ".join([str(l) for l in linhas_crit3])
-        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
 
@@ -1328,20 +1328,20 @@ def analise_carta_u(df, coluna_y, subgrupo):
     texto += "🔎 **Critérios avaliados:**\n"
 
     if crit1_flag:
-        pontos = ", ".join([f"Subgrupo {linha}: {valor:.4f}" for linha, valor in crit1_flag])
+        pontos = ", ".join([f"Linha {linha}: {valor:.4f}" for linha, valor in crit1_flag])
         texto += f"1. Critério 1 – Pontos fora dos limites: ❌ Detectado ({pontos})\n"
     else:
         texto += "1. Critério 1 – Pontos fora dos limites: ✅ OK\n"
 
     if crit2:
         linhas = ", ".join([str(l) for l in linhas_crit2])
-        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Subgrupos {linhas})\n"
+        texto += f"2. Critério 2 – 9 pontos do mesmo lado da média: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto += "2. Critério 2 – 9 pontos do mesmo lado da média: ✅ OK\n"
 
     if crit3:
         linhas = ", ".join([str(l) for l in linhas_crit3])
-        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Subgrupos {linhas})\n"
+        texto += f"3. Critério 3 – 6 pontos subindo ou descendo: ❌ Detectado (Linhas {linhas})\n"
     else:
         texto += "3. Critério 3 – 6 pontos subindo ou descendo: ✅ OK\n"
 
