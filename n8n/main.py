@@ -85,6 +85,7 @@ CONFIG_ANALISES = {
     "Bolhas - 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
     "Superfície - 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
     "Dispersão 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
+    "Intervalo": ["df", "lista_y", "subgrupo", "field_conf"],
     "1 Sample T": ["df", "coluna_y", "field", "field_conf"],
     "2 Sample T": ["df", "lista_y", "field_conf"],
     "2 Paired Test": ["df", "lista_y", "field_conf"],
