@@ -1706,11 +1706,9 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
         "inclinacao_x": 0
     }
 
-    # Valida Ys
     if not lista_y or any(y not in df.columns for y in lista_y):
         return "❌ Uma ou mais colunas Ys não foram encontradas no arquivo.", None, None
 
-    # Valida Subgrupo
     if subgrupo:
         if isinstance(subgrupo, list):
             if any(s not in df.columns for s in subgrupo):
@@ -1723,10 +1721,10 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
     else:
         df['__grupo__'] = 'Todos'
 
-    # Ajusta e valida nível de confiança
+    # 🔧 Correção definitiva do campo de confiança
     try:
         confianca = float(confianca)
-        if confianca <= 1:
+        if 0 < confianca <= 1:
             confianca *= 100
     except:
         return "❌ Valor de confiança inválido.", None, None
@@ -1740,9 +1738,7 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
     if dados.empty:
         return "❌ Dados insuficientes para gerar o gráfico.", None, None
 
-    # Início do gráfico
     fig, ax = plt.subplots(figsize=(10, 6))
-
     cores = sns.color_palette("colorblind", len(lista_y))
     deslocamento = 0.2
 
@@ -1765,7 +1761,6 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
 
     plt.tight_layout()
 
-    # Metadados
     info_grafico["titulo_grafico"] = f"IC de {confianca:.1f}% para {', '.join(lista_y)}"
     info_grafico["titulo_x"] = "Subgrupo"
     info_grafico["titulo_y"] = "Valores"
@@ -1778,6 +1773,7 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64, info_grafico
+
 
 
 
