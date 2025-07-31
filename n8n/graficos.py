@@ -1721,6 +1721,17 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
     else:
         df['__grupo__'] = 'Todos'
 
+    # Normaliza o valor de confiança
+    try:
+        if confianca <= 1:
+            confianca *= 100
+        confianca = float(confianca)
+    except:
+        return "❌ Valor de confiança inválido.", None, None
+
+    if confianca < 50 or confianca > 100:
+        return "❌ O nível de confiança deve estar entre 50% e 100%.", None, None
+
     dados = df[lista_y + ['__grupo__']].dropna()
     if dados.empty:
         return "❌ Dados insuficientes para gerar o gráfico.", None, None
@@ -1741,15 +1752,16 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
 
     ax.set_xticks(np.arange(len(medias)) + 0.1 * (len(lista_y) - 1))
     ax.set_xticklabels(medias.index, rotation=0)
-    ax.set_ylabel("Média")
-    ax.set_title(f"Gráfico de Intervalo de Confiança ({confianca}%)")
+    ax.set_ylabel("Valores", fontsize=14)
+    ax.set_xlabel("Subgrupo", fontsize=14)
+    ax.set_title(f"Intervalo de Confiança de {confianca:.1f}% para Média", fontsize=16)
     ax.legend(title="Variável")
 
     plt.tight_layout()
 
-    info_grafico["titulo_grafico"] = f"IC de {confianca}% para {', '.join(lista_y)}"
+    info_grafico["titulo_grafico"] = f"IC de {confianca:.1f}% para {', '.join(lista_y)}"
     info_grafico["titulo_x"] = "Subgrupo"
-    info_grafico["titulo_y"] = "Média"
+    info_grafico["titulo_y"] = "Valores"
     info_grafico["lista_y"] = lista_y
 
     buf = BytesIO()
@@ -1759,6 +1771,7 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64, info_grafico
+
 
 
 
