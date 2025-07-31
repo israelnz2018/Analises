@@ -1778,12 +1778,14 @@ def gerar_icplot(df, lista_y, subgrupo=None, field_conf=None):
 
 def personalizar_icplot(df, lista_y,
                         subgrupo=None,
-                        field_conf=None,
-                        titulo_grafico="",
+                        titulo_grafico="", 
                         tamanho_fonte=12,
                         titulo_x="Subgrupo",
                         titulo_y="Valores",
-                        inclinacao_x=""):
+                        inclinacao_x="",
+                        cor="",  # não usado mas necessário para manter padrão
+                        field_conf=None):
+    
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -1795,7 +1797,7 @@ def personalizar_icplot(df, lista_y,
     aplicar_estilo_minitab()
 
     if not lista_y or any(y not in df.columns for y in lista_y):
-        return "❌ Uma ou mais colunas Ys não foram encontradas no arquivo.", None, None
+        return None, None
 
     if isinstance(lista_y, str):
         lista_y = [lista_y]
@@ -1803,11 +1805,11 @@ def personalizar_icplot(df, lista_y,
     if subgrupo:
         if isinstance(subgrupo, list):
             if any(s not in df.columns for s in subgrupo):
-                return "❌ Uma ou mais colunas de Subgrupo não foram encontradas no arquivo.", None, None
+                return None, None
             df['__grupo__'] = df[subgrupo].astype(str).agg(' - '.join, axis=1)
         else:
             if subgrupo not in df.columns:
-                return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, None
+                return None, None
             df['__grupo__'] = df[subgrupo].astype(str)
     else:
         df['__grupo__'] = 'Todos'
@@ -1820,12 +1822,13 @@ def personalizar_icplot(df, lista_y,
         confianca = 95.0
 
     if confianca < 50 or confianca > 100:
-        return "❌ O nível de confiança deve estar entre 50% e 100%.", None, None
+        return None, None
 
     alpha = 1 - (confianca / 100)
+
     dados = df[lista_y + ['__grupo__']].dropna()
     if dados.empty:
-        return "❌ Dados insuficientes para gerar o gráfico.", None, None
+        return None, None
 
     fig, ax = plt.subplots(figsize=(10, 6))
     cores = sns.color_palette("colorblind", len(lista_y))
@@ -1842,8 +1845,8 @@ def personalizar_icplot(df, lista_y,
 
     ax.set_xticks(np.arange(len(medias)) + 0.1 * (len(lista_y) - 1))
     ax.set_xticklabels(medias.index, rotation=float(inclinacao_x) if inclinacao_x else 0, fontsize=int(tamanho_fonte))
-    ax.set_ylabel(titulo_y, fontsize=int(tamanho_fonte))
-    ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+    ax.set_ylabel(titulo_y if titulo_y else "Valores", fontsize=int(tamanho_fonte))
+    ax.set_xlabel(titulo_x if titulo_x else "Subgrupo", fontsize=int(tamanho_fonte))
 
     titulo_final = titulo_grafico.strip() if titulo_grafico.strip() else f"Intervalo de Confiança de {confianca:.0f}% para a Média"
     ax.set_title(titulo_final, fontsize=int(tamanho_fonte))
@@ -1857,17 +1860,21 @@ def personalizar_icplot(df, lista_y,
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     info_grafico = {
+        "cor": cor or "",
         "titulo_grafico": titulo_final,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
-        "tamanho_fonte": tamanho_fonte,
+        "tamanho_fonte": tamanho_fonte or "",
         "inclinacao_x": inclinacao_x or "",
+        "inclinacao_y": "",
+        "espessura": "",
         "lista_y": lista_y,
-        "subgrupo": subgrupo or "",
+        "subgrupo": subgrupo if subgrupo else "",
         "confianca": confianca
     }
 
-    return "", imagem_base64, info_grafico
+    return imagem_base64, info_grafico
+
 
 
 
