@@ -1687,7 +1687,78 @@ def personalizar_dispersao_3d_com_regressao(df, coluna_y, coluna_x, coluna_z, co
     return imagem_base64, info_grafico
 
 
+def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+    import scipy.stats as stats
+    import numpy as np
+    from suporte import aplicar_estilo_minitab
 
+    aplicar_estilo_minitab()
+
+    info_grafico = {
+        "titulo_grafico": "",
+        "tamanho_fonte": 12,
+        "titulo_x": "",
+        "titulo_y": "",
+        "inclinacao_x": 0
+    }
+
+    if not lista_y or any(y not in df.columns for y in lista_y):
+        return "❌ Uma ou mais colunas Ys não foram encontradas no arquivo.", None, None
+
+    if subgrupo:
+        if isinstance(subgrupo, list):
+            if any(s not in df.columns for s in subgrupo):
+                return "❌ Uma ou mais colunas de Subgrupo não foram encontradas no arquivo.", None, None
+            df['__grupo__'] = df[subgrupo].astype(str).agg(' - '.join, axis=1)
+        else:
+            if subgrupo not in df.columns:
+                return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, None
+            df['__grupo__'] = df[subgrupo].astype(str)
+    else:
+        df['__grupo__'] = 'Todos'
+
+    dados = df[lista_y + ['__grupo__']].dropna()
+    if dados.empty:
+        return "❌ Dados insuficientes para gerar o gráfico.", None, None
+
+    alpha = 1 - confianca / 100
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    cores = sns.color_palette("colorblind", len(lista_y))
+    for i, y in enumerate(lista_y):
+        grupos = dados.groupby('__grupo__')[y]
+        medias = grupos.mean()
+        ns = grupos.count()
+        stds = grupos.std()
+        erros = stats.t.ppf(1 - alpha/2, ns - 1) * (stds / np.sqrt(ns))
+
+        x = np.arange(len(medias)) + i * 0.2
+        ax.errorbar(x, medias, yerr=erros, fmt='o', label=y, capsize=5, color=cores[i])
+
+    ax.set_xticks(np.arange(len(medias)) + 0.1 * (len(lista_y) - 1))
+    ax.set_xticklabels(medias.index, rotation=0)
+    ax.set_ylabel("Média")
+    ax.set_title(f"Gráfico de Intervalo de Confiança ({confianca}%)")
+    ax.legend(title="Variável")
+
+    plt.tight_layout()
+
+    info_grafico["titulo_grafico"] = f"IC de {confianca}% para {', '.join(lista_y)}"
+    info_grafico["titulo_x"] = "Subgrupo"
+    info_grafico["titulo_y"] = "Média"
+    info_grafico["lista_y"] = lista_y
+
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close()
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    return "", imagem_base64, info_grafico
 
 
 
@@ -1712,7 +1783,8 @@ GRAFICOS = {
     "Superfície - 3D": gerar_superficie_3d,
     "Superfície - 3D Personalizado": personalizar_superficie_3d,
     "Dispersão 3D": gerar_dispersao_3d_com_regressao,
-    "Dispersão 3D Personalizado": personalizar_dispersao_3d_com_regressao
+    "Dispersão 3D Personalizado": personalizar_dispersao_3d_com_regressao,
+    "Intervalo": gerar_icplot
 }
 
 # ✅ Configuração de personalização permitida para cada tipo de boxplot
