@@ -1776,16 +1776,16 @@ def gerar_icplot(df, lista_y, subgrupo=None, field_conf=None):
 
     return "", imagem_base64, info_grafico
 
-def personalizar_icplot(df, lista_y,
+def personalizar_icplot(df, lista_y, 
                         subgrupo=None,
                         titulo_grafico="", 
                         tamanho_fonte=12,
                         titulo_x="Subgrupo",
                         titulo_y="Valores",
                         inclinacao_x="",
-                        cor="",  # não usado mas necessário para manter padrão
+                        cor="",
                         field_conf=None):
-    
+
     import matplotlib.pyplot as plt
     import seaborn as sns
     import base64
@@ -1796,23 +1796,27 @@ def personalizar_icplot(df, lista_y,
 
     aplicar_estilo_minitab()
 
-    if not lista_y or any(y not in df.columns for y in lista_y):
+    if not lista_y:
         return None, None
 
     if isinstance(lista_y, str):
         lista_y = [lista_y]
 
+    colunas_validas = [col for col in lista_y if col in df.columns]
+    if not colunas_validas:
+        return None, None
+
     if subgrupo:
         if isinstance(subgrupo, list):
             if any(s not in df.columns for s in subgrupo):
                 return None, None
-            df['__grupo__'] = df[subgrupo].astype(str).agg(' - '.join, axis=1)
+            df["__grupo__"] = df[subgrupo].astype(str).agg(" - ".join, axis=1)
         else:
             if subgrupo not in df.columns:
                 return None, None
-            df['__grupo__'] = df[subgrupo].astype(str)
+            df["__grupo__"] = df[subgrupo].astype(str)
     else:
-        df['__grupo__'] = 'Todos'
+        df["__grupo__"] = "Todos"
 
     try:
         confianca = float(field_conf) if field_conf else 95.0
@@ -1825,17 +1829,16 @@ def personalizar_icplot(df, lista_y,
         return None, None
 
     alpha = 1 - (confianca / 100)
-
-    dados = df[lista_y + ['__grupo__']].dropna()
+    dados = df[colunas_validas + ["__grupo__"]].dropna()
     if dados.empty:
         return None, None
 
     fig, ax = plt.subplots(figsize=(10, 6))
-    cores = sns.color_palette("colorblind", len(lista_y))
+    cores = sns.color_palette("colorblind", len(colunas_validas))
     deslocamento = 0.2
 
-    for i, y in enumerate(lista_y):
-        grupos = dados.groupby('__grupo__')[y]
+    for i, y in enumerate(colunas_validas):
+        grupos = dados.groupby("__grupo__")[y]
         medias = grupos.mean()
         ns = grupos.count()
         stds = grupos.std()
@@ -1843,10 +1846,10 @@ def personalizar_icplot(df, lista_y,
         x = np.arange(len(medias)) + i * deslocamento
         ax.errorbar(x, medias, yerr=erros, fmt='o', label=y, capsize=5, color=cores[i])
 
-    ax.set_xticks(np.arange(len(medias)) + 0.1 * (len(lista_y) - 1))
+    ax.set_xticks(np.arange(len(medias)) + 0.1 * (len(colunas_validas) - 1))
     ax.set_xticklabels(medias.index, rotation=float(inclinacao_x) if inclinacao_x else 0, fontsize=int(tamanho_fonte))
-    ax.set_ylabel(titulo_y if titulo_y else "Valores", fontsize=int(tamanho_fonte))
-    ax.set_xlabel(titulo_x if titulo_x else "Subgrupo", fontsize=int(tamanho_fonte))
+    ax.set_ylabel(titulo_y or "Valores", fontsize=int(tamanho_fonte))
+    ax.set_xlabel(titulo_x or "Subgrupo", fontsize=int(tamanho_fonte))
 
     titulo_final = titulo_grafico.strip() if titulo_grafico.strip() else f"Intervalo de Confiança de {confianca:.0f}% para a Média"
     ax.set_title(titulo_final, fontsize=int(tamanho_fonte))
@@ -1864,7 +1867,7 @@ def personalizar_icplot(df, lista_y,
         "titulo_grafico": titulo_final,
         "titulo_x": titulo_x,
         "titulo_y": titulo_y,
-        "tamanho_fonte": tamanho_fonte or "",
+        "tamanho_fonte": tamanho_fonte,
         "inclinacao_x": inclinacao_x or "",
         "inclinacao_y": "",
         "espessura": "",
@@ -1874,8 +1877,6 @@ def personalizar_icplot(df, lista_y,
     }
 
     return imagem_base64, info_grafico
-
-
 
 
 
