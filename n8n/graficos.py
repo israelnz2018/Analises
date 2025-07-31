@@ -1706,9 +1706,11 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
         "inclinacao_x": 0
     }
 
+    # Valida Ys
     if not lista_y or any(y not in df.columns for y in lista_y):
         return "❌ Uma ou mais colunas Ys não foram encontradas no arquivo.", None, None
 
+    # Valida Subgrupo
     if subgrupo:
         if isinstance(subgrupo, list):
             if any(s not in df.columns for s in subgrupo):
@@ -1721,44 +1723,49 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
     else:
         df['__grupo__'] = 'Todos'
 
-    # Normaliza o valor de confiança
+    # Ajusta e valida nível de confiança
     try:
+        confianca = float(confianca)
         if confianca <= 1:
             confianca *= 100
-        confianca = float(confianca)
     except:
         return "❌ Valor de confiança inválido.", None, None
 
     if confianca < 50 or confianca > 100:
         return "❌ O nível de confiança deve estar entre 50% e 100%.", None, None
 
+    alpha = 1 - (confianca / 100)
+
     dados = df[lista_y + ['__grupo__']].dropna()
     if dados.empty:
         return "❌ Dados insuficientes para gerar o gráfico.", None, None
 
-    alpha = 1 - confianca / 100
+    # Início do gráfico
     fig, ax = plt.subplots(figsize=(10, 6))
 
     cores = sns.color_palette("colorblind", len(lista_y))
+    deslocamento = 0.2
+
     for i, y in enumerate(lista_y):
         grupos = dados.groupby('__grupo__')[y]
         medias = grupos.mean()
         ns = grupos.count()
         stds = grupos.std()
-        erros = stats.t.ppf(1 - alpha/2, ns - 1) * (stds / np.sqrt(ns))
+        erros = stats.t.ppf(1 - alpha / 2, df=ns - 1) * (stds / np.sqrt(ns))
 
-        x = np.arange(len(medias)) + i * 0.2
+        x = np.arange(len(medias)) + i * deslocamento
         ax.errorbar(x, medias, yerr=erros, fmt='o', label=y, capsize=5, color=cores[i])
 
     ax.set_xticks(np.arange(len(medias)) + 0.1 * (len(lista_y) - 1))
     ax.set_xticklabels(medias.index, rotation=0)
     ax.set_ylabel("Valores", fontsize=14)
     ax.set_xlabel("Subgrupo", fontsize=14)
-    ax.set_title(f"Intervalo de Confiança de {confianca:.1f}% para Média", fontsize=16)
+    ax.set_title(f"Intervalo de Confiança de {confianca:.1f}%", fontsize=16)
     ax.legend(title="Variável")
 
     plt.tight_layout()
 
+    # Metadados
     info_grafico["titulo_grafico"] = f"IC de {confianca:.1f}% para {', '.join(lista_y)}"
     info_grafico["titulo_x"] = "Subgrupo"
     info_grafico["titulo_y"] = "Valores"
@@ -1771,6 +1778,7 @@ def gerar_icplot(df, lista_y, subgrupo=None, confianca=95):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
 
     return "", imagem_base64, info_grafico
+
 
 
 
