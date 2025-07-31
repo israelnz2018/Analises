@@ -1776,6 +1776,99 @@ def gerar_icplot(df, lista_y, subgrupo=None, field_conf=None):
 
     return "", imagem_base64, info_grafico
 
+def personalizar_icplot(df, lista_y,
+                        subgrupo=None,
+                        field_conf=None,
+                        titulo_grafico="",
+                        tamanho_fonte=12,
+                        titulo_x="Subgrupo",
+                        titulo_y="Valores",
+                        inclinacao_x=""):
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import base64
+    from io import BytesIO
+    import scipy.stats as stats
+    import numpy as np
+    from suporte import aplicar_estilo_minitab
+
+    aplicar_estilo_minitab()
+
+    if not lista_y or any(y not in df.columns for y in lista_y):
+        return "❌ Uma ou mais colunas Ys não foram encontradas no arquivo.", None, None
+
+    if isinstance(lista_y, str):
+        lista_y = [lista_y]
+
+    if subgrupo:
+        if isinstance(subgrupo, list):
+            if any(s not in df.columns for s in subgrupo):
+                return "❌ Uma ou mais colunas de Subgrupo não foram encontradas no arquivo.", None, None
+            df['__grupo__'] = df[subgrupo].astype(str).agg(' - '.join, axis=1)
+        else:
+            if subgrupo not in df.columns:
+                return "❌ A coluna Subgrupo informada não foi encontrada no arquivo.", None, None
+            df['__grupo__'] = df[subgrupo].astype(str)
+    else:
+        df['__grupo__'] = 'Todos'
+
+    try:
+        confianca = float(field_conf) if field_conf else 95.0
+        if confianca <= 1:
+            confianca *= 100
+    except (ValueError, TypeError):
+        confianca = 95.0
+
+    if confianca < 50 or confianca > 100:
+        return "❌ O nível de confiança deve estar entre 50% e 100%.", None, None
+
+    alpha = 1 - (confianca / 100)
+    dados = df[lista_y + ['__grupo__']].dropna()
+    if dados.empty:
+        return "❌ Dados insuficientes para gerar o gráfico.", None, None
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    cores = sns.color_palette("colorblind", len(lista_y))
+    deslocamento = 0.2
+
+    for i, y in enumerate(lista_y):
+        grupos = dados.groupby('__grupo__')[y]
+        medias = grupos.mean()
+        ns = grupos.count()
+        stds = grupos.std()
+        erros = stats.t.ppf(1 - alpha / 2, df=ns - 1) * (stds / np.sqrt(ns))
+        x = np.arange(len(medias)) + i * deslocamento
+        ax.errorbar(x, medias, yerr=erros, fmt='o', label=y, capsize=5, color=cores[i])
+
+    ax.set_xticks(np.arange(len(medias)) + 0.1 * (len(lista_y) - 1))
+    ax.set_xticklabels(medias.index, rotation=float(inclinacao_x) if inclinacao_x else 0, fontsize=int(tamanho_fonte))
+    ax.set_ylabel(titulo_y, fontsize=int(tamanho_fonte))
+    ax.set_xlabel(titulo_x, fontsize=int(tamanho_fonte))
+
+    titulo_final = titulo_grafico.strip() if titulo_grafico.strip() else f"Intervalo de Confiança de {confianca:.0f}% para a Média"
+    ax.set_title(titulo_final, fontsize=int(tamanho_fonte))
+    ax.legend(title="Variável")
+
+    plt.tight_layout()
+    buf = BytesIO()
+    plt.savefig(buf, format="png")
+    plt.close(fig)
+    buf.seek(0)
+    imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
+
+    info_grafico = {
+        "titulo_grafico": titulo_final,
+        "titulo_x": titulo_x,
+        "titulo_y": titulo_y,
+        "tamanho_fonte": tamanho_fonte,
+        "inclinacao_x": inclinacao_x or "",
+        "lista_y": lista_y,
+        "subgrupo": subgrupo or "",
+        "confianca": confianca
+    }
+
+    return "", imagem_base64, info_grafico
+
 
 
 
@@ -1804,7 +1897,9 @@ GRAFICOS = {
     "Superfície - 3D Personalizado": personalizar_superficie_3d,
     "Dispersão 3D": gerar_dispersao_3d_com_regressao,
     "Dispersão 3D Personalizado": personalizar_dispersao_3d_com_regressao,
-    "Intervalo": gerar_icplot
+    "Intervalo": gerar_icplot,
+    "Intervalo Personalizado": personalizar_icplot
+
 }
 
 # ✅ Configuração de personalização permitida para cada tipo de boxplot
