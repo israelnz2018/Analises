@@ -14,5 +14,5 @@ fitter
 requests
 firebase-admin
 pmdarima
-
+httpx
 
