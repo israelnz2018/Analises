@@ -18,6 +18,9 @@ HEADERS = {
     "anthropic-version": "2023-06-01"
 }
 
+TOOL_STRUCTURES = {}
+TOOL_SPECIFIC_INSTRUCTIONS = {}
+
 async def call_claude(system_prompt: str, user_prompt: str, max_tokens: int = 4096, model: str = None) -> str:
     if model is None:
         model = CLAUDE_MODEL_FAST
@@ -32,6 +35,452 @@ async def call_claude(system_prompt: str, user_prompt: str, max_tokens: int = 40
         response.raise_for_status()
         data = response.json()
         return data["content"][0]["text"]
+
+# ════════════════════════════════════════════════════════════════
+# FERRAMENTAS — ESTRUTURAS E INSTRUÇÕES
+# Para atualizar uma ferramenta: apague o bloco dela e cole o novo
+# Para adicionar ferramenta nova: cole o bloco no final desta seção
+# ════════════════════════════════════════════════════════════════
+
+# ════════════════════════════════════════
+# FERRAMENTA: SIPOC
+# ════════════════════════════════════════
+TOOL_STRUCTURES["sipoc"] = """{
+  "suppliers": ["Fornecedor 1", "Fornecedor 2"],
+  "inputs": ["Entrada 1", "Entrada 2"],
+  "process": ["Passo 1", "Passo 2", "Passo 3", "Passo 4", "Passo 5"],
+  "outputs": ["Saida principal", "Saida secundaria"],
+  "customers": ["Cliente interno/externo"]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["sipoc"] = """
+ATENCAO - SIPOC:
+- suppliers: quem fornece entradas para o processo
+- inputs: materiais, informacoes ou recursos que entram
+- process: exatamente 5 passos principais do processo
+- outputs: resultados ou produtos do processo
+- customers: quem recebe as saidas
+Use dados reais do contexto do projeto.
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: BRAINSTORMING
+# ════════════════════════════════════════
+TOOL_STRUCTURES["brainstorming"] = """{
+  "ideas": [
+    {"id": "1", "text": "x1: Ideia tecnica curta", "category": "Metodo", "author": "IA LBW", "votes": 0},
+    {"id": "2", "text": "x2: Outra ideia", "category": "Mao de Obra", "author": "IA LBW", "votes": 0}
+  ],
+  "brainstormingType": "Causas do problema",
+  "brainstormingTopic": "Tema baseado no problema identificado"
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["brainstorming"] = """
+ATENCAO - BRAINSTORMING:
+- Gere minimo 12 ideias distribuidas nos 6Ms: Metodo, Mao de Obra, Material, Maquina, Meio Ambiente, Medicao
+- Prefixe cada ideia com x1:, x2:, etc.
+- Ideias curtas e tecnicas - maximo 8 palavras cada
+- Baseie nas informacoes do projeto
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: MATRIZ GUT
+# ════════════════════════════════════════
+TOOL_STRUCTURES["gut"] = """{
+  "columns": [
+    {"id": "description", "label": "Problema / Oportunidade", "isScore": false},
+    {"id": "gravidade", "label": "Gravidade", "isScore": true},
+    {"id": "urgencia", "label": "Urgencia", "isScore": true},
+    {"id": "tendencia", "label": "Tendencia", "isScore": true}
+  ],
+  "opportunities": [
+    {"id": "1", "description": "Titulo do projeto", "gravidade": 5, "urgencia": 3, "tendencia": 5}
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["gut"] = """
+ATENCAO - MATRIZ GUT:
+- Use os projetos da Ideia de Projetos como opportunities
+- Pontuacoes APENAS: 1, 3 ou 5
+- gravidade: 5=Extremamente Grave, 3=Grave, 1=Leve
+- urgencia: 5=Imediata, 3=O mais rapido, 1=Pode esperar
+- tendencia: 5=Piorar rapido, 3=Ira piorar, 1=Nao piora
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: MATRIZ RAB
+# ════════════════════════════════════════
+TOOL_STRUCTURES["rab"] = """{
+  "columns": [
+    {"id": "description", "label": "Problema / Oportunidade", "isScore": false},
+    {"id": "rapidez", "label": "Rapidez", "isScore": true},
+    {"id": "autonomia", "label": "Autonomia", "isScore": true},
+    {"id": "beneficio", "label": "Beneficio", "isScore": true}
+  ],
+  "opportunities": [
+    {"id": "1", "description": "Titulo do projeto", "rapidez": 5, "autonomia": 3, "beneficio": 5}
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["rab"] = """
+ATENCAO - MATRIZ RAB:
+- Use os projetos da Ideia de Projetos como opportunities
+- Pontuacoes APENAS: 1, 3 ou 5
+- rapidez: 5=Imediato/1 mes, 3=1-3 meses, 1=+3 meses
+- autonomia: 5=Total, 3=Apoio de outras areas, 1=Depende de terceiros
+- beneficio: 5=Impacto Estrategico, 3=Impacto na Area, 1=Impacto no Processo
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: ENTENDENDO O PROBLEMA (BRIEF)
+# ════════════════════════════════════════
+TOOL_STRUCTURES["brief"] = """{
+  "answers": {
+    "q1": "Nome do processo",
+    "q2": "Problema com dados quantitativos",
+    "q3": "Pessoas e areas envolvidas",
+    "q4": "O que esta errado com exemplos",
+    "q5": "Riscos se nao resolvido",
+    "q6": "O que se quer melhorar",
+    "q7": "Meta SMART: reduzir X de A para B em Y meses",
+    "q8": "Beneficios financeiros e operacionais",
+    "q10": "Proximos passos imediatos",
+    "q12": "Recursos necessarios"
+  }
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["brief"] = """
+ATENCAO - ENTENDENDO O PROBLEMA:
+- Use o projeto selecionado como foco central
+- q7 deve ser uma meta SMART com indicador, baseline e target
+- q2 deve ter pelo menos um numero ou percentual
+- Linguagem tecnica e executiva
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: PROJECT CHARTER
+# ════════════════════════════════════════
+TOOL_STRUCTURES["charter"] = """{
+  "title": "Verbo + indicador + processo sem Lean Six Sigma",
+  "date": "DD/MM/AAAA",
+  "rev": "00",
+  "area": "Area responsavel",
+  "leader": "",
+  "champion": "",
+  "problemDefinition": "Problema com baseline quantitativo",
+  "problemHistory": "Historico e riscos",
+  "goalDefinition": "Meta SMART completa com baseline e target",
+  "kpi": "Y primario: indicador | Y secundario: indicador",
+  "scopeIn": "O que esta dentro do escopo",
+  "scopeOut": "O que esta fora do escopo",
+  "businessContributions": "1. Beneficio financeiro. 2. Operacional. 3. Cliente.",
+  "stakeholders": [
+    {"role": "Lider:", "name": "", "definition": "R", "measurement": "A", "analysis": "R", "improvement": "R", "control": "R"},
+    {"role": "Patrocinador:", "name": "", "definition": "A", "measurement": "I", "analysis": "I", "improvement": "A", "control": "I"}
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["charter"] = """
+ATENCAO - PROJECT CHARTER:
+- title: comeca com Reduzir/Aumentar/Melhorar/Otimizar - SEM Lean Six Sigma
+- goalDefinition: formato SMART obrigatorio com baseline e target numericos
+- scopeIn e scopeOut: ambos obrigatorios
+- NAO invente nomes de pessoas para stakeholders
+- problemDefinition deve ter pelo menos um numero
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: ESPINHA DE PEIXE (ISHIKAWA)
+# ════════════════════════════════════════
+TOOL_STRUCTURES["measureIshikawa"] = """{
+  "categories": ["Metodo", "Maquina", "Medida", "Meio Ambiente", "Mao de Obra", "Material"],
+  "causes": {
+    "Metodo": ["x1: Causa curta maximo 6 palavras"],
+    "Maquina": [],
+    "Medida": [],
+    "Meio Ambiente": [],
+    "Mao de Obra": [],
+    "Material": []
+  },
+  "problem": "Problema central do projeto"
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["measureIshikawa"] = """
+ATENCAO - ESPINHA DE PEIXE:
+- Use ideias do Brainstorming como causas se disponiveis
+- Distribua nos 6Ms corretamente
+- Frases EXTREMAMENTE curtas - maximo 6 palavras por causa
+- O problem deve ser o problema central do projeto
+- Minimo 2 causas por categoria
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: MATRIZ CAUSA E EFEITO
+# ════════════════════════════════════════
+TOOL_STRUCTURES["measureMatrix"] = """{
+  "outputs": [
+    {"name": "Y principal - Indicador", "importance": 10}
+  ],
+  "causes": [
+    {"id": "X01", "name": "Causa da Espinha de Peixe", "scores": [9], "effort": 1, "selected": false}
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["measureMatrix"] = """
+ATENCAO - MATRIZ CAUSA E EFEITO:
+- outputs: use os KPIs do projeto como Y com importance 10
+- causes: use as causas da Espinha de Peixe como X
+- scores: correlacao 0=sem relacao, 1=fraca, 3=media, 9=forte
+- O array scores deve ter o mesmo tamanho que outputs
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: PLANO DE COLETA DE DADOS
+# ════════════════════════════════════════
+TOOL_STRUCTURES["dataCollection"] = """{
+  "items": [
+    {
+      "id": "1",
+      "data": {
+        "variable": "ID - Nome da variavel",
+        "priority": "Alta",
+        "operationalDefinition": "O QUE MEDIR: procedimento tecnico",
+        "msa": "Sim",
+        "method": "Quantitativa",
+        "stratification": "Por turno, operador",
+        "responsible": "Responsavel",
+        "when": "Frequencia",
+        "howMany": "Quantidade"
+      }
+    }
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["dataCollection"] = """
+ATENCAO - PLANO DE COLETA:
+- Use APENAS causas com selected=true da Matriz C&E se disponivel
+- Quantitativa: envolve numeros, tempos, dimensoes
+- Qualitativa: envolve auditoria visual, Sim/Nao
+- operationalDefinition no formato: O QUE MEDIR: procedimento tecnico
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: 5 PORQUES
+# ════════════════════════════════════════
+TOOL_STRUCTURES["fiveWhys"] = """{
+  "chains": [
+    {
+      "id": "1",
+      "problem": "Problema central",
+      "whys": ["Por que 1", "Por que 2", "Por que 3", "Por que 4", "Por que 5"],
+      "rootCause": "Causa raiz identificada"
+    }
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["fiveWhys"] = """
+ATENCAO - 5 PORQUES:
+- Use as causas mais criticas da Espinha de Peixe ou Matriz C&E
+- Cada por que deve aprofundar o anterior
+- rootCause deve ser uma causa sistemica real
+- Gere uma cadeia por causa principal identificada
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: FMEA
+# ════════════════════════════════════════
+TOOL_STRUCTURES["fmea"] = """{
+  "items": [
+    {
+      "id": "1",
+      "processStep": "Etapa do processo",
+      "failureMode": "Como pode falhar",
+      "failureEffect": "Impacto da falha",
+      "severity": 7,
+      "causes": "Causas da falha",
+      "occurrence": 5,
+      "controls": "Controles atuais",
+      "detection": 4,
+      "actions": "Acoes recomendadas"
+    }
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["fmea"] = """
+ATENCAO - FMEA:
+- Baseie os modos de falha nas causas da Espinha de Peixe
+- severity (1-10): impacto no cliente
+- occurrence (1-10): frequencia da falha
+- detection (1-10): dificuldade de detectar
+- RPN = severity x occurrence x detection
+- Ordene por RPN decrescente
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: PLANO DE ACAO 5W2H
+# ════════════════════════════════════════
+TOOL_STRUCTURES["plan5w2h"] = """{
+  "actions": [
+    {
+      "id": "1",
+      "variable": "Causa origem",
+      "what": "O que sera feito",
+      "why": "Por que resolve",
+      "where": "Onde executar",
+      "when": "DD/MM/AAAA",
+      "who": "Responsavel",
+      "how": "Como executar",
+      "howMuch": "Custo estimado",
+      "status": {"state": "green", "progress": "0%"}
+    }
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["plan5w2h"] = """
+ATENCAO - PLANO DE ACAO 5W2H:
+- Baseie as acoes nas causas confirmadas (FMEA, 5 Porques)
+- what: verbo + objeto + resultado esperado
+- who: cargo/funcao, nao nome generico
+- when: datas realistas no formato DD/MM/AAAA
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: POP (PROCEDIMENTO OPERACIONAL)
+# ════════════════════════════════════════
+TOOL_STRUCTURES["sop"] = """{
+  "title": "Titulo do POP",
+  "objective": "Objetivo do procedimento",
+  "scope": "Abrangencia",
+  "responsibilities": "Responsaveis",
+  "steps": [
+    {"id": "1", "title": "Titulo do passo", "description": "Descricao detalhada", "warning": ""}
+  ],
+  "frequency": "Frequencia de revisao",
+  "kpis": "Indicadores associados"
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["sop"] = """
+ATENCAO - POP:
+- Baseie os passos nas acoes do Plano de Acao 5W2H
+- steps deve ter entre 5 e 10 passos claros e executaveis
+- kpis: use os indicadores do Project Charter
+- responsibilities: use os responsaveis do Plano de Acao
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: ESFORCO X IMPACTO
+# ════════════════════════════════════════
+TOOL_STRUCTURES["effortImpact"] = """{
+  "actions": [
+    {"id": "1", "label": "X1", "description": "Descricao da acao", "effort": 3, "impact": 5}
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["effortImpact"] = """
+ATENCAO - ESFORCO X IMPACTO:
+- Use as ideias do Brainstorming como actions
+- effort: 1=Muito Baixo, 2=Baixo, 3=Medio, 4=Alto, 5=Muito Alto
+- impact: 1=Muito Baixo, 2=Baixo, 3=Medio, 4=Alto, 5=Muito Alto
+- label: use os prefixos x1, x2, etc. do Brainstorming
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: OBSERVACAO DIRETA (GEMBA)
+# ════════════════════════════════════════
+TOOL_STRUCTURES["directObservation"] = """{
+  "observations": [
+    {
+      "id": "1",
+      "variable": "Variavel qualitativa",
+      "operationalDefinition": "Definicao operacional",
+      "identifiedCause": false,
+      "observationDescription": "",
+      "images": [],
+      "aiSuggestions": {
+        "trueHypothesis": "Situacao que CONFIRMA a causa raiz",
+        "falseHypothesis": "Situacao onde nenhum desvio foi encontrado"
+      }
+    }
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["directObservation"] = """
+ATENCAO - OBSERVACAO DIRETA:
+- Use APENAS variaveis QUALITATIVAS do Plano de Coleta
+- observationDescription: sempre string vazia (usuario preenche)
+- trueHypothesis: simulacao realistica que CONFIRMA a causa raiz
+- falseHypothesis: situacao onde nenhum desvio foi encontrado
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: NATUREZA DOS DADOS
+# ════════════════════════════════════════
+TOOL_STRUCTURES["dataNature"] = """{
+  "analyses": [
+    {
+      "id": "1",
+      "variableY": {"name": "Nome Y", "type": "Continuo", "description": "Por que e Y"},
+      "variableX": {"name": "Nome X", "type": "Discreto", "description": "Por que e X"},
+      "quadrant": "Y Continuo / X Discreto",
+      "recommendedTools": ["Box Plot", "ANOVA"],
+      "explanation": "Explicacao tecnica da recomendacao"
+    }
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["dataNature"] = """
+ATENCAO - NATUREZA DOS DADOS:
+- Y Continuo + X Continuo: Regressao Linear, Dispersao
+- Y Continuo + X Discreto: Box Plot, ANOVA, Teste T
+- Y Discreto + X Continuo: Regressao Logistica
+- Y Discreto + X Discreto: Qui-quadrado, Pareto
+- Use variaveis do Plano de Coleta como base
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: ANALISE DE STAKEHOLDERS
+# ════════════════════════════════════════
+TOOL_STRUCTURES["stakeholders"] = """{
+  "stakeholders": [
+    {
+      "id": "1",
+      "name": "Nome extraido do Charter ou contexto do projeto",
+      "area": "Area/Departamento",
+      "role": "Champion Executive",
+      "power": "Alto",
+      "interest": "Alto",
+      "currentEngagement": "Apoiador",
+      "notes": "Observacoes sobre a relacao deste stakeholder com o projeto"
+    }
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["stakeholders"] = """
+ATENCAO - ANALISE DE STAKEHOLDERS:
+
+FONTES DE DADOS - use nesta ordem:
+1. Nomes do Project Charter (lider, champion, equipe)
+2. Areas mencionadas no Brief e SIPOC
+3. Funcoes implicitas no processo descrito
+
+POWER (Poder):
+- Alto: autoridade para aprovar, vetar ou alocar recursos
+- Medio: influencia decisoes mas nao as toma sozinho
+- Baixo: executa mas nao decide
+
+INTEREST (Interesse):
+- Alto: diretamente afetado pelo resultado do projeto
+- Medio: afetado indiretamente
+- Baixo: pouca relacao com o escopo
+
+CURRENT ENGAGEMENT (Engajamento Atual):
+- Lider: defende e lidera ativamente
+- Apoiador: favoravel e colaborativo
+- Neutro: nem favoravel nem contrario
+- Resistente: apresenta obstaculos
+- Desconhece: ainda nao foi apresentado ao projeto
+
+ROLES DISPONIVEIS:
+Champion Executive, Champion, MBB, Black Belt, Green Belt,
+Yellow Belt, Process Owner, Team Member, Sponsor,
+Focal Point, Customers, Outro
+
+REGRAS CRITICAS:
+1. Use APENAS nomes e areas mencionados no contexto
+2. Se nao houver nomes, use cargo/funcao como identificador
+3. Gere entre 4 e 8 stakeholders relevantes
+4. Lider do projeto: power=Alto, interest=Alto
+5. Champion: power=Alto, role=Champion Executive
+6. Inclua pelo menos um Resistente ou Neutro para realismo
+7. notes: informacao especifica sobre a relacao com o projeto
+"""
+
+# ════════════════════════════════════════════════════════════════
+# FIM DAS FERRAMENTAS
+# ════════════════════════════════════════════════════════════════
 
 # ─── Modelos de request ────────────────────────────────────────────
 
@@ -55,296 +504,6 @@ class MentorRequest(BaseModel):
     projectData: Optional[Any] = None
     history: Optional[list] = []
 
-# ─── Estruturas JSON esperadas por ferramenta ──────────────────────
-
-TOOL_STRUCTURES = {
-    "sipoc": """{
-  "suppliers": ["Fornecedor 1", "Fornecedor 2"],
-  "inputs": ["Entrada 1", "Entrada 2"],
-  "process": ["Passo 1", "Passo 2", "Passo 3", "Passo 4", "Passo 5"],
-  "outputs": ["Saída principal", "Saída secundária"],
-  "customers": ["Cliente interno/externo"]
-}""",
-    "brainstorming": """{
-  "ideas": [
-    {"id": "1", "text": "x1: Ideia técnica curta", "category": "Método", "author": "IA LBW", "votes": 0},
-    {"id": "2", "text": "x2: Outra ideia", "category": "Mão de Obra", "author": "IA LBW", "votes": 0}
-  ],
-  "brainstormingType": "Causas do problema",
-  "brainstormingTopic": "Tema baseado no problema identificado"
-}""",
-    "gut": """{
-  "columns": [
-    {"id": "description", "label": "Problema / Oportunidade", "isScore": false},
-    {"id": "gravidade", "label": "Gravidade", "isScore": true},
-    {"id": "urgencia", "label": "Urgência", "isScore": true},
-    {"id": "tendencia", "label": "Tendência", "isScore": true}
-  ],
-  "opportunities": [
-    {"id": "1", "description": "Título do projeto", "gravidade": 5, "urgencia": 3, "tendencia": 5}
-  ]
-}""",
-    "rab": """{
-  "columns": [
-    {"id": "description", "label": "Problema / Oportunidade", "isScore": false},
-    {"id": "rapidez", "label": "Rapidez", "isScore": true},
-    {"id": "autonomia", "label": "Autonomia", "isScore": true},
-    {"id": "beneficio", "label": "Benefício", "isScore": true}
-  ],
-  "opportunities": [
-    {"id": "1", "description": "Título do projeto", "rapidez": 5, "autonomia": 3, "beneficio": 5}
-  ]
-}""",
-    "brief": """{
-  "answers": {
-    "q1": "Nome do processo",
-    "q2": "Problema com dados quantitativos",
-    "q3": "Pessoas e áreas envolvidas",
-    "q4": "O que está errado com exemplos",
-    "q5": "Riscos se não resolvido",
-    "q6": "O que se quer melhorar",
-    "q7": "Meta SMART: reduzir X de A para B em Y meses",
-    "q8": "Benefícios financeiros e operacionais",
-    "q10": "Próximos passos imediatos",
-    "q12": "Recursos necessários"
-  }
-}""",
-    "charter": """{
-  "title": "Verbo + indicador + processo",
-  "date": "DD/MM/AAAA",
-  "rev": "00",
-  "area": "Área responsável",
-  "leader": "",
-  "champion": "",
-  "problemDefinition": "Problema com baseline quantitativo",
-  "problemHistory": "Histórico e riscos",
-  "goalDefinition": "Meta SMART completa",
-  "kpi": "Y primário: indicador | Y secundário: indicador",
-  "scopeIn": "O que está dentro do escopo",
-  "scopeOut": "O que está fora do escopo",
-  "businessContributions": "1. Benefício financeiro. 2. Operacional. 3. Cliente.",
-  "stakeholders": [
-    {"role": "Líder:", "name": "", "definition": "R", "measurement": "A", "analysis": "R", "improvement": "R", "control": "R"},
-    {"role": "Patrocinador:", "name": "", "definition": "A", "measurement": "I", "analysis": "I", "improvement": "A", "control": "I"}
-  ]
-}""",
-    "measureIshikawa": """{
-  "categories": ["Método", "Máquina", "Medida", "Meio Ambiente", "Mão de Obra", "Material"],
-  "causes": {
-    "Método": ["x1: Causa curta máximo 6 palavras"],
-    "Máquina": [],
-    "Medida": [],
-    "Meio Ambiente": [],
-    "Mão de Obra": [],
-    "Material": []
-  },
-  "problem": "Problema central do projeto"
-}""",
-    "measureMatrix": """{
-  "outputs": [
-    {"name": "Y principal — Indicador", "importance": 10}
-  ],
-  "causes": [
-    {"id": "X01", "name": "Causa da Espinha de Peixe", "scores": [9], "effort": 1, "selected": false}
-  ]
-}""",
-    "dataCollection": """{
-  "items": [
-    {
-      "id": "1",
-      "data": {
-        "variable": "ID - Nome da variável",
-        "priority": "Alta",
-        "operationalDefinition": "O QUE MEDIR: procedimento técnico",
-        "msa": "Sim",
-        "method": "Quantitativa",
-        "stratification": "Por turno, operador",
-        "responsible": "Responsável",
-        "when": "Frequência",
-        "howMany": "Quantidade"
-      }
-    }
-  ]
-}""",
-    "fiveWhys": """{
-  "chains": [
-    {
-      "id": "1",
-      "problem": "Problema central",
-      "whys": ["Por que 1", "Por que 2", "Por que 3", "Por que 4", "Por que 5"],
-      "rootCause": "Causa raiz identificada"
-    }
-  ]
-}""",
-    "fmea": """{
-  "items": [
-    {
-      "id": "1",
-      "processStep": "Etapa do processo",
-      "failureMode": "Como pode falhar",
-      "failureEffect": "Impacto da falha",
-      "severity": 7,
-      "causes": "Causas da falha",
-      "occurrence": 5,
-      "controls": "Controles atuais",
-      "detection": 4,
-      "actions": "Ações recomendadas"
-    }
-  ]
-}""",
-    "plan5w2h": """{
-  "actions": [
-    {
-      "id": "1",
-      "variable": "Causa origem",
-      "what": "O que será feito",
-      "why": "Por que resolve",
-      "where": "Onde executar",
-      "when": "DD/MM/AAAA",
-      "who": "Responsável",
-      "how": "Como executar",
-      "howMuch": "Custo estimado",
-      "status": {"state": "green", "progress": "0%"}
-    }
-  ]
-}""",
-    "sop": """{
-  "title": "Título do POP",
-  "objective": "Objetivo do procedimento",
-  "scope": "Abrangência",
-  "responsibilities": "Responsáveis",
-  "steps": [
-    {"id": "1", "title": "Título do passo", "description": "Descrição detalhada", "warning": ""}
-  ],
-  "frequency": "Frequência de revisão",
-  "kpis": "Indicadores associados"
-}""",
-    "effortImpact": """{
-  "actions": [
-    {"id": "1", "label": "X1", "description": "Descrição da ação", "effort": 3, "impact": 5}
-  ]
-}""",
-    "directObservation": """{
-  "observations": [
-    {
-      "id": "1",
-      "variable": "Variável qualitativa",
-      "operationalDefinition": "Definição operacional",
-      "identifiedCause": false,
-      "observationDescription": "",
-      "images": [],
-      "aiSuggestions": {
-        "trueHypothesis": "Situação que CONFIRMA a causa raiz",
-        "falseHypothesis": "Situação onde nenhum desvio foi encontrado"
-      }
-    }
-  ]
-}""",
-    "dataNature": """{
-  "analyses": [
-    {
-      "id": "1",
-      "variableY": {"name": "Nome Y", "type": "Contínuo", "description": "Por que é Y"},
-      "variableX": {"name": "Nome X", "type": "Discreto", "description": "Por que é X"},
-      "quadrant": "Y Contínuo / X Discreto",
-      "recommendedTools": ["Box Plot", "ANOVA"],
-      "explanation": "Explicação técnica da recomendação"
-    }
-  ]
-}""",
-    "stakeholders": """{
-  "stakeholders": [
-    {"role": "Líder:", "name": "", "definition": "R", "measurement": "A", "analysis": "R", "improvement": "R", "control": "R"}
-  ]
-}""",
-}
-
-# ─── Instruções específicas por ferramenta ─────────────────────────
-
-TOOL_SPECIFIC_INSTRUCTIONS = {
-    "sipoc": """
-ATENÇÃO — SIPOC:
-- suppliers: quem fornece entradas para o processo
-- inputs: materiais, informações ou recursos que entram
-- process: exatamente 5 passos principais do processo
-- outputs: resultados ou produtos do processo
-- customers: quem recebe as saídas
-Use dados reais do contexto do projeto.
-""",
-    "brainstorming": """
-ATENÇÃO — BRAINSTORMING:
-- Gere mínimo 12 ideias distribuídas nos 6Ms: Método, Mão de Obra, Material, Máquina, Meio Ambiente, Medição
-- Prefixe cada ideia com "x1:", "x2:", etc.
-- Ideias curtas e técnicas — máximo 8 palavras cada
-- Baseie nas informações do projeto
-""",
-    "measureIshikawa": """
-ATENÇÃO — ESPINHA DE PEIXE:
-- Use ideias do Brainstorming como causas se disponíveis
-- Distribua nos 6Ms corretamente
-- Frases EXTREMAMENTE curtas — máximo 6 palavras por causa
-- O "problem" deve ser o problema central do projeto
-""",
-    "measureMatrix": """
-ATENÇÃO — MATRIZ CAUSA E EFEITO:
-- outputs: use os KPIs do projeto como Y's com importance 10
-- causes: use as causas da Espinha de Peixe como X's
-- scores: correlação 0=sem relação, 1=fraca, 3=média, 9=forte
-- O array "scores" deve ter o mesmo tamanho que "outputs"
-""",
-    "gut": """
-ATENÇÃO — MATRIZ GUT:
-- Use os projetos da Ideia de Projetos como opportunities
-- Pontuações APENAS: 1, 3 ou 5
-- gravidade: 5=Extremamente Grave, 3=Grave, 1=Leve
-- urgencia: 5=Imediata, 3=O mais rápido, 1=Pode esperar
-- tendencia: 5=Piorar rápido, 3=Irá piorar, 1=Não piora
-""",
-    "rab": """
-ATENÇÃO — MATRIZ RAB:
-- Use os projetos da Ideia de Projetos como opportunities
-- Pontuações APENAS: 1, 3 ou 5
-- rapidez: 5=Imediato/1 mês, 3=1-3 meses, 1=+3 meses
-- autonomia: 5=Total, 3=Apoio de outras áreas, 1=Depende de terceiros
-- beneficio: 5=Impacto Estratégico, 3=Impacto na Área, 1=Impacto no Processo
-""",
-    "charter": """
-ATENÇÃO — PROJECT CHARTER:
-- title: começa com Reduzir/Aumentar/Melhorar/Otimizar — SEM "Lean Six Sigma"
-- goalDefinition: formato SMART obrigatório com baseline e target
-- scopeIn e scopeOut: ambos obrigatórios
-- NÃO invente nomes de pessoas para stakeholders
-""",
-    "fiveWhys": """
-ATENÇÃO — 5 PORQUÊS:
-- Use as causas mais críticas da Espinha de Peixe ou Matriz C&E
-- Cada "por que" deve aprofundar o anterior
-- rootCause deve ser uma causa sistêmica real
-""",
-    "fmea": """
-ATENÇÃO — FMEA:
-- Baseie os modos de falha nas causas da Espinha de Peixe
-- severity (1-10): impacto no cliente
-- occurrence (1-10): frequência da falha
-- detection (1-10): dificuldade de detectar
-- RPN = severity × occurrence × detection
-""",
-    "plan5w2h": """
-ATENÇÃO — PLANO DE AÇÃO 5W2H:
-- Baseie as ações nas causas confirmadas (FMEA, 5 Porquês)
-- "what": verbo + objeto + resultado esperado
-- "who": cargo/função, não nome genérico
-- "when": datas realistas no formato DD/MM/AAAA
-""",
-    "dataNature": """
-ATENÇÃO — NATUREZA DOS DADOS:
-- Y Contínuo + X Contínuo → Regressão Linear, Dispersão
-- Y Contínuo + X Discreto → Box Plot, ANOVA, Teste T
-- Y Discreto + X Contínuo → Regressão Logística
-- Y Discreto + X Discreto → Qui-quadrado, Pareto
-""",
-}
-
 # ─── Rota 1: Gerar dados da ferramenta ────────────────────────────
 
 @router.post("/tool-data")
@@ -365,15 +524,15 @@ DADOS DA FERRAMENTA ANTERIOR ("{req.previousToolName}"):
         structure = TOOL_STRUCTURES.get(req.toolId, "{}")
         specific_instruction = TOOL_SPECIFIC_INSTRUCTIONS.get(req.toolId, "")
 
-        system_prompt = """Você é um consultor sênior Master Black Belt em Lean Six Sigma.
-Use os dados já preenchidos nas ferramentas anteriores para pré-preencher a próxima ferramenta.
-REGRAS CRÍTICAS:
-1. Use APENAS informações do contexto fornecido — nunca invente dados.
-2. Mantenha consistência absoluta com fases anteriores.
-3. Retorne EXCLUSIVAMENTE um objeto JSON válido sem explicações e sem markdown.
-4. Se um campo não puder ser inferido, use string vazia "".
-5. Qualidade de consultoria sênior.
-6. Responda em português do Brasil."""
+        system_prompt = """Voce e um consultor senior Master Black Belt em Lean Six Sigma.
+Use os dados ja preenchidos nas ferramentas anteriores para pre-preencher a proxima ferramenta.
+REGRAS CRITICAS:
+1. Use APENAS informacoes do contexto fornecido - nunca invente dados.
+2. Mantenha consistencia absoluta com fases anteriores.
+3. Retorne EXCLUSIVAMENTE um objeto JSON valido sem explicacoes e sem markdown.
+4. Se um campo nao puder ser inferido, use string vazia.
+5. Qualidade de consultoria senior.
+6. Responda em portugues do Brasil."""
 
         user_prompt = f"""
 Projeto: "{req.projectInfo.get('name', 'Projeto de Melhoria') if req.projectInfo else 'Projeto de Melhoria'}"
@@ -388,64 +547,63 @@ ESTRUTURA JSON ESPERADA (use exatamente esta estrutura):
 {structure}
 
 Retorne EXCLUSIVAMENTE o JSON preenchido com dados reais do projeto.
-Sem explicações, sem markdown, sem backticks.
+Sem explicacoes, sem markdown, sem backticks.
 """
 
         result = await call_claude(system_prompt, user_prompt)
         clean = result.replace("```json", "").replace("```", "").strip()
 
-        # Remove possível texto antes do JSON
-        if clean.startswith("{") is False and "{" in clean:
+        if not clean.startswith("{") and "{" in clean:
             clean = clean[clean.index("{"):]
-        if clean.startswith("[") is False and "[" in clean:
-            if clean.index("[") < clean.index("{") if "{" in clean else True:
+        if not clean.startswith("[") and "[" in clean:
+            if "{" not in clean or clean.index("[") < clean.index("{"):
                 clean = clean[clean.index("["):]
 
         parsed = json.loads(clean)
         return {"success": True, "data": parsed}
 
     except json.JSONDecodeError as e:
-        return {"success": False, "error": f"JSON inválido retornado pelo Claude: {str(e)}", "raw": result[:500] if 'result' in locals() else ""}
+        return {"success": False, "error": f"JSON invalido: {str(e)}", "raw": result[:500] if 'result' in locals() else ""}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-# ─── Rota 2: Gerar relatório da ferramenta ────────────────────────
+# ─── Rota 2: Gerar relatorio da ferramenta ────────────────────────
 
 @router.post("/report")
 async def generate_report(req: ReportRequest):
     try:
-        # Usa Opus para relatório consolidado, Sonnet para individual
         model = CLAUDE_MODEL_BEST if req.toolName == "consolidated" else CLAUDE_MODEL_FAST
 
         tool_specific = {
-            "Brainstorming": "Gere tabela Markdown: | Nº | Categoria | Ideia | Prioridade |. Top 3 ideias em destaque.",
-            "Espinha de Peixe": "Estruture pelos 6Ms. Destaque as 3 causas mais críticas. Tabela de priorização.",
-            "Plano de Ação 5W2H": "Tabela: | O Quê | Por Quê | Onde | Quando | Quem | Como | Quanto | Status |",
-            "Project Charter": "Documento executivo: Problema, Meta SMART, Escopo, Equipe, Benefícios.",
-            "SIPOC": "Tabela SIPOC completa. Análise dos pontos críticos do fluxo.",
-            "FMEA": "Tabela FMEA ordenada por RPN decrescente. Ações prioritárias.",
+            "Brainstorming": "Gere tabela Markdown: | No | Categoria | Ideia | Prioridade |. Top 3 ideias em destaque.",
+            "Espinha de Peixe": "Estruture pelos 6Ms. Destaque as 3 causas mais criticas. Tabela de priorizacao.",
+            "Plano de Acao 5W2H": "Tabela: | O Que | Por Que | Onde | Quando | Quem | Como | Quanto | Status |",
+            "Project Charter": "Documento executivo: Problema, Meta SMART, Escopo, Equipe, Beneficios.",
+            "SIPOC": "Tabela SIPOC completa. Analise dos pontos criticos do fluxo.",
+            "FMEA": "Tabela FMEA ordenada por RPN decrescente. Acoes prioritarias.",
+            "Analise de Stakeholders": "Tabela com nome, poder, interesse, engajamento atual e plano de acao por stakeholder.",
         }
 
-        specific = tool_specific.get(req.toolName, f"Relatório executivo profissional para {req.toolName}.")
+        specific = tool_specific.get(req.toolName, f"Relatorio executivo profissional para {req.toolName}.")
 
-        system_prompt = """Você é um consultor sênior Master Black Belt em Lean Six Sigma especializado
-em geração de relatórios executivos profissionais.
+        system_prompt = """Voce e um consultor senior Master Black Belt em Lean Six Sigma especializado
+em geracao de relatorios executivos profissionais.
 REGRAS:
 1. Use APENAS os dados fornecidos.
-2. Melhore a redação para padrão executivo de consultoria.
-3. Seja conciso — cabe em uma página A4.
-4. Use tabelas Markdown, negrito, títulos hierárquicos.
-5. Termine com "## Próximos Passos Recomendados" com 2 a 3 ações concretas.
-6. Idioma: Português do Brasil."""
+2. Melhore a redacao para padrao executivo de consultoria.
+3. Seja conciso - cabe em uma pagina A4.
+4. Use tabelas Markdown, negrito, titulos hierarquicos.
+5. Termine com ## Proximos Passos Recomendados com 2 a 3 acoes concretas.
+6. Idioma: Portugues do Brasil."""
 
         user_prompt = f"""
 PROJETO: {req.projectName}
 FERRAMENTA: {req.toolName}
 DADOS: {json.dumps(req.toolData, ensure_ascii=False, indent=2)}
 
-INSTRUÇÃO ESPECÍFICA: {specific}
+INSTRUCAO ESPECIFICA: {specific}
 
-Gere o relatório executivo agora.
+Gere o relatorio executivo agora.
 """
 
         result = await call_claude(system_prompt, user_prompt, max_tokens=2048, model=model)
@@ -460,29 +618,29 @@ Gere o relatório executivo agora.
 async def mentor_chat(req: MentorRequest):
     try:
         phase_context = {
-            "PreDefinir": "O usuário está na fase Pré-Definir, identificando e priorizando oportunidades de melhoria.",
-            "Define": "O usuário está na fase Definir, estruturando o escopo, problema e objetivos do projeto.",
-            "Measure": "O usuário está na fase Medir, mapeando o processo e coletando dados da situação atual.",
-            "Analyze": "O usuário está na fase Analisar, identificando causas raiz do problema com dados.",
-            "Improve": "O usuário está na fase Melhorar, desenvolvendo e implementando soluções.",
-            "Control": "O usuário está na fase Controlar, sustentando os ganhos e padronizando melhorias.",
+            "PreDefinir": "O usuario esta na fase Pre-Definir, identificando e priorizando oportunidades de melhoria.",
+            "Define": "O usuario esta na fase Definir, estruturando o escopo, problema e objetivos do projeto.",
+            "Measure": "O usuario esta na fase Medir, mapeando o processo e coletando dados da situacao atual.",
+            "Analyze": "O usuario esta na fase Analisar, identificando causas raiz do problema com dados.",
+            "Improve": "O usuario esta na fase Melhorar, desenvolvendo e implementando solucoes.",
+            "Control": "O usuario esta na fase Controlar, sustentando os ganhos e padronizando melhorias.",
         }
 
-        system_prompt = f"""Você é o Mentor LBW — um consultor sênior Master Black Belt em Lean Six Sigma
-com 20 anos de experiência em projetos de melhoria de processos.
+        system_prompt = f"""Voce e o Mentor LBW - um consultor senior Master Black Belt em Lean Six Sigma
+com 20 anos de experiencia em projetos de melhoria de processos.
 
-PRINCÍPIOS:
-- Seja direto e técnico. Evite respostas genéricas.
-- Use sempre os dados do projeto do usuário para personalizar cada resposta.
-- Quando sugerir uma próxima ação, seja específico.
-- Use linguagem de consultoria executiva — profissional mas acessível.
-- Responda em português do Brasil.
+PRINCIPIOS:
+- Seja direto e tecnico. Evite respostas genericas.
+- Use sempre os dados do projeto do usuario para personalizar cada resposta.
+- Quando sugerir uma proxima acao, seja especifico.
+- Use linguagem de consultoria executiva - profissional mas acessivel.
+- Responda em portugues do Brasil.
 
 CONTEXTO ATUAL: {phase_context.get(req.currentPhase, "")}
 Ferramenta ativa: {req.currentTool}
 
 DADOS DO PROJETO:
-{json.dumps(req.projectData, ensure_ascii=False, indent=2) if req.projectData else "Nenhum dado disponível ainda."}"""
+{json.dumps(req.projectData, ensure_ascii=False, indent=2) if req.projectData else "Nenhum dado disponivel ainda."}"""
 
         messages = list(req.history) if req.history else []
         messages.append({"role": "user", "content": req.message})
@@ -505,7 +663,7 @@ DADOS DO PROJETO:
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-# ─── Rota 4: Sugestões contextuais do Mentor ──────────────────────
+# ─── Rota 4: Sugestoes contextuais do Mentor ──────────────────────
 
 @router.post("/mentor-suggestions")
 async def mentor_suggestions(req: dict):
@@ -515,21 +673,21 @@ async def mentor_suggestions(req: dict):
         completed_tools = req.get("completedTools", [])
         project_data = req.get("projectData", {})
 
-        system_prompt = """Você é o Mentor LBW. Gere exatamente 3 sugestões de perguntas curtas e relevantes
+        system_prompt = """Voce e o Mentor LBW. Gere exatamente 3 sugestoes de perguntas curtas e relevantes
 que um profissional faria neste momento do projeto DMAIC.
-As sugestões devem ser:
-- Específicas para a fase e ferramenta atual
-- Baseadas nos dados já preenchidos
-- Máximo 8 palavras cada
-Retorne EXCLUSIVAMENTE um array JSON com 3 strings. Sem explicações.
-Exemplo: ["Como escrever uma meta SMART?", "Qual o próximo passo?", "Como calcular o impacto?"]"""
+As sugestoes devem ser:
+- Especificas para a fase e ferramenta atual
+- Baseadas nos dados ja preenchidos
+- Maximo 8 palavras cada
+Retorne EXCLUSIVAMENTE um array JSON com 3 strings. Sem explicacoes.
+Exemplo: ["Como escrever uma meta SMART?", "Qual o proximo passo?", "Como calcular o impacto?"]"""
 
         user_prompt = f"""
 Fase atual: {current_phase}
 Ferramenta atual: {current_tool}
-Ferramentas concluídas: {', '.join(completed_tools)}
+Ferramentas concluidas: {', '.join(completed_tools)}
 Contexto: {json.dumps(project_data, ensure_ascii=False)}
-Gere as 3 sugestões agora.
+Gere as 3 sugestoes agora.
 """
 
         result = await call_claude(system_prompt, user_prompt, max_tokens=200)
@@ -538,14 +696,13 @@ Gere as 3 sugestões agora.
         return {"success": True, "suggestions": suggestions}
 
     except Exception:
-        # Fallback por fase
         fallbacks = {
-            "PreDefinir": ["Como priorizar os projetos?", "O que é a Matriz GUT?", "Como validar uma ideia?"],
+            "PreDefinir": ["Como priorizar os projetos?", "O que e a Matriz GUT?", "Como validar uma ideia?"],
             "Define": ["Como escrever uma meta SMART?", "O que colocar no escopo?", "Como calcular o impacto?"],
-            "Measure": ["Como mapear o processo?", "Quais dados coletar?", "O que é MSA?"],
-            "Analyze": ["Como identificar a causa raiz?", "Quando usar o 5 Porquês?", "Como usar o Ishikawa?"],
-            "Improve": ["Como priorizar as soluções?", "O que é um piloto?", "Como fazer o FMEA?"],
-            "Control": ["Como sustentar os ganhos?", "O que é um POP?", "Como monitorar o KPI?"],
+            "Measure": ["Como mapear o processo?", "Quais dados coletar?", "O que e MSA?"],
+            "Analyze": ["Como identificar a causa raiz?", "Quando usar o 5 Porques?", "Como usar o Ishikawa?"],
+            "Improve": ["Como priorizar as solucoes?", "O que e um piloto?", "Como fazer o FMEA?"],
+            "Control": ["Como sustentar os ganhos?", "O que e um POP?", "Como monitorar o KPI?"],
         }
         phase = req.get("currentPhase", "")
-        return {"success": True, "suggestions": fallbacks.get(phase, ["Qual o próximo passo?", "Como posso melhorar?", "O que é importante aqui?"])}
+        return {"success": True, "suggestions": fallbacks.get(phase, ["Qual o proximo passo?", "Como posso melhorar?", "O que e importante aqui?"])}
