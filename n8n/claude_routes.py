@@ -477,7 +477,94 @@ REGRAS CRITICAS:
 6. Inclua pelo menos um Resistente ou Neutro para realismo
 7. notes: informacao especifica sobre a relacao com o projeto
 """
+# ════════════════════════════════════════
+# FERRAMENTA: MAPA DE PROCESSO
+# ════════════════════════════════════════
+TOOL_STRUCTURES["processMap"] = """{
+  "nodes": [
+    {
+      "id": "1",
+      "type": "start",
+      "position": {"x": 50, "y": 100},
+      "data": {"label": "Inicio", "fontSize": 12}
+    },
+    {
+      "id": "2",
+      "type": "step",
+      "position": {"x": 220, "y": 80},
+      "data": {"label": "Nome da atividade", "fontSize": 12, "area": "Nome da area"}
+    },
+    {
+      "id": "3",
+      "type": "decision",
+      "position": {"x": 420, "y": 75},
+      "data": {"label": "Decisao?", "fontSize": 11}
+    },
+    {
+      "id": "4",
+      "type": "step",
+      "position": {"x": 600, "y": 40},
+      "data": {"label": "Atividade sim", "fontSize": 12, "area": "Nome da area"}
+    },
+    {
+      "id": "5",
+      "type": "step",
+      "position": {"x": 600, "y": 160},
+      "data": {"label": "Atividade nao", "fontSize": 12, "area": "Nome da area"}
+    },
+    {
+      "id": "6",
+      "type": "end",
+      "position": {"x": 800, "y": 100},
+      "data": {"label": "Fim", "isEnd": true, "fontSize": 12}
+    }
+  ],
+  "edges": [
+    {"id": "e1-2", "source": "1", "target": "2"},
+    {"id": "e2-3", "source": "2", "target": "3"},
+    {"id": "e3-4", "source": "3", "target": "4", "label": "Sim"},
+    {"id": "e3-5", "source": "3", "target": "5", "label": "Nao"},
+    {"id": "e4-6", "source": "4", "target": "6"},
+    {"id": "e5-6", "source": "5", "target": "6"}
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["processMap"] = """
+ATENCAO - MAPA DE PROCESSO:
 
+FONTES DE DADOS - use nesta ordem:
+1. SIPOC - use os 5 passos do process[] como base das atividades
+2. Brief - use o nome do processo e o problema para contexto
+3. Charter - use as areas para identificar quem executa cada passo
+
+REGRAS DE POSICIONAMENTO:
+- Inicio sempre em x=50, y=100
+- Cada atividade avanca 180px no eixo x
+- Atividades na mesma area ficam no mesmo nivel y
+- Atividades de areas diferentes ficam em y diferentes (separar 120px)
+- Decisoes ficam no centro entre duas atividades
+
+TIPOS DE NOS:
+- start: apenas um no inicio do processo
+- end: apenas um no final do processo
+- step: atividades normais do processo (retangulo)
+- decision: pontos de aprovacao ou verificacao (losango)
+
+REGRAS DE CONEXAO (edges):
+- Conexoes normais: sem label
+- Saida Sim da decisao: label="Sim", style.stroke="#0F6E56"
+- Saida Nao da decisao: label="Nao", style.stroke="#993C1D"
+- Cada no deve ter pelo menos uma conexao de entrada e uma de saida
+- Exceto start (so saida) e end (so entrada)
+
+REGRAS CRITICAS:
+1. Use EXATAMENTE os passos do SIPOC como atividades
+2. Identifique pontos de aprovacao no processo e crie nos decision
+3. Gere entre 5 e 12 nos no total
+4. Posicione os nos de forma que nao se sobreponham
+5. O campo area em data indica qual departamento executa aquela atividade
+6. IDs devem ser strings numericas simples: "1", "2", "3"...
+7. IDs das edges devem seguir o padrao: "e1-2", "e2-3", etc.
+"""
 # ════════════════════════════════════════════════════════════════
 # FIM DAS FERRAMENTAS
 # ════════════════════════════════════════════════════════════════
