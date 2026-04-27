@@ -9,6 +9,8 @@ import io
 import matplotlib.pyplot as plt
 import inspect 
 from claude_routes import router as claude_router
+from metavise_routes import router as metavise_router
+
 
 
 
