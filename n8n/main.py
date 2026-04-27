@@ -37,6 +37,7 @@ except ImportError as e:
 # Iniciar app
 app = FastAPI()
 app.include_router(claude_router)
+app.include_router(metavise_router)
 
 # Middleware de CORS atualizado para incluir seu novo domínio
 app.add_middleware(
