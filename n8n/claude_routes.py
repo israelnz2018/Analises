@@ -573,8 +573,8 @@ TOOL_STRUCTURES["stakeholderAdkar"] = """{
   "stakeholders": [
     {
       "id": "1",
-      "name": "Nome do Sponsor",
-      "area": "Diretoria / Area",
+      "name": "Maria Silva",
+      "area": "Diretoria Industrial",
       "role": "Patrocinador (Sponsor)",
       "type": "Core Team",
       "power": "Alto",
@@ -593,8 +593,8 @@ TOOL_STRUCTURES["stakeholderAdkar"] = """{
     },
     {
       "id": "2",
-      "name": "Nome do Black Belt / Green Belt",
-      "area": "Area do projeto",
+      "name": "Joao Pereira",
+      "area": "Engenharia de Processos",
       "role": "Lider do Projeto (Black Belt / Green Belt)",
       "type": "Core Team",
       "power": "Medio",
@@ -610,46 +610,6 @@ TOOL_STRUCTURES["stakeholderAdkar"] = """{
       "owner": "",
       "customAction": "",
       "notes": ""
-    },
-    {
-      "id": "3",
-      "name": "Gestor da area impactada",
-      "area": "Area impactada pelo projeto",
-      "role": "Gestor de Area Impactada",
-      "type": "Impactado",
-      "power": "Alto",
-      "interest": "Medio",
-      "awareness": "Amarelo",
-      "desire": "Vermelho",
-      "knowledge": "Vermelho",
-      "ability": "Vermelho",
-      "reinforcement": "Vermelho",
-      "barrier": "Nao sabe ainda o impacto na sua area",
-      "channel": "Reuniao 1:1",
-      "frequency": "Quinzenal",
-      "owner": "",
-      "customAction": "",
-      "notes": ""
-    },
-    {
-      "id": "4",
-      "name": "Operadores / Executores do processo",
-      "area": "Area operacional impactada",
-      "role": "Operador Impactado",
-      "type": "Impactado",
-      "power": "Baixo",
-      "interest": "Alto",
-      "awareness": "Vermelho",
-      "desire": "Vermelho",
-      "knowledge": "Vermelho",
-      "ability": "Vermelho",
-      "reinforcement": "Vermelho",
-      "barrier": "Ainda nao foram comunicados sobre o projeto",
-      "channel": "Workshop",
-      "frequency": "Mensal",
-      "owner": "",
-      "customAction": "",
-      "notes": ""
     }
   ]
 }"""
@@ -657,27 +617,62 @@ TOOL_SPECIFIC_INSTRUCTIONS["stakeholderAdkar"] = """
 ATENCAO - STAKEHOLDER & ADKAR:
 Voce e um especialista em Change Management (Prosci ADKAR) e Lean Six Sigma.
 
-REGRAS CRITICAS:
-1. Identifique os stakeholders REAIS baseado no contexto do Charter/Brief.
-   Use nomes de cargos/funcoes reais do projeto - NAO invente nomes de pessoas.
-2. Classifique cada stakeholder como:
+REGRA MAIS IMPORTANTE - PREENCHIMENTO DOS CAMPOS name E area:
+
+CAMPO "name" = NOME DA PESSOA (primeiro e ultimo nome)
+- Procure em allProjectData os nomes reais em: charter.leader, charter.champion,
+  charter.team[].name, charter.stakeholders[].name, projectCharterPMI (mesmos campos)
+- Se houver nome real no contexto, USE ESSE NOME (ex: "Maria Silva", "Joao Pereira")
+- Se NAO houver nome no contexto, use o cargo seguido de "(a definir)"
+  Ex: "Sponsor (a definir)", "Black Belt (a definir)", "Gestor de Pintura (a definir)"
+- NUNCA coloque so o cargo sem o sufixo "(a definir)" no campo name
+- NUNCA coloque a area no campo name
+
+CAMPO "area" = DEPARTAMENTO / AREA DA PESSOA
+- Ex: "Producao", "Pintura Automotiva", "Meio Ambiente / Utilidades", "Engenharia"
+- Use a area mencionada no Charter/Brief/SIPOC
+- NUNCA coloque o cargo no campo area
+- NUNCA coloque o nome no campo area
+
+CAMPO "role" = FUNCAO NO PROJETO (selecionar da lista)
+- Patrocinador (Sponsor)
+- Champion / Process Owner
+- Lider do Projeto (Black Belt / Green Belt)
+- Membro da Equipe (Core)
+- Gestor de Area Impactada
+- Operador Impactado
+- Cliente / Usuario Final
+- Fornecedor / Suporte
+- Outros
+
+EXEMPLO CORRETO:
+{ "name": "Maria Silva", "area": "Meio Ambiente / Utilidades", "role": "Patrocinador (Sponsor)" }
+
+EXEMPLO ERRADO (NAO FAZER):
+{ "name": "Especialista em Meio Ambiente", "area": "Meio Ambiente / Utilidades", "role": "Patrocinador (Sponsor)" }
+                ^^^ cargo no campo name - ERRADO
+
+REGRAS DE NEGOCIO:
+1. Classifique cada stakeholder:
    - Core Team: quem EXECUTA a mudanca (Sponsor, BB/GB, Process Owner, equipe tecnica)
    - Impactado: quem RECEBE a mudanca (gestores de area, operadores, clientes internos)
-3. ADKAR inicial - regra geral:
-   - Core Team: Awareness e Desire costumam estar Verde ou Amarelo (estao no projeto)
-   - Impactados: normalmente comecar com Awareness Vermelho ou Amarelo
-   - NINGUEM comeca com Ability ou Reinforcement Verde - ainda nao implementou nada
-4. Valores validos para ADKAR: apenas "Vermelho", "Amarelo" ou "Verde"
-5. Valores validos para power/interest: "Baixo", "Medio" ou "Alto"
-6. Valores validos para type: "Core Team" ou "Impactado"
-7. Gere entre 5 e 8 stakeholders realistas para o projeto descrito.
-8. Para cada Impactado com Desire Vermelho, preencha o campo barrier com
-   a resistencia mais provavel baseada no contexto do projeto.
-9. Sugira channel e frequency coerentes com a classificacao Poder x Interesse:
-   - Gerenciar de Perto (poder alto + interesse alto): Reuniao 1:1 / Semanal
-   - Manter Satisfeito (poder alto + interesse baixo): Steering Committee / Mensal
-   - Manter Informado (poder baixo + interesse alto): Status Report / Quinzenal
-   - Monitorar (poder baixo + interesse baixo): Comunicado Geral / Marcos
+2. ADKAR inicial - regra geral:
+   - Core Team: awareness e desire costumam estar Verde ou Amarelo (estao no projeto)
+   - Impactados: comecar tipicamente com awareness Vermelho ou Amarelo
+   - NINGUEM comeca com ability ou reinforcement Verde - ainda nao implementou
+3. Valores validos:
+   - ADKAR (5 letras): apenas "Vermelho", "Amarelo" ou "Verde"
+   - power, interest: "Baixo", "Medio" ou "Alto"
+   - type: "Core Team" ou "Impactado"
+4. Gere entre 5 e 8 stakeholders realistas para o projeto.
+5. Para cada Impactado com desire Vermelho, preencha o campo barrier
+   com a resistencia mais provavel baseada no contexto.
+6. Sugira channel e frequency coerentes com Poder x Interesse:
+   - Gerenciar de Perto (poder alto + interesse alto): "Reuniao 1:1" / "Semanal"
+   - Manter Satisfeito (poder alto + interesse baixo): "Steering Committee" / "Mensal"
+   - Manter Informado (poder baixo + interesse alto): "Status Report" / "Quinzenal"
+   - Monitorar (poder baixo + interesse baixo): "Comunicado Geral" / "Marcos"
+"""
 """
 # ════════════════════════════════════════════════════════════════
 # FIM DAS FERRAMENTAS
