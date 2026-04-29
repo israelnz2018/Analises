@@ -565,6 +565,120 @@ REGRAS CRITICAS:
 6. IDs devem ser strings numericas simples: "1", "2", "3"...
 7. IDs das edges devem seguir o padrao: "e1-2", "e2-3", etc.
 """
+
+# ════════════════════════════════════════
+# FERRAMENTA: STAKEHOLDER & ADKAR
+# ════════════════════════════════════════
+TOOL_STRUCTURES["stakeholderAdkar"] = """{
+  "stakeholders": [
+    {
+      "id": "1",
+      "name": "Nome do Sponsor",
+      "area": "Diretoria / Area",
+      "role": "Patrocinador (Sponsor)",
+      "type": "Core Team",
+      "power": "Alto",
+      "interest": "Alto",
+      "awareness": "Verde",
+      "desire": "Verde",
+      "knowledge": "Amarelo",
+      "ability": "Vermelho",
+      "reinforcement": "Vermelho",
+      "barrier": "",
+      "channel": "Reuniao 1:1",
+      "frequency": "Semanal",
+      "owner": "",
+      "customAction": "",
+      "notes": ""
+    },
+    {
+      "id": "2",
+      "name": "Nome do Black Belt / Green Belt",
+      "area": "Area do projeto",
+      "role": "Lider do Projeto (Black Belt / Green Belt)",
+      "type": "Core Team",
+      "power": "Medio",
+      "interest": "Alto",
+      "awareness": "Verde",
+      "desire": "Verde",
+      "knowledge": "Verde",
+      "ability": "Amarelo",
+      "reinforcement": "Vermelho",
+      "barrier": "",
+      "channel": "Reuniao 1:1",
+      "frequency": "Semanal",
+      "owner": "",
+      "customAction": "",
+      "notes": ""
+    },
+    {
+      "id": "3",
+      "name": "Gestor da area impactada",
+      "area": "Area impactada pelo projeto",
+      "role": "Gestor de Area Impactada",
+      "type": "Impactado",
+      "power": "Alto",
+      "interest": "Medio",
+      "awareness": "Amarelo",
+      "desire": "Vermelho",
+      "knowledge": "Vermelho",
+      "ability": "Vermelho",
+      "reinforcement": "Vermelho",
+      "barrier": "Nao sabe ainda o impacto na sua area",
+      "channel": "Reuniao 1:1",
+      "frequency": "Quinzenal",
+      "owner": "",
+      "customAction": "",
+      "notes": ""
+    },
+    {
+      "id": "4",
+      "name": "Operadores / Executores do processo",
+      "area": "Area operacional impactada",
+      "role": "Operador Impactado",
+      "type": "Impactado",
+      "power": "Baixo",
+      "interest": "Alto",
+      "awareness": "Vermelho",
+      "desire": "Vermelho",
+      "knowledge": "Vermelho",
+      "ability": "Vermelho",
+      "reinforcement": "Vermelho",
+      "barrier": "Ainda nao foram comunicados sobre o projeto",
+      "channel": "Workshop",
+      "frequency": "Mensal",
+      "owner": "",
+      "customAction": "",
+      "notes": ""
+    }
+  ]
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["stakeholderAdkar"] = """
+ATENCAO - STAKEHOLDER & ADKAR:
+Voce e um especialista em Change Management (Prosci ADKAR) e Lean Six Sigma.
+
+REGRAS CRITICAS:
+1. Identifique os stakeholders REAIS baseado no contexto do Charter/Brief.
+   Use nomes de cargos/funcoes reais do projeto - NAO invente nomes de pessoas.
+2. Classifique cada stakeholder como:
+   - Core Team: quem EXECUTA a mudanca (Sponsor, BB/GB, Process Owner, equipe tecnica)
+   - Impactado: quem RECEBE a mudanca (gestores de area, operadores, clientes internos)
+3. ADKAR inicial - regra geral:
+   - Core Team: Awareness e Desire costumam estar Verde ou Amarelo (estao no projeto)
+   - Impactados: normalmente comecar com Awareness Vermelho ou Amarelo
+   - NINGUEM comeca com Ability ou Reinforcement Verde - ainda nao implementou nada
+4. Valores validos para ADKAR: apenas "Vermelho", "Amarelo" ou "Verde"
+5. Valores validos para power/interest: "Baixo", "Medio" ou "Alto"
+6. Valores validos para type: "Core Team" ou "Impactado"
+7. Gere entre 5 e 8 stakeholders realistas para o projeto descrito.
+8. Para cada Impactado com Desire Vermelho, preencha o campo barrier com
+   a resistencia mais provavel baseada no contexto do projeto.
+9. Sugira channel e frequency coerentes com a classificacao Poder x Interesse:
+   - Gerenciar de Perto (poder alto + interesse alto): Reuniao 1:1 / Semanal
+   - Manter Satisfeito (poder alto + interesse baixo): Steering Committee / Mensal
+   - Manter Informado (poder baixo + interesse alto): Status Report / Quinzenal
+   - Monitorar (poder baixo + interesse baixo): Comunicado Geral / Marcos
+"""
 # ════════════════════════════════════════════════════════════════
 # FIM DAS FERRAMENTAS
 # ════════════════════════════════════════════════════════════════
@@ -669,6 +783,7 @@ async def generate_report(req: ReportRequest):
             "SIPOC": "Tabela SIPOC completa. Analise dos pontos criticos do fluxo.",
             "FMEA": "Tabela FMEA ordenada por RPN decrescente. Acoes prioritarias.",
             "Analise de Stakeholders": "Tabela com nome, poder, interesse, engajamento atual e plano de acao por stakeholder.",
+            "Stakeholder & ADKAR": "Tabela com nome, tipo (Core/Impactado), classificacao Poder x Interesse, semaforo ADKAR (A-D-K-A-R) e plano de acao por stakeholder. Destaque o GAP entre Core Team e Impactados.",
         }
 
         specific = tool_specific.get(req.toolName, f"Relatorio executivo profissional para {req.toolName}.")
