@@ -565,7 +565,6 @@ REGRAS CRITICAS:
 6. IDs devem ser strings numericas simples: "1", "2", "3"...
 7. IDs das edges devem seguir o padrao: "e1-2", "e2-3", etc.
 """
-
 # ════════════════════════════════════════
 # FERRAMENTA: STAKEHOLDER & ADKAR
 # ════════════════════════════════════════
@@ -575,34 +574,16 @@ TOOL_STRUCTURES["stakeholderAdkar"] = """{
       "id": "1",
       "name": "Maria Silva",
       "area": "Diretoria Industrial",
-      "role": "Patrocinador (Sponsor)",
+      "role": "Patrocinador / Sponsor",
       "type": "Core Team",
       "power": "Alto",
       "interest": "Alto",
+      "currentEngagement": "Apoiador",
+      "desiredEngagement": "Apoiador",
       "awareness": "Verde",
       "desire": "Verde",
       "knowledge": "Amarelo",
       "ability": "Vermelho",
-      "reinforcement": "Vermelho",
-      "barrier": "",
-      "channel": "Reuniao 1:1",
-      "frequency": "Semanal",
-      "owner": "",
-      "customAction": "",
-      "notes": ""
-    },
-    {
-      "id": "2",
-      "name": "Joao Pereira",
-      "area": "Engenharia de Processos",
-      "role": "Lider do Projeto (Black Belt / Green Belt)",
-      "type": "Core Team",
-      "power": "Medio",
-      "interest": "Alto",
-      "awareness": "Verde",
-      "desire": "Verde",
-      "knowledge": "Verde",
-      "ability": "Amarelo",
       "reinforcement": "Vermelho",
       "barrier": "",
       "channel": "Reuniao 1:1",
@@ -615,65 +596,156 @@ TOOL_STRUCTURES["stakeholderAdkar"] = """{
 }"""
 TOOL_SPECIFIC_INSTRUCTIONS["stakeholderAdkar"] = """
 ATENCAO - STAKEHOLDER & ADKAR:
-Voce e um especialista em Change Management (Prosci ADKAR) e Lean Six Sigma.
+Voce e um especialista em Lean Six Sigma + Prosci ADKAR.
 
-REGRA MAIS IMPORTANTE - PREENCHIMENTO DOS CAMPOS name E area:
+═════════════════════════════════════════════════════════════════
+REGRA #1 - CAMPO name vs area
+═════════════════════════════════════════════════════════════════
 
 CAMPO "name" = NOME DA PESSOA (primeiro e ultimo nome)
-- Procure em allProjectData os nomes reais em: charter.leader, charter.champion,
-  charter.team[].name, charter.stakeholders[].name, projectCharterPMI (mesmos campos)
-- Se houver nome real no contexto, USE ESSE NOME (ex: "Maria Silva", "Joao Pereira")
-- Se NAO houver nome no contexto, use o cargo seguido de "(a definir)"
-  Ex: "Sponsor (a definir)", "Black Belt (a definir)", "Gestor de Pintura (a definir)"
-- NUNCA coloque so o cargo sem o sufixo "(a definir)" no campo name
+- Procure nomes reais em: charter.leader, charter.champion,
+  charter.team[].name, charter.stakeholders[].name,
+  projectCharterPMI (mesmos campos)
+- Se houver nome real no contexto, USE ESSE NOME
+  (ex: "Maria Silva", "Joao Pereira")
+- Se NAO houver nome, use cargo + "(a definir)"
+  Ex: "Sponsor (a definir)", "Black Belt (a definir)"
+- NUNCA coloque so o cargo no campo name
 - NUNCA coloque a area no campo name
 
 CAMPO "area" = DEPARTAMENTO / AREA DA PESSOA
-- Ex: "Producao", "Pintura Automotiva", "Meio Ambiente / Utilidades", "Engenharia"
-- Use a area mencionada no Charter/Brief/SIPOC
+- Ex: "Producao", "Pintura Automotiva", "Engenharia de Processos"
 - NUNCA coloque o cargo no campo area
-- NUNCA coloque o nome no campo area
-
-CAMPO "role" = FUNCAO NO PROJETO (selecionar da lista)
-- Patrocinador (Sponsor)
-- Champion / Process Owner
-- Lider do Projeto (Black Belt / Green Belt)
-- Membro da Equipe (Core)
-- Gestor de Area Impactada
-- Operador Impactado
-- Cliente / Usuario Final
-- Fornecedor / Suporte
-- Outros
 
 EXEMPLO CORRETO:
-{ "name": "Maria Silva", "area": "Meio Ambiente / Utilidades", "role": "Patrocinador (Sponsor)" }
+{ "name": "Maria Silva", "area": "Diretoria Industrial",
+  "role": "Patrocinador / Sponsor" }
 
-EXEMPLO ERRADO (NAO FAZER):
-{ "name": "Especialista em Meio Ambiente", "area": "Meio Ambiente / Utilidades", "role": "Patrocinador (Sponsor)" }
-                ^^^ cargo no campo name - ERRADO
+EXEMPLO ERRADO:
+{ "name": "Especialista em Meio Ambiente",
+  "area": "Meio Ambiente",
+  "role": "Patrocinador / Sponsor" }
 
-REGRAS DE NEGOCIO:
-1. Classifique cada stakeholder:
-   - Core Team: quem EXECUTA a mudanca (Sponsor, BB/GB, Process Owner, equipe tecnica)
-   - Impactado: quem RECEBE a mudanca (gestores de area, operadores, clientes internos)
-2. ADKAR inicial - regra geral:
-   - Core Team: awareness e desire costumam estar Verde ou Amarelo (estao no projeto)
-   - Impactados: comecar tipicamente com awareness Vermelho ou Amarelo
-   - NINGUEM comeca com ability ou reinforcement Verde - ainda nao implementou
-3. Valores validos:
-   - ADKAR (5 letras): apenas "Vermelho", "Amarelo" ou "Verde"
-   - power, interest: "Baixo", "Medio" ou "Alto"
-   - type: "Core Team" ou "Impactado"
-4. Gere entre 5 e 8 stakeholders realistas para o projeto.
-5. Para cada Impactado com desire Vermelho, preencha o campo barrier
-   com a resistencia mais provavel baseada no contexto.
-6. Sugira channel e frequency coerentes com Poder x Interesse:
-   - Gerenciar de Perto (poder alto + interesse alto): "Reuniao 1:1" / "Semanal"
-   - Manter Satisfeito (poder alto + interesse baixo): "Steering Committee" / "Mensal"
-   - Manter Informado (poder baixo + interesse alto): "Status Report" / "Quinzenal"
-   - Monitorar (poder baixo + interesse baixo): "Comunicado Geral" / "Marcos"
+═════════════════════════════════════════════════════════════════
+REGRA #2 - 15 PAPEIS, TIPO E ENGAJAMENTO DESEJADO INICIAL
+═════════════════════════════════════════════════════════════════
+
+USE EXATAMENTE estes 15 papeis no campo "role".
+Preencha "type" e "desiredEngagement" conforme a tabela:
+
+| Papel                        | type      | desiredEngagement |
+|------------------------------|-----------|-------------------|
+| Patrocinador / Sponsor       | Core Team | Apoiador          |
+| Champion Executive           | Core Team | Lider             |
+| Champion                     | Core Team | Lider             |
+| Process Owner                | Core Team | Apoiador          |
+| Master Black Belt (MBB)      | Core Team | Lider             |
+| Black Belt                   | Core Team | Lider             |
+| Green Belt                   | Core Team | Lider             |
+| Yellow Belt                  | Core Team | Lider             |
+| White Belt                   | Core Team | Apoiador          |
+| Team Member / SME            | Core Team | Apoiador          |
+| Gestor de Area Impactada     | Impactado | Apoiador          |
+| Operador / Frontline         | Impactado | Apoiador          |
+| Cliente / Usuario Final      | Impactado | Apoiador          |
+| Fornecedor / Suporte         | Impactado | Neutro            |
+| Outro                        | Impactado | Neutro            |
+
+IMPORTANTE: o desiredEngagement gerado e apenas SUGESTAO INICIAL.
+O usuario podera editar manualmente no frontend conforme o contexto
+real do projeto.
+
+═════════════════════════════════════════════════════════════════
+REGRA #3 - ENGAJAMENTO ATUAL (currentEngagement)
+═════════════════════════════════════════════════════════════════
+
+Niveis PMI (5):
+- Lider: defende e lidera ativamente
+- Apoiador: favoravel e colaborativo
+- Neutro: nem favoravel nem contrario
+- Resistente: apresenta obstaculos
+- Desconhece: ainda nao foi apresentado ao projeto
+
+REGRA EM DEFINE (projeto comecando):
+- Core Team: comecam tipicamente em Apoiador ou Neutro
+- Impactados: comecam em Neutro, Resistente ou Desconhece
+- Inclua pelo menos 1 stakeholder Resistente ou Desconhece
+  para realismo
+
+═════════════════════════════════════════════════════════════════
+REGRA #4 - SEMAFORO ADKAR (5 letras)
+═════════════════════════════════════════════════════════════════
+
+Valores validos: apenas "Vermelho", "Amarelo" ou "Verde".
+
+REGRA INICIAL EM DEFINE:
+- Core Team: awareness e desire = Verde ou Amarelo
+- Impactados: awareness = Vermelho ou Amarelo
+- NINGUEM comeca com ability ou reinforcement Verde
+  (ainda nao implementou nada)
+
+CRITERIOS POR LETRA:
+
+awareness (consciencia da necessidade de mudanca)
+- Vermelho: nao sabe que o projeto existe
+- Amarelo: sabe que existe mas nao entende o impacto
+- Verde: explica o problema com dados
+
+desire (desejo de participar)
+- Vermelho: resiste ativamente
+- Amarelo: nao resiste mas nao engaja
+- Verde: declara apoio ativo
+
+knowledge (saber como mudar)
+- Vermelho: nao recebeu informacao
+- Amarelo: entende conceito mas nao sabe detalhes
+- Verde: sabe o que muda e como fazer
+
+ability (conseguir fazer na pratica)
+- Vermelho: nao praticou ainda
+- Amarelo: tenta mas comete erros
+- Verde: executa sozinho consistentemente
+
+reinforcement (sustentar a mudanca)
+- Vermelho: voltou ao processo antigo
+- Amarelo: faz as vezes mas regride sob pressao
+- Verde: sustenta ha mais de 30 dias
+
+═════════════════════════════════════════════════════════════════
+REGRA #5 - CHANNEL e FREQUENCY (sugerido por Poder x Interesse)
+═════════════════════════════════════════════════════════════════
+
+| Quadrante                    | channel              | frequency  |
+|------------------------------|----------------------|------------|
+| Gerenciar de Perto (P+I alto)| Reuniao 1:1          | Semanal    |
+| Manter Satisfeito (P alto)   | Steering Committee   | Mensal     |
+| Manter Informado (I alto)    | Status Report        | Quinzenal  |
+| Monitorar (P+I baixo)        | Comunicado Geral     | Marcos     |
+
+═════════════════════════════════════════════════════════════════
+REGRA #6 - CAMPOS COMPLEMENTARES
+═════════════════════════════════════════════════════════════════
+
+barrier: para Impactados com desire Vermelho/Amarelo, descrever
+a resistencia provavel baseada no contexto. Para Core Team em Verde,
+deixar vazio.
+
+owner (sender preferido):
+- Mensagens estrategicas: nome do Sponsor
+- Mensagens operacionais: nome do gestor direto
+- Mensagens tecnicas: nome do BB/GB
+- Se nao souber, deixar vazio
+
+customAction: deixar vazio (usuario preenche)
+notes: deixar vazio
+
+═════════════════════════════════════════════════════════════════
+QUANTIDADE
+═════════════════════════════════════════════════════════════════
+
+Gere entre 5 e 8 stakeholders relevantes para o projeto.
 """
-"""
+
 # ════════════════════════════════════════════════════════════════
 # FIM DAS FERRAMENTAS
 # ════════════════════════════════════════════════════════════════
