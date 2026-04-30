@@ -622,8 +622,10 @@ CAMPO "name" = NOME DA PESSOA (primeiro e ultimo nome)
   projectCharterPMI (mesmos campos)
 - Se houver nome real no contexto, USE ESSE NOME
   (ex: "Maria Silva", "Joao Pereira")
-- Se NAO houver nome, use cargo + "(a definir)"
-  Ex: "Sponsor (a definir)", "Black Belt (a definir)"
+- Se NAO houver nome no Charter, use o role + " (a definir)"
+  MAS APENAS para pessoas que JA EXISTEM no charter.team[]
+  com o campo name vazio.
+  NUNCA crie uma pessoa nova so para preencher o campo.
 - NUNCA coloque so o cargo no campo name
 - NUNCA coloque a area no campo name
 
@@ -761,7 +763,11 @@ notes: deixar vazio
 QUANTIDADE
 ═════════════════════════════════════════════════════════════════
 
-Gere entre 5 e 8 stakeholders relevantes para o projeto.
+Gere EXATAMENTE o mesmo numero de pessoas que existem em
+charter.team[] e charter.stakeholders[].
+NAO adicione nem remova ninguem.
+Se o Charter tiver 4 pessoas, gere 4 stakeholders.
+Se o Charter tiver 7 pessoas, gere 7 stakeholders.
 """
 # ════════════════════════════════════════
 # FERRAMENTA: DESIRE CHECK (MEASURE)
