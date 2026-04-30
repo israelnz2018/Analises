@@ -763,6 +763,197 @@ QUANTIDADE
 
 Gere entre 5 e 8 stakeholders relevantes para o projeto.
 """
+# ════════════════════════════════════════
+# FERRAMENTA: DESIRE CHECK (MEASURE)
+# ════════════════════════════════════════
+TOOL_STRUCTURES["desireCheck"] = """{
+  "actions": [
+    {
+      "stakeholderId": "1",
+      "stakeholderName": "Nome da pessoa",
+      "role": "Champion",
+      "type": "Core Team",
+      "desireCurrent": "Vermelho",
+      "barrier": "Nao entende o impacto na sua area",
+      "action": "Reuniao 1:1 para apresentar o impacto direto",
+      "owner": "Black Belt",
+      "dueDate": "DD/MM/AAAA",
+      "status": "Pendente"
+    }
+  ],
+  "tollgateDecision": "Aprovado com restrições",
+  "tollgateNotes": ""
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["desireCheck"] = """
+ATENCAO - DESIRE CHECK (TOLL-GATE MEASURE):
+Voce e um especialista em Lean Six Sigma + Prosci ADKAR.
+
+CONTEXTO:
+Esta ferramenta e o toll-gate de entrada na fase Measure.
+O Belt precisa garantir que as pessoas QUEREM cooperar antes
+de mapear o processo e coletar dados.
+Sem Desire, o Belt nao consegue medir nada — as pessoas nao
+abrem dados, nao participam do mapeamento, nao deixam observar.
+
+FONTE DE DADOS:
+Leia os stakeholders de allProjectData.stakeholderAdkar.stakeholders
+Se nao existir, leia de allProjectData.stakeholders.stakeholders
+
+GERE actions PARA TODOS OS STAKEHOLDERS — nao filtre ninguem.
+Ordene assim:
+1. Vermelho (prioridade maxima)
+2. Amarelo (atencao)
+3. Verde (monitorar — pode regredir)
+
+PARA CADA STAKEHOLDER:
+- stakeholderId: id do stakeholder na ferramenta-mae
+- stakeholderName: nome da ferramenta-mae
+- role: papel da ferramenta-mae
+- type: Core Team ou Impactado da ferramenta-mae
+- desireCurrent: valor atual do campo "desire" da ferramenta-mae
+- barrier: usar o barrier da ferramenta-mae se existir.
+  Se vazio e desire for Vermelho/Amarelo, inferir a resistencia
+  mais provavel baseada no papel e contexto do projeto.
+  Se desire for Verde, deixar vazio.
+- action: sugerir acao concreta para destravar ou monitorar.
+  Vermelho: acao urgente e especifica
+  Amarelo: acao de engajamento
+  Verde: "Monitorar — verificar na proxima reuniao de fase"
+- owner: quem deve executar a acao (BB/GB para acoes tecnicas,
+  Sponsor para acoes estrategicas, gestor direto para operacionais)
+- dueDate: deixar vazio (Belt preenche)
+- status: sempre "Pendente" ao gerar
+
+TOLLGATE:
+- tollgateDecision: avaliar baseado no percentual de Verde no Core Team:
+  >= 70% Verde no Core Team → "Aprovado"
+  50-69% Verde no Core Team → "Aprovado com restrições"
+  < 50% Verde no Core Team → "Bloqueado"
+- tollgateNotes: escrever 2-3 linhas explicando a decisao e
+  os principais riscos identificados no Desire do time.
+"""
+# ════════════════════════════════════════
+# FERRAMENTA: KNOWLEDGE CHECK (ANALYZE)
+# ════════════════════════════════════════
+TOOL_STRUCTURES["knowledgeCheck"] = """{
+  "coreTeam": [
+    {
+      "stakeholderId": "1",
+      "stakeholderName": "Nome da pessoa",
+      "role": "Champion",
+      "type": "Core Team",
+      "knowledgeCurrent": "Amarelo",
+      "technicalUnderstanding": "Amarelo",
+      "agreesWithConclusions": "Parcialmente",
+      "objection": "Questiona se a amostra é representativa",
+      "response": "Apresentar série histórica de 12 meses com mesma tendência",
+      "action": "Reunião técnica para revisar metodologia juntos",
+      "owner": "Black Belt",
+      "dueDate": "",
+      "status": "Pendente"
+    }
+  ],
+  "stakeholders": [
+    {
+      "stakeholderId": "3",
+      "stakeholderName": "Nome da pessoa",
+      "role": "Gestor de Área Impactada",
+      "type": "Impactado",
+      "knowledgeCurrent": "Vermelho",
+      "agreesWithConclusions": "Não",
+      "objection": "Acredita que o problema é pontual, não sistêmico",
+      "response": "Mostrar dados dos últimos 18 meses com frequência e custo acumulado",
+      "action": "Apresentação executiva com dashboard histórico",
+      "owner": "Black Belt",
+      "dueDate": "",
+      "status": "Pendente"
+    }
+  ],
+  "tollgateDecision": "Aprovado com restrições",
+  "tollgateNotes": ""
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["knowledgeCheck"] = """
+ATENCAO - KNOWLEDGE CHECK (TOLL-GATE ANALYZE):
+Voce e um especialista em Lean Six Sigma + Prosci ADKAR.
+
+CONTEXTO:
+Esta ferramenta e o toll-gate de entrada na fase Improve.
+O Belt apresentou as analises — causas raiz, variaveis criticas,
+correlacoes. Precisa garantir que todos ENTENDEM e ACEITAM
+as conclusoes antes de propor solucoes.
+
+Duas dimensoes avaliadas:
+1. Entendimento tecnico (principalmente Core Team)
+2. Aceitacao das conclusoes (todos os stakeholders)
+
+IMPORTANTE: discordancia nao e um problema — e esperado.
+O Belt confronta com fatos e dados historicos.
+O campo "response" deve conter a evidencia que responde
+a objecao.
+
+FONTE DE DADOS:
+- Stakeholders: allProjectData.stakeholderAdkar.stakeholders
+- Analises disponiveis: allProjectData (fases Measure e Analyze)
+
+SEPARACAO:
+- coreTeam[]: stakeholders com type = "Core Team"
+- stakeholders[]: stakeholders com type = "Impactado"
+
+PARA CADA PESSOA:
+
+knowledgeCurrent (estado atual do K no ADKAR):
+- Vermelho: nao recebeu informacao sobre as analises
+- Amarelo: entende parcialmente mas tem duvidas ou objecoes
+- Verde: entende e aceita as conclusoes
+
+technicalUnderstanding (so para Core Team):
+- Vermelho: nao entende a metodologia usada
+- Amarelo: entende o conceito mas nao os detalhes
+- Verde: consegue explicar a analise para outro colega
+
+agreesWithConclusions:
+- "Sim": concorda com as conclusoes
+- "Parcialmente": concorda em parte, tem ressalvas
+- "Não": discorda das conclusoes
+
+objection (se agreesWithConclusions != "Sim"):
+- Descrever a objecao especifica baseada no papel da pessoa
+  e no contexto do projeto
+- Exemplos:
+  Gestor: "Acredita que o problema e pontual"
+  Operador: "Acha que a causa e outra — equipamento antigo"
+  Sponsor: "Questiona o ROI da solucao"
+- Se agreesWithConclusions = "Sim": deixar vazio
+
+response (se agreesWithConclusions != "Sim"):
+- Sugerir a evidencia ou argumento para responder a objecao
+- Sempre baseado em dados e fatos historicos
+- Ex: "Mostrar serie historica de 18 meses"
+      "Apresentar benchmarking do setor"
+      "Comparar com dados de outra planta"
+- Se agreesWithConclusions = "Sim": deixar vazio
+
+action:
+- Sim: "Validado — manter alinhamento"
+- Parcialmente/Nao: acao concreta para resolver a objecao
+  antes de apresentar a solucao
+
+owner:
+- Objecoes tecnicas: Black Belt
+- Objecoes estrategicas: Sponsor ou Champion
+- Objecoes operacionais: Gestor de Area
+
+status: sempre "Pendente" ao gerar
+
+TOLLGATE:
+- tollgateDecision: avaliar baseado em agreesWithConclusions
+  do Core Team:
+  Todos "Sim" no Core Team → "Aprovado"
+  Algum "Parcialmente" no Core Team → "Aprovado com restrições"
+  Algum "Não" no Core Team → "Bloqueado"
+- tollgateNotes: 2-3 linhas explicando as principais objecoes
+  e como o Belt planeja responder antes de avançar para Improve
+"""
 
 # ════════════════════════════════════════════════════════════════
 # FIM DAS FERRAMENTAS
