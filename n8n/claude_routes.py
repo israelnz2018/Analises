@@ -169,18 +169,32 @@ TOOL_STRUCTURES["charter"] = """{
   "scopeIn": "O que esta dentro do escopo",
   "scopeOut": "O que esta fora do escopo",
   "businessContributions": "1. Beneficio financeiro. 2. Operacional. 3. Cliente.",
-  "stakeholders": [
-    {"role": "Lider:", "name": "", "definition": "R", "measurement": "A", "analysis": "R", "improvement": "R", "control": "R"},
-    {"role": "Patrocinador:", "name": "", "definition": "A", "measurement": "I", "analysis": "I", "improvement": "A", "control": "I"}
+  "team": [
+    {"role": "Black Belt", "name": "", "definition": "A", "measurement": "A", "analysis": "A", "improvement": "A", "control": "A"},
+    {"role": "Champion", "name": "", "definition": "P", "measurement": "", "analysis": "", "improvement": "P", "control": "P"},
+    {"role": "Patrocinador / Sponsor", "name": "", "definition": "P", "measurement": "", "analysis": "", "improvement": "P", "control": "P"}
   ]
+  
 }"""
 TOOL_SPECIFIC_INSTRUCTIONS["charter"] = """
 ATENCAO - PROJECT CHARTER:
 - title: comeca com Reduzir/Aumentar/Melhorar/Otimizar - SEM Lean Six Sigma
 - goalDefinition: formato SMART obrigatorio com baseline e target numericos
 - scopeIn e scopeOut: ambos obrigatorios
-- NAO invente nomes de pessoas para stakeholders
+- NAO invente nomes de pessoas
 - problemDefinition deve ter pelo menos um numero
+- team[].role: usar APENAS estes papeis Lean Six Sigma:
+  Patrocinador / Sponsor, Champion Executive, Champion,
+  Process Owner, Master Black Belt (MBB), Black Belt,
+  Green Belt, Yellow Belt, White Belt, Team Member / SME,
+  Gestor de Area Impactada, Operador / Frontline,
+  Cliente / Usuario Final, Fornecedor / Suporte, Outro
+- team[].definition/measurement/analysis/improvement/control:
+  "A" = participa ativamente nesta fase DMAIC
+  "P" = apenas informado/consultado nesta fase
+  ""  = nao participa nesta fase
+- REGRA: quem tem pelo menos um "A" = faz parte do time do projeto
+         quem tem apenas "P" ou vazio = e um impactado
 """
 
 # ════════════════════════════════════════
@@ -627,33 +641,37 @@ EXEMPLO ERRADO:
   "role": "Patrocinador / Sponsor" }
 
 ═════════════════════════════════════════════════════════════════
-REGRA #2 - 15 PAPEIS, TIPO E ENGAJAMENTO DESEJADO INICIAL
+REGRA #2 - DEFINIR type E desiredEngagement A PARTIR DO CHARTER
 ═════════════════════════════════════════════════════════════════
 
-USE EXATAMENTE estes 15 papeis no campo "role".
-Preencha "type" e "desiredEngagement" conforme a tabela:
+Leia o campo "charter.team" (ou "projectCharterPMI.team") do contexto.
+Cada membro tem os campos: role, name, d, m, a, i, c.
 
-| Papel                        | type      | desiredEngagement |
-|------------------------------|-----------|-------------------|
-| Patrocinador / Sponsor       | Core Team | Apoiador          |
-| Champion Executive           | Core Team | Lider             |
-| Champion                     | Core Team | Lider             |
-| Process Owner                | Core Team | Apoiador          |
-| Master Black Belt (MBB)      | Core Team | Lider             |
-| Black Belt                   | Core Team | Lider             |
-| Green Belt                   | Core Team | Lider             |
-| Yellow Belt                  | Core Team | Lider             |
-| White Belt                   | Core Team | Apoiador          |
-| Team Member / SME            | Core Team | Apoiador          |
-| Gestor de Area Impactada     | Impactado | Apoiador          |
-| Operador / Frontline         | Impactado | Apoiador          |
-| Cliente / Usuario Final      | Impactado | Apoiador          |
-| Fornecedor / Suporte         | Impactado | Neutro            |
-| Outro                        | Impactado | Neutro            |
+REGRA DE TIPO:
+- Se o membro tem pelo menos UM campo "A" (Ativo) em d/m/a/i/c
+  → type = "Core Team"
+- Se o membro tem APENAS "P" (Passivo) ou vazio em todos os campos
+  → type = "Impactado"
 
-IMPORTANTE: o desiredEngagement gerado e apenas SUGESTAO INICIAL.
-O usuario podera editar manualmente no frontend conforme o contexto
-real do projeto.
+REGRA DE desiredEngagement (pelo role):
+
+| role                         | desiredEngagement |
+|------------------------------|-------------------|
+| Patrocinador / Sponsor       | Apoiador          |
+| Champion Executive           | Lider             |
+| Champion                     | Lider             |
+| Process Owner                | Apoiador          |
+| Master Black Belt (MBB)      | Lider             |
+| Black Belt                   | Lider             |
+| Green Belt                   | Lider             |
+| Yellow Belt                  | Lider             |
+| White Belt                   | Apoiador          |
+| Team Member / SME            | Apoiador          |
+| Gestor de Area Impactada     | Apoiador          |
+| Operador / Frontline         | Apoiador          |
+| Cliente / Usuario Final      | Apoiador          |
+| Fornecedor / Suporte         | Neutro            |
+| Outro                        | Neutro            |
 
 ═════════════════════════════════════════════════════════════════
 REGRA #3 - ENGAJAMENTO ATUAL (currentEngagement)
