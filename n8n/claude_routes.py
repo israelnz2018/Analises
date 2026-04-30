@@ -954,7 +954,269 @@ TOLLGATE:
 - tollgateNotes: 2-3 linhas explicando as principais objecoes
   e como o Belt planeja responder antes de avançar para Improve
 """
+# ════════════════════════════════════════
+# FERRAMENTA: ABILITY CHECK (IMPROVE)
+# ════════════════════════════════════════
+TOOL_STRUCTURES["abilityCheck"] = """{
+  "solutionValidation": [
+    {
+      "stakeholderId": "1",
+      "stakeholderName": "Nome da pessoa",
+      "role": "Champion",
+      "type": "Core Team",
+      "abilityCurrent": "Amarelo",
+      "agreesWithSolution": "Parcialmente",
+      "objection": "Preocupação com o tempo de implementação",
+      "response": "Apresentar cronograma detalhado com marcos semanais",
+      "action": "Reunião para revisar cronograma juntos",
+      "owner": "Black Belt",
+      "dueDate": "",
+      "status": "Pendente"
+    }
+  ],
+  "planApproval": [
+    {
+      "stakeholderId": "3",
+      "stakeholderName": "Nome da pessoa",
+      "role": "Gestor de Área Impactada",
+      "type": "Impactado",
+      "approvesP lan": "Com ressalvas",
+      "resourceConcern": "Custo de treinamento não previsto no budget",
+      "objection": "Não tem budget para treinar a equipe agora",
+      "response": "Apresentar ROI — payback em 3 meses cobre o custo",
+      "environment": "Piloto Produção",
+      "pilotSize": "2 turnos, linha 3 apenas",
+      "action": "Apresentação executiva com análise de ROI",
+      "owner": "Sponsor",
+      "dueDate": "",
+      "status": "Pendente"
+    }
+  ],
+  "implementation": [
+    {
+      "stakeholderId": "4",
+      "stakeholderName": "Nome da pessoa",
+      "role": "Operador / Frontline",
+      "type": "Impactado",
+      "abilityCurrent": "Vermelho",
+      "training": "Não realizado",
+      "practiced": "Não",
+      "difficulty": "",
+      "supportAction": "Treinamento hands-on na linha com BB presente",
+      "owner": "Black Belt",
+      "dueDate": "",
+      "status": "Pendente"
+    }
+  ],
+  "tollgateDecision": "Aprovado com restrições",
+  "tollgateNotes": ""
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["abilityCheck"] = """
+ATENCAO - ABILITY CHECK (TOLL-GATE IMPROVE):
+Voce e um especialista em Lean Six Sigma + Prosci ADKAR.
 
+CONTEXTO:
+Esta ferramenta cobre 3 momentos criticos da fase Improve:
+1. O time concorda com as solucoes propostas?
+2. Os gestores aprovam o plano de implementacao?
+3. Os afetados conseguem executar o novo processo?
+
+FONTE DE DADOS:
+- Stakeholders: allProjectData.stakeholderAdkar.stakeholders
+- Separar por type: Core Team vs Impactado
+- Gestores = Impactados com role "Gestor de Area Impactada"
+  ou power "Alto" ou "Medio"
+
+MOMENTO 1 — solutionValidation (Core Team apenas):
+
+abilityCurrent:
+- Vermelho: nao entende ou nao consegue executar a solucao
+- Amarelo: entende mas tem duvidas ou objecoes
+- Verde: entende e apoia a solucao
+
+agreesWithSolution:
+- "Sim": concorda com a solucao proposta
+- "Parcialmente": concorda em parte, tem ressalvas
+- "Não": discorda da solucao
+
+objection (se != "Sim"):
+- Descrever objecao especifica baseada no papel e contexto
+- Exemplos:
+  BB/GB: "Solucao tecnicamente fragil em pico de producao"
+  Process Owner: "Impacto nao mapeado no processo X"
+  Champion: "Risco reputacional com cliente nao endereçado"
+
+response (se != "Sim"):
+- Argumento tecnico ou dado que responde a objecao
+
+action:
+- Sim: "Validado — avançar para piloto"
+- Parcialmente/Nao: acao concreta para resolver antes do piloto
+
+MOMENTO 2 — planApproval (Impactados com poder):
+
+approvesP lan:
+- "Sim": aprova o plano completo
+- "Com ressalvas": aprova com condições
+- "Não": nao aprova
+
+resourceConcern:
+- Descrever o recurso ou custo questionado se houver
+- Ex: "Custo de treinamento", "Alocacao de 2 operadores",
+  "Parada de linha para piloto"
+
+objection:
+- Objecao especifica ao plano
+
+response:
+- Argumento ou dado que responde (ROI, benchmarking, etc)
+
+environment:
+- "Controlado": lab, area isolada, sem impacto producao
+- "Piloto Produção": subconjunto da producao real
+- "Produção direta": implementacao completa imediata
+- Inferir pelo contexto do projeto — projetos de alto risco
+  ou alta complexidade tendem a Piloto Producao
+
+pilotSize (se environment = "Piloto Produção"):
+- Descrever escopo minimo do piloto
+- Ex: "1 turno, linha 1", "10% do volume", "Area X apenas"
+- Principio: menor possivel para validar sem parar producao
+
+MOMENTO 3 — implementation (Impactados diretos):
+
+abilityCurrent:
+- Vermelho: nao praticou ainda
+- Amarelo: praticou mas comete erros
+- Verde: executa sozinho sem apoio
+
+training:
+- "Não realizado": ainda nao foi treinado
+- "Realizado": passou pelo treinamento
+- "Não necessário": mudanca simples, nao requer treinamento
+
+practiced:
+- "Não": ainda nao praticou na realidade
+- "Sim com dificuldade": praticou mas precisa de apoio
+- "Sim sem dificuldade": executa de forma independente
+
+difficulty (se practiced != "Não"):
+- Descrever a dificuldade principal encontrada na pratica
+- Se "Sim sem dificuldade": deixar vazio
+
+supportAction:
+- Acao de suporte especifica para desenvolver a Ability
+- Vermelho: treinamento hands-on obrigatorio
+- Amarelo: acompanhamento no gemba, checklist de apoio
+- Verde: "Monitorar — verificar na proxima semana"
+
+TOLLGATE:
+- tollgateDecision:
+  Todos concordam + todos aprovam → "Aprovado"
+  Alguma ressalva mas sem bloqueio → "Aprovado com restrições"
+  Algum "Não" em qualquer momento → "Bloqueado"
+- tollgateNotes: 2-3 linhas sobre os principais riscos
+  nos 3 momentos e condicoes para avancar para Control
+"""
+
+# ════════════════════════════════════════
+# FERRAMENTA: REINFORCEMENT CHECK (CONTROL)
+# ════════════════════════════════════════
+TOOL_STRUCTURES["reinforcementCheck"] = """{
+  "sustainability": [
+    {
+      "stakeholderId": "1",
+      "stakeholderName": "Nome da pessoa",
+      "role": "Champion",
+      "type": "Core Team",
+      "reinforcementCurrent": "Amarelo",
+      "sustainingFor": "2-4 semanas",
+      "regressed": "Não",
+      "regressionCause": "",
+      "action": "Verificar na reunião semanal de fase",
+      "owner": "Black Belt",
+      "dueDate": "",
+      "status": "Pendente"
+    }
+  ],
+  "postProject": {
+    "processOwner": "",
+    "controlIndicator": "",
+    "monitoringFrequency": "Mensal",
+    "reopenCriteria": ""
+  },
+  "closureDecision": "Encerrado com monitoramento",
+  "closureNotes": ""
+}"""
+TOOL_SPECIFIC_INSTRUCTIONS["reinforcementCheck"] = """
+ATENCAO - REINFORCEMENT CHECK (TOLL-GATE CONTROL):
+Voce e um especialista em Lean Six Sigma + Prosci ADKAR.
+
+CONTEXTO:
+Esta e a ultima ferramenta ADKAR. O projeto esta encerrando.
+O Belt esta saindo de cena. A unica pergunta e:
+a mudanca vai sobreviver 30 dias sem o Belt?
+
+As pessoas ja aceitaram a mudanca — chegaram ate aqui.
+O risco agora e regressao: voltar ao jeito antigo quando
+a pressao do projeto some.
+
+FONTE DE DADOS:
+- Stakeholders: allProjectData.stakeholderAdkar.stakeholders
+- Usar todos os stakeholders
+
+PARA CADA STAKEHOLDER:
+
+reinforcementCurrent:
+- Vermelho: voltou ao processo antigo, indicador regrediu
+- Amarelo: faz o novo processo as vezes mas regride sob pressao
+- Verde: sustenta ha mais de 30 dias sem acompanhamento
+
+sustainingFor:
+- "< 2 semanas": implementacao muito recente
+- "2-4 semanas": em andamento, ainda nao confirmado
+- "+ 30 dias": sustentado — criterio de sucesso
+- "Regrediu": voltou ao processo antigo
+
+regressed:
+- "Sim": voltou ao processo antigo
+- "Não": mantendo o novo processo
+
+regressionCause (se regressed = "Sim"):
+- Descrever a causa mais provavel da regressao
+- Exemplos:
+  "Pressao de producao fez voltar ao atalho antigo"
+  "Novo funcionario nao foi treinado no processo novo"
+  "Sistema nao foi atualizado para suportar novo fluxo"
+- Se regressed = "Não": deixar vazio
+
+action:
+- "+ 30 dias" e nao regrediu: "Validado — encerrar acompanhamento"
+- "2-4 semanas": "Verificar novamente em 2 semanas"
+- "< 2 semanas": "Agendar verificacao em 30 dias"
+- Regrediu: acao corretiva especifica e urgente
+
+REGRA DE reinforcementCurrent automatica:
+- sustainingFor = "+ 30 dias" e regressed = "Não" → Verde
+- sustainingFor = "2-4 semanas" → Amarelo
+- sustainingFor = "< 2 semanas" → Amarelo
+- regressed = "Sim" → Vermelho
+
+POST PROJECT:
+- processOwner: nome do Process Owner do charter se disponivel
+- controlIndicator: KPI principal do projeto (do charter.kpi)
+- monitoringFrequency: "Mensal" como default
+- reopenCriteria: criterio objetivo para reabrir o projeto
+  Ex: "Se indicador regredir mais de 20% por 2 meses consecutivos"
+
+CLOSURE DECISION:
+- Todos Verde e "+ 30 dias" → "Encerrado"
+- Maioria Verde mas algum Amarelo → "Encerrado com monitoramento"
+- Qualquer Vermelho ou regrediu → "Reabrir projeto"
+
+closureNotes: 2-3 linhas sobre o status geral de sustentacao
+e recomendacoes para o Process Owner apos encerramento.
+"""
 # ════════════════════════════════════════════════════════════════
 # FIM DAS FERRAMENTAS
 # ════════════════════════════════════════════════════════════════
