@@ -1065,3 +1065,44 @@ Gere as 3 sugestoes agora.
         }
         phase = req.get("currentPhase", "")
         return {"success": True, "suggestions": fallbacks.get(phase, ["Qual o proximo passo?", "Como posso melhorar?", "O que e importante aqui?"])}
+
+
+# ════════════════════════════════════════════════════════════════
+# ROTA GENÉRICA — frontend monta o prompt e envia pronto
+# Esta é a rota nova. As antigas continuam funcionando.
+# ════════════════════════════════════════════════════════════════
+
+class GenerateRequest(BaseModel):
+    system: str
+    user: str
+    max_tokens: Optional[int] = 4096
+    model: Optional[str] = None
+    response_format: Optional[str] = "json"
+
+@router.post("/generate")
+async def generate(req: GenerateRequest):
+    try:
+        result = await call_claude(
+            system_prompt=req.system,
+            user_prompt=req.user,
+            max_tokens=req.max_tokens,
+            model=req.model
+        )
+
+        if req.response_format == "json":
+            clean = result.replace("```json", "").replace("```", "").strip()
+            if not clean.startswith("{") and "{" in clean:
+                clean = clean[clean.index("{"):]
+            if not clean.startswith("[") and "[" in clean:
+                if "{" not in clean or clean.index("[") < clean.index("{"):
+                    clean = clean[clean.index("["):]
+            try:
+                parsed = json.loads(clean)
+                return {"success": True, "data": parsed}
+            except json.JSONDecodeError as e:
+                return {"success": False, "error": f"JSON invalido: {str(e)}", "raw": result[:500]}
+
+        return {"success": True, "data": result}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
