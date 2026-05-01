@@ -690,62 +690,12 @@ EXEMPLO CORRETO:
   "role": "Black Belt" }
 
 ═════════════════════════════════════════════════════════════════
-REGRA #4 - CAMPO customAction (acao recomendada)
+REGRA #4 - CAMPO customAction
 ═════════════════════════════════════════════════════════════════
 
-customAction e a acao de COMUNICACAO recomendada para este
-stakeholder NESTA fase Define.
-
-PADRAO DA FRASE:
-[Verbo de comunicacao] + [conteudo do Charter] + [com quem]
-
-Verbos validos: apresentar, alinhar, comunicar, convidar,
-discutir, esclarecer, validar entendimento, conversar.
-
-Conteudo: o problema do projeto, o Charter, o escopo,
-o papel da pessoa, o cronograma macro, o impacto esperado.
-
-EXEMPLOS POR TIPO DE STAKEHOLDER:
-
-Sponsor / Champion (poder alto):
-"Apresentar Charter em reuniao 1:1 e validar patrocinio"
-"Alinhar expectativas sobre marcos do projeto"
-
-Process Owner:
-"Conversar sobre o escopo e validar limites do processo"
-"Apresentar cronograma macro e definir checkpoints"
-
-Black Belt / Green Belt:
-"Reuniao de kick-off para alinhar plano de trabalho"
-"Validar entendimento do problema com a equipe"
-
-Team Member / SME:
-"Convidar para reuniao de kick-off do projeto"
-"Apresentar papel esperado nas fases DMAIC"
-
-Gestor de Area Impactada:
-"Apresentar o problema e o impacto esperado na area"
-"Conversa 1:1 para entender preocupacoes iniciais"
-
-Operador / Frontline:
-"Comunicar inicio do projeto via reuniao de turno"
-"Apresentar problema e ouvir percepcoes da operacao"
-
-PADRAO MENTAL antes de escrever a customAction:
-"Esta acao e uma CONVERSA ou um TRABALHO?"
-- Se e conversa, reuniao, apresentacao, alinhamento → OK.
-- Se mencionar dado especifico, indicador, treinamento,
-  ROI, validacao tecnica, ajuste de processo → REESCREVA
-  como conversa sobre esse tema.
-
-EXEMPLO DE REESCRITA:
-Antes: "Reduzir consumo de agua de 450L para 320L"
-Depois: "Apresentar meta de reducao de consumo e validar
-suporte para o projeto"
-
-Antes: "Realizar treinamento sobre calibracao de bicos"
-Depois: "Comunicar inicio do projeto e papel esperado
-durante a fase Define"
+NAO gere o campo customAction.
+O frontend calcula a acao recomendada automaticamente.
+Deixe customAction como string vazia "" em todos os stakeholders.
 
 ═════════════════════════════════════════════════════════════════
 REGRA #5 - DEFINIR type A PARTIR DOS CAMPOS A/P DO CHARTER
