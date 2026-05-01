@@ -764,458 +764,77 @@ REGRA #9 - CHANNEL e FREQUENCY
 | Monitorar (P+I baixo)        | Comunicado Geral     | Marcos     |
 """
 # ════════════════════════════════════════
-# FERRAMENTA: DESIRE CHECK (MEASURE)
+# FERRAMENTA: STAKEHOLDER & ADKAR — MEDIR (DESIRE)
 # ════════════════════════════════════════
-TOOL_STRUCTURES["desireCheck"] = """{
-  "actions": [
-    {
-      "stakeholderId": "1",
-      "stakeholderName": "Nome da pessoa",
-      "role": "Champion",
-      "type": "Core Team",
-      "desireCurrent": "Vermelho",
-      "barrier": "Nao entende o impacto na sua area",
-      "action": "Reuniao 1:1 para apresentar o impacto direto",
-      "owner": "Black Belt",
-      "dueDate": "DD/MM/AAAA",
-      "status": "Pendente"
-    }
-  ],
-  "tollgateDecision": "Aprovado com restrições",
-  "tollgateNotes": ""
-}"""
-TOOL_SPECIFIC_INSTRUCTIONS["desireCheck"] = """
-ATENCAO - DESIRE CHECK (TOLL-GATE MEASURE):
-Voce e um especialista em Lean Six Sigma + Prosci ADKAR.
-
-CONTEXTO:
-Esta ferramenta e o toll-gate de entrada na fase Measure.
-O Belt precisa garantir que as pessoas QUEREM cooperar antes
-de mapear o processo e coletar dados.
-Sem Desire, o Belt nao consegue medir nada — as pessoas nao
-abrem dados, nao participam do mapeamento, nao deixam observar.
-
-FONTE DE DADOS:
-Leia os stakeholders de allProjectData.stakeholderAdkar.stakeholders
-Se nao existir, leia de allProjectData.stakeholders.stakeholders
-
-GERE actions PARA TODOS OS STAKEHOLDERS — nao filtre ninguem.
-Ordene assim:
-1. Vermelho (prioridade maxima)
-2. Amarelo (atencao)
-3. Verde (monitorar — pode regredir)
-
-PARA CADA STAKEHOLDER:
-- stakeholderId: id do stakeholder na ferramenta-mae
-- stakeholderName: nome da ferramenta-mae
-- role: papel da ferramenta-mae
-- type: Core Team ou Impactado da ferramenta-mae
-- desireCurrent: valor atual do campo "desire" da ferramenta-mae
-- barrier: usar o barrier da ferramenta-mae se existir.
-  Se vazio e desire for Vermelho/Amarelo, inferir a resistencia
-  mais provavel baseada no papel e contexto do projeto.
-  Se desire for Verde, deixar vazio.
-- action: sugerir acao concreta para destravar ou monitorar.
-  Vermelho: acao urgente e especifica
-  Amarelo: acao de engajamento
-  Verde: "Monitorar — verificar na proxima reuniao de fase"
-- owner: quem deve executar a acao (BB/GB para acoes tecnicas,
-  Sponsor para acoes estrategicas, gestor direto para operacionais)
-- dueDate: deixar vazio (Belt preenche)
-- status: sempre "Pendente" ao gerar
-
-TOLLGATE:
-- tollgateDecision: avaliar baseado no percentual de Verde no Core Team:
-  >= 70% Verde no Core Team → "Aprovado"
-  50-69% Verde no Core Team → "Aprovado com restrições"
-  < 50% Verde no Core Team → "Bloqueado"
-- tollgateNotes: escrever 2-3 linhas explicando a decisao e
-  os principais riscos identificados no Desire do time.
-"""
-# ════════════════════════════════════════
-# FERRAMENTA: KNOWLEDGE CHECK (ANALYZE)
-# ════════════════════════════════════════
-TOOL_STRUCTURES["knowledgeCheck"] = """{
-  "coreTeam": [
-    {
-      "stakeholderId": "1",
-      "stakeholderName": "Nome da pessoa",
-      "role": "Champion",
-      "type": "Core Team",
-      "knowledgeCurrent": "Amarelo",
-      "technicalUnderstanding": "Amarelo",
-      "agreesWithConclusions": "Parcialmente",
-      "objection": "Questiona se a amostra é representativa",
-      "response": "Apresentar série histórica de 12 meses com mesma tendência",
-      "action": "Reunião técnica para revisar metodologia juntos",
-      "owner": "Black Belt",
-      "dueDate": "",
-      "status": "Pendente"
-    }
-  ],
+TOOL_STRUCTURES["measureAdkar"] = """{
   "stakeholders": [
     {
-      "stakeholderId": "3",
-      "stakeholderName": "Nome da pessoa",
-      "role": "Gestor de Área Impactada",
-      "type": "Impactado",
-      "knowledgeCurrent": "Vermelho",
-      "agreesWithConclusions": "Não",
-      "objection": "Acredita que o problema é pontual, não sistêmico",
-      "response": "Mostrar dados dos últimos 18 meses com frequência e custo acumulado",
-      "action": "Apresentação executiva com dashboard histórico",
-      "owner": "Black Belt",
-      "dueDate": "",
-      "status": "Pendente"
-    }
-  ],
-  "tollgateDecision": "Aprovado com restrições",
-  "tollgateNotes": ""
-}"""
-TOOL_SPECIFIC_INSTRUCTIONS["knowledgeCheck"] = """
-ATENCAO - KNOWLEDGE CHECK (TOLL-GATE ANALYZE):
-Voce e um especialista em Lean Six Sigma + Prosci ADKAR.
-
-CONTEXTO:
-Esta ferramenta e o toll-gate de entrada na fase Improve.
-O Belt apresentou as analises — causas raiz, variaveis criticas,
-correlacoes. Precisa garantir que todos ENTENDEM e ACEITAM
-as conclusoes antes de propor solucoes.
-
-Duas dimensoes avaliadas:
-1. Entendimento tecnico (principalmente Core Team)
-2. Aceitacao das conclusoes (todos os stakeholders)
-
-IMPORTANTE: discordancia nao e um problema — e esperado.
-O Belt confronta com fatos e dados historicos.
-O campo "response" deve conter a evidencia que responde
-a objecao.
-
-FONTE DE DADOS:
-- Stakeholders: allProjectData.stakeholderAdkar.stakeholders
-- Analises disponiveis: allProjectData (fases Measure e Analyze)
-
-SEPARACAO:
-- coreTeam[]: stakeholders com type = "Core Team"
-- stakeholders[]: stakeholders com type = "Impactado"
-
-PARA CADA PESSOA:
-
-knowledgeCurrent (estado atual do K no ADKAR):
-- Vermelho: nao recebeu informacao sobre as analises
-- Amarelo: entende parcialmente mas tem duvidas ou objecoes
-- Verde: entende e aceita as conclusoes
-
-technicalUnderstanding (so para Core Team):
-- Vermelho: nao entende a metodologia usada
-- Amarelo: entende o conceito mas nao os detalhes
-- Verde: consegue explicar a analise para outro colega
-
-agreesWithConclusions:
-- "Sim": concorda com as conclusoes
-- "Parcialmente": concorda em parte, tem ressalvas
-- "Não": discorda das conclusoes
-
-objection (se agreesWithConclusions != "Sim"):
-- Descrever a objecao especifica baseada no papel da pessoa
-  e no contexto do projeto
-- Exemplos:
-  Gestor: "Acredita que o problema e pontual"
-  Operador: "Acha que a causa e outra — equipamento antigo"
-  Sponsor: "Questiona o ROI da solucao"
-- Se agreesWithConclusions = "Sim": deixar vazio
-
-response (se agreesWithConclusions != "Sim"):
-- Sugerir a evidencia ou argumento para responder a objecao
-- Sempre baseado em dados e fatos historicos
-- Ex: "Mostrar serie historica de 18 meses"
-      "Apresentar benchmarking do setor"
-      "Comparar com dados de outra planta"
-- Se agreesWithConclusions = "Sim": deixar vazio
-
-action:
-- Sim: "Validado — manter alinhamento"
-- Parcialmente/Nao: acao concreta para resolver a objecao
-  antes de apresentar a solucao
-
-owner:
-- Objecoes tecnicas: Black Belt
-- Objecoes estrategicas: Sponsor ou Champion
-- Objecoes operacionais: Gestor de Area
-
-status: sempre "Pendente" ao gerar
-
-TOLLGATE:
-- tollgateDecision: avaliar baseado em agreesWithConclusions
-  do Core Team:
-  Todos "Sim" no Core Team → "Aprovado"
-  Algum "Parcialmente" no Core Team → "Aprovado com restrições"
-  Algum "Não" no Core Team → "Bloqueado"
-- tollgateNotes: 2-3 linhas explicando as principais objecoes
-  e como o Belt planeja responder antes de avançar para Improve
-"""
-# ════════════════════════════════════════
-# FERRAMENTA: ABILITY CHECK (IMPROVE)
-# ════════════════════════════════════════
-TOOL_STRUCTURES["abilityCheck"] = """{
-  "solutionValidation": [
-    {
-      "stakeholderId": "1",
-      "stakeholderName": "Nome da pessoa",
-      "role": "Champion",
+      "id": "1",
+      "name": "Maria Silva",
+      "area": "Diretoria Industrial",
+      "role": "Patrocinador / Sponsor",
       "type": "Core Team",
-      "abilityCurrent": "Amarelo",
-      "agreesWithSolution": "Parcialmente",
-      "objection": "Preocupação com o tempo de implementação",
-      "response": "Apresentar cronograma detalhado com marcos semanais",
-      "action": "Reunião para revisar cronograma juntos",
-      "owner": "Black Belt",
-      "dueDate": "",
-      "status": "Pendente"
+      "power": "Alto",
+      "interest": "Alto",
+      "currentEngagement": "Apoiador",
+      "desiredEngagement": "Neutro",
+      "currentEngagementDefine": "Apoiador",
+      "currentEngagementMeasure": "",
+      "awareness": "Verde",
+      "desire": "Cinza",
+      "knowledge": "Cinza",
+      "ability": "Cinza",
+      "reinforcement": "Cinza",
+      "barrier": "",
+      "channel": "Reuniao 1:1",
+      "frequency": "Semanal",
+      "owner": "",
+      "customAction": "",
+      "notes": ""
     }
-  ],
-  "planApproval": [
-    {
-      "stakeholderId": "3",
-      "stakeholderName": "Nome da pessoa",
-      "role": "Gestor de Área Impactada",
-      "type": "Impactado",
-      "approvesP lan": "Com ressalvas",
-      "resourceConcern": "Custo de treinamento não previsto no budget",
-      "objection": "Não tem budget para treinar a equipe agora",
-      "response": "Apresentar ROI — payback em 3 meses cobre o custo",
-      "environment": "Piloto Produção",
-      "pilotSize": "2 turnos, linha 3 apenas",
-      "action": "Apresentação executiva com análise de ROI",
-      "owner": "Sponsor",
-      "dueDate": "",
-      "status": "Pendente"
-    }
-  ],
-  "implementation": [
-    {
-      "stakeholderId": "4",
-      "stakeholderName": "Nome da pessoa",
-      "role": "Operador / Frontline",
-      "type": "Impactado",
-      "abilityCurrent": "Vermelho",
-      "training": "Não realizado",
-      "practiced": "Não",
-      "difficulty": "",
-      "supportAction": "Treinamento hands-on na linha com BB presente",
-      "owner": "Black Belt",
-      "dueDate": "",
-      "status": "Pendente"
-    }
-  ],
-  "tollgateDecision": "Aprovado com restrições",
-  "tollgateNotes": ""
+  ]
 }"""
-TOOL_SPECIFIC_INSTRUCTIONS["abilityCheck"] = """
-ATENCAO - ABILITY CHECK (TOLL-GATE IMPROVE):
+TOOL_SPECIFIC_INSTRUCTIONS["measureAdkar"] = """
+ATENCAO - STAKEHOLDER & ADKAR — MEDIR (DESIRE):
 Voce e um especialista em Lean Six Sigma + Prosci ADKAR.
 
-CONTEXTO:
-Esta ferramenta cobre 3 momentos criticos da fase Improve:
-1. O time concorda com as solucoes propostas?
-2. Os gestores aprovam o plano de implementacao?
-3. Os afetados conseguem executar o novo processo?
+═════════════════════════════════════════════════════════════════
+PRINCIPIO FUNDAMENTAL
+═════════════════════════════════════════════════════════════════
 
-FONTE DE DADOS:
-- Stakeholders: allProjectData.stakeholderAdkar.stakeholders
-- Separar por type: Core Team vs Impactado
-- Gestores = Impactados com role "Gestor de Area Impactada"
-  ou power "Alto" ou "Medio"
+Esta ferramenta e usada na fase MEDIR (Measure) do DMAIC.
+O foco e DESIRE — fazer cada pessoa QUERER cooperar com
+o mapeamento do processo e a coleta de dados.
 
-MOMENTO 1 — solutionValidation (Core Team apenas):
+═════════════════════════════════════════════════════════════════
+REGRA #1 - QUEM INCLUIR
+═════════════════════════════════════════════════════════════════
 
-abilityCurrent:
-- Vermelho: nao entende ou nao consegue executar a solucao
-- Amarelo: entende mas tem duvidas ou objecoes
-- Verde: entende e apoia a solucao
+UNICA FONTE: allProjectData.stakeholderAdkar.stakeholders
+(a ferramenta da fase Definir).
 
-agreesWithSolution:
-- "Sim": concorda com a solucao proposta
-- "Parcialmente": concorda em parte, tem ressalvas
-- "Não": discorda da solucao
+PROCESSO:
+1. Pegue TODOS os stakeholders de stakeholderAdkar.
+2. Preserve TODOS os campos existentes (nome, area, role,
+   type, power, interest, desiredEngagement,
+   currentEngagementDefine, awareness etc).
+3. NAO adicione nem remova ninguem.
+4. NAO altere os campos da fase Define ja preenchidos.
 
-objection (se != "Sim"):
-- Descrever objecao especifica baseada no papel e contexto
-- Exemplos:
-  BB/GB: "Solucao tecnicamente fragil em pico de producao"
-  Process Owner: "Impacto nao mapeado no processo X"
-  Champion: "Risco reputacional com cliente nao endereçado"
+═════════════════════════════════════════════════════════════════
+REGRA #2 - CAMPO currentEngagementMeasure
+═════════════════════════════════════════════════════════════════
 
-response (se != "Sim"):
-- Argumento tecnico ou dado que responde a objecao
+Deixe currentEngagementMeasure como string vazia "".
+O frontend vai pedir para o usuario preencher manualmente
+baseado na realidade da fase Medir.
 
-action:
-- Sim: "Validado — avançar para piloto"
-- Parcialmente/Nao: acao concreta para resolver antes do piloto
+═════════════════════════════════════════════════════════════════
+REGRA #3 - CAMPO customAction
+═════════════════════════════════════════════════════════════════
 
-MOMENTO 2 — planApproval (Impactados com poder):
-
-approvesP lan:
-- "Sim": aprova o plano completo
-- "Com ressalvas": aprova com condições
-- "Não": nao aprova
-
-resourceConcern:
-- Descrever o recurso ou custo questionado se houver
-- Ex: "Custo de treinamento", "Alocacao de 2 operadores",
-  "Parada de linha para piloto"
-
-objection:
-- Objecao especifica ao plano
-
-response:
-- Argumento ou dado que responde (ROI, benchmarking, etc)
-
-environment:
-- "Controlado": lab, area isolada, sem impacto producao
-- "Piloto Produção": subconjunto da producao real
-- "Produção direta": implementacao completa imediata
-- Inferir pelo contexto do projeto — projetos de alto risco
-  ou alta complexidade tendem a Piloto Producao
-
-pilotSize (se environment = "Piloto Produção"):
-- Descrever escopo minimo do piloto
-- Ex: "1 turno, linha 1", "10% do volume", "Area X apenas"
-- Principio: menor possivel para validar sem parar producao
-
-MOMENTO 3 — implementation (Impactados diretos):
-
-abilityCurrent:
-- Vermelho: nao praticou ainda
-- Amarelo: praticou mas comete erros
-- Verde: executa sozinho sem apoio
-
-training:
-- "Não realizado": ainda nao foi treinado
-- "Realizado": passou pelo treinamento
-- "Não necessário": mudanca simples, nao requer treinamento
-
-practiced:
-- "Não": ainda nao praticou na realidade
-- "Sim com dificuldade": praticou mas precisa de apoio
-- "Sim sem dificuldade": executa de forma independente
-
-difficulty (se practiced != "Não"):
-- Descrever a dificuldade principal encontrada na pratica
-- Se "Sim sem dificuldade": deixar vazio
-
-supportAction:
-- Acao de suporte especifica para desenvolver a Ability
-- Vermelho: treinamento hands-on obrigatorio
-- Amarelo: acompanhamento no gemba, checklist de apoio
-- Verde: "Monitorar — verificar na proxima semana"
-
-TOLLGATE:
-- tollgateDecision:
-  Todos concordam + todos aprovam → "Aprovado"
-  Alguma ressalva mas sem bloqueio → "Aprovado com restrições"
-  Algum "Não" em qualquer momento → "Bloqueado"
-- tollgateNotes: 2-3 linhas sobre os principais riscos
-  nos 3 momentos e condicoes para avancar para Control
-"""
-
-# ════════════════════════════════════════
-# FERRAMENTA: REINFORCEMENT CHECK (CONTROL)
-# ════════════════════════════════════════
-TOOL_STRUCTURES["reinforcementCheck"] = """{
-  "sustainability": [
-    {
-      "stakeholderId": "1",
-      "stakeholderName": "Nome da pessoa",
-      "role": "Champion",
-      "type": "Core Team",
-      "reinforcementCurrent": "Amarelo",
-      "sustainingFor": "2-4 semanas",
-      "regressed": "Não",
-      "regressionCause": "",
-      "action": "Verificar na reunião semanal de fase",
-      "owner": "Black Belt",
-      "dueDate": "",
-      "status": "Pendente"
-    }
-  ],
-  "postProject": {
-    "processOwner": "",
-    "controlIndicator": "",
-    "monitoringFrequency": "Mensal",
-    "reopenCriteria": ""
-  },
-  "closureDecision": "Encerrado com monitoramento",
-  "closureNotes": ""
-}"""
-TOOL_SPECIFIC_INSTRUCTIONS["reinforcementCheck"] = """
-ATENCAO - REINFORCEMENT CHECK (TOLL-GATE CONTROL):
-Voce e um especialista em Lean Six Sigma + Prosci ADKAR.
-
-CONTEXTO:
-Esta e a ultima ferramenta ADKAR. O projeto esta encerrando.
-O Belt esta saindo de cena. A unica pergunta e:
-a mudanca vai sobreviver 30 dias sem o Belt?
-
-As pessoas ja aceitaram a mudanca — chegaram ate aqui.
-O risco agora e regressao: voltar ao jeito antigo quando
-a pressao do projeto some.
-
-FONTE DE DADOS:
-- Stakeholders: allProjectData.stakeholderAdkar.stakeholders
-- Usar todos os stakeholders
-
-PARA CADA STAKEHOLDER:
-
-reinforcementCurrent:
-- Vermelho: voltou ao processo antigo, indicador regrediu
-- Amarelo: faz o novo processo as vezes mas regride sob pressao
-- Verde: sustenta ha mais de 30 dias sem acompanhamento
-
-sustainingFor:
-- "< 2 semanas": implementacao muito recente
-- "2-4 semanas": em andamento, ainda nao confirmado
-- "+ 30 dias": sustentado — criterio de sucesso
-- "Regrediu": voltou ao processo antigo
-
-regressed:
-- "Sim": voltou ao processo antigo
-- "Não": mantendo o novo processo
-
-regressionCause (se regressed = "Sim"):
-- Descrever a causa mais provavel da regressao
-- Exemplos:
-  "Pressao de producao fez voltar ao atalho antigo"
-  "Novo funcionario nao foi treinado no processo novo"
-  "Sistema nao foi atualizado para suportar novo fluxo"
-- Se regressed = "Não": deixar vazio
-
-action:
-- "+ 30 dias" e nao regrediu: "Validado — encerrar acompanhamento"
-- "2-4 semanas": "Verificar novamente em 2 semanas"
-- "< 2 semanas": "Agendar verificacao em 30 dias"
-- Regrediu: acao corretiva especifica e urgente
-
-REGRA DE reinforcementCurrent automatica:
-- sustainingFor = "+ 30 dias" e regressed = "Não" → Verde
-- sustainingFor = "2-4 semanas" → Amarelo
-- sustainingFor = "< 2 semanas" → Amarelo
-- regressed = "Sim" → Vermelho
-
-POST PROJECT:
-- processOwner: nome do Process Owner do charter se disponivel
-- controlIndicator: KPI principal do projeto (do charter.kpi)
-- monitoringFrequency: "Mensal" como default
-- reopenCriteria: criterio objetivo para reabrir o projeto
-  Ex: "Se indicador regredir mais de 20% por 2 meses consecutivos"
-
-CLOSURE DECISION:
-- Todos Verde e "+ 30 dias" → "Encerrado"
-- Maioria Verde mas algum Amarelo → "Encerrado com monitoramento"
-- Qualquer Vermelho ou regrediu → "Reabrir projeto"
-
-closureNotes: 2-3 linhas sobre o status geral de sustentacao
-e recomendacoes para o Process Owner apos encerramento.
+Deixe customAction como string vazia "".
+O frontend calcula a acao recomendada automaticamente.
 """
 # ════════════════════════════════════════════════════════════════
 # FIM DAS FERRAMENTAS
