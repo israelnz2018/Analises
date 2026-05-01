@@ -764,7 +764,7 @@ REGRA #6 - desiredEngagement (pelo role mapeado)
 
 | role                         | desiredEngagement |
 |------------------------------|-------------------|
-| Patrocinador / Sponsor       | Apoiador          |
+| Patrocinador / Sponsor       | Neutro            |
 | Champion Executive           | Lider             |
 | Champion                     | Lider             |
 | Process Owner                | Apoiador          |
@@ -776,7 +776,7 @@ REGRA #6 - desiredEngagement (pelo role mapeado)
 | Team Member / SME            | Apoiador          |
 | Gestor de Area Impactada     | Apoiador          |
 | Operador / Frontline         | Apoiador          |
-| Cliente / Usuario Final      | Apoiador          |
+| Cliente / Usuario Final      | Neutro            |
 | Fornecedor / Suporte         | Neutro            |
 | Outro                        | Neutro            |
 
