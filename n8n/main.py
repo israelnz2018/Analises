@@ -771,3 +771,137 @@ async def pergunta_v2(request: Request, pergunta: str = Form(...), tipo: str = F
         }, status_code=500)
 
 
+# ════════════════════════════════════════════════════════════════════
+# ENDPOINT — GERAR PLANILHA DE COLETA GAGE R&R
+# Adicionar este bloco ao main.py (em qualquer lugar após as outras
+# rotas /v2/...). Não toque em nada já existente.
+# ════════════════════════════════════════════════════════════════════
+ 
+@app.post("/v2/gerar-planilha-gage-rr")
+async def gerar_planilha_gage_rr(
+    request: Request,
+    n_pecas: int = Form(...),
+    n_operadores: int = Form(...),
+    n_replicas: int = Form(...),
+    ordem: str = Form("aleatorio"),  # "aleatorio" ou "sequencial"
+):
+    """
+    Gera uma planilha Excel de coleta para estudo Gage R&R Cruzado.
+    Saída: arquivo .xlsx com 3 colunas (Peça, Operador, Medição).
+    A coluna Medição vem em branco para o usuário preencher no chão de fábrica.
+    """
+    try:
+        import io
+        import random
+        import pandas as pd
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from fastapi.responses import StreamingResponse
+ 
+        # ============== VALIDAÇÕES ==============
+        if n_pecas < 2 or n_pecas > 100:
+            return JSONResponse({"erro": "Número de peças deve estar entre 2 e 100."}, status_code=400)
+        if n_operadores < 2 or n_operadores > 50:
+            return JSONResponse({"erro": "Número de operadores deve estar entre 2 e 50."}, status_code=400)
+        if n_replicas < 2 or n_replicas > 50:
+            return JSONResponse({"erro": "Número de réplicas deve estar entre 2 e 50."}, status_code=400)
+ 
+        # ============== GERAR NOMES PADRÃO ==============
+        nomes_pecas = [f"Peça {str(i+1).zfill(2)}" for i in range(n_pecas)]
+        nomes_operadores = [f"Operador {chr(65+i)}" for i in range(n_operadores)]  # A, B, C, ...
+ 
+        # ============== MONTAR LINHAS ==============
+        # Para cada réplica, cada operador mede todas as peças.
+        # Total de linhas = n_pecas × n_operadores × n_replicas
+        linhas = []
+        for replica in range(1, n_replicas + 1):
+            for operador in nomes_operadores:
+                pecas_desta_rodada = nomes_pecas.copy()
+                if ordem == "aleatorio":
+                    random.shuffle(pecas_desta_rodada)
+                for peca in pecas_desta_rodada:
+                    linhas.append({
+                        "Peça": peca,
+                        "Operador": operador,
+                        "Medição": ""  # em branco para preencher
+                    })
+ 
+        # ============== CRIAR EXCEL ==============
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Gage R&R"
+ 
+        # Cabeçalho com formatação
+        headers = ["Peça", "Operador", "Medição"]
+        for col_idx, header in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col_idx, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="1F2937", end_color="1F2937", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+ 
+        # Dados
+        for row_idx, linha in enumerate(linhas, start=2):
+            ws.cell(row=row_idx, column=1, value=linha["Peça"])
+            ws.cell(row=row_idx, column=2, value=linha["Operador"])
+            ws.cell(row=row_idx, column=3, value=linha["Medição"])
+ 
+        # Larguras de coluna
+        ws.column_dimensions["A"].width = 18
+        ws.column_dimensions["B"].width = 18
+        ws.column_dimensions["C"].width = 18
+ 
+        # Aba de instruções
+        ws_inst = wb.create_sheet("Instruções")
+        instrucoes = [
+            ["📋 PLANILHA DE COLETA — GAGE R&R"],
+            [""],
+            [f"Configuração: {n_pecas} peças × {n_operadores} operadores × {n_replicas} réplicas"],
+            [f"Total de medições: {len(linhas)}"],
+            [f"Ordem das medições: {'Aleatória' if ordem == 'aleatorio' else 'Sequencial'}"],
+            [""],
+            ["INSTRUÇÕES DE PREENCHIMENTO:"],
+            ["1. Não altere as colunas 'Peça' e 'Operador' — siga a ordem proposta."],
+            ["2. Cada operador mede cada peça o número de réplicas indicado, sem ver"],
+            ["   medições anteriores."],
+            ["3. Preencha apenas a coluna 'Medição' com o valor obtido."],
+            ["4. Após preencher tudo, faça upload desta planilha de volta no sistema"],
+            ["   no modo 'Analisar planilha preenchida'."],
+            [""],
+            ["BOAS PRÁTICAS:"],
+            ["• Use peças que cubram a faixa de variação do processo."],
+            ["• Operadores devem ser representativos dos que normalmente medem."],
+            ["• Não revele aos operadores qual peça eles estão medindo."],
+        ]
+        for row_idx, linha in enumerate(instrucoes, start=1):
+            cell = ws_inst.cell(row=row_idx, column=1, value=linha[0] if linha else "")
+            if row_idx == 1:
+                cell.font = Font(bold=True, size=14, color="1F2937")
+            elif "INSTRUÇÕES" in (linha[0] if linha else "") or "BOAS PRÁTICAS" in (linha[0] if linha else ""):
+                cell.font = Font(bold=True, size=11, color="2563EB")
+        ws_inst.column_dimensions["A"].width = 80
+ 
+        # Salvar em memória
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+ 
+        nome_arquivo = f"gage_rr_{n_pecas}p_{n_operadores}op_{n_replicas}r.xlsx"
+ 
+        return StreamingResponse(
+            buffer,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={nome_arquivo}"}
+        )
+ 
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao gerar a planilha.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+ 
+
+
+
