@@ -502,3 +502,269 @@ async def pergunta(request: Request, pergunta: str = Form(...), tipo: str = Form
         }, status_code=500)
 
 
+# ════════════════════════════════════════════════════════════════════
+# ROTAS V2 — copia literal das rotas originais para uso pelo Copilot
+# As rotas /analise, /personalizar-grafico e /pergunta acima continuam
+# intactas servindo o html-main.
+# ════════════════════════════════════════════════════════════════════
+
+@app.post("/v2/analise")
+async def analisar_v2(
+    request: Request,
+    arquivo: UploadFile = File(None),
+    ferramenta: str = Form(None),
+    grafico: str = Form(None),
+    aba: str = Form(None),
+    coluna_y: str = Form(None),
+    coluna_x: str = Form(None),
+    coluna_z: str = Form(None),
+    lista_y: str = Form(None),
+    lista_x: str = Form(None),
+    subgrupo: str = Form(None),
+    field: str = Form(None),
+    field_conf: str = Form(None),
+    field_dist: str = Form(None),
+    field_LSE: str = Form(None),
+    field_LIE: str = Form(None),
+    Data: str = Form(None),
+    pergunta: str = Form(None)
+):
+    try:
+        if not arquivo:
+            return JSONResponse({"erro": "Nenhum arquivo recebido.", "analise": ""}, status_code=400)
+
+        df = await ler_arquivo(arquivo, aba)
+        global df_global
+        df_global = df
+
+        if df is None or df.empty:
+            return JSONResponse({"erro": "Arquivo vazio ou aba inválida.", "analise": ""}, status_code=400)
+
+        lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
+        lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
+        lista_z = [coluna_z.strip()] if coluna_z else []
+        subgrupo_val = subgrupo.strip() if subgrupo else None
+
+        resultado_texto = ""
+        imagem_analise_base64 = None
+        imagem_grafico_isolado_base64 = None
+        info_grafico = None
+        resposta_ia = None
+
+        global ultimo_resultado_texto
+
+        if ferramenta:
+            funcao = ANALISES.get(ferramenta.strip())
+            if not funcao:
+                return JSONResponse({"erro": f"Análise {ferramenta} desconhecida.", "analise": ""}, status_code=400)
+
+            disponiveis = {
+                "df": df,
+                "coluna_y": coluna_y.strip() if coluna_y else None,
+                "coluna_x": coluna_x.strip() if coluna_x else None,
+                "coluna_z": coluna_z.strip() if coluna_z else None,
+                "Data": Data,
+                "lista_y": lista_y_processada,
+                "lista_x": lista_x_processada,
+                "lista_z": lista_z,
+                "subgrupo": subgrupo_val,
+                "field": field,
+                "field_conf": field_conf,
+                "field_dist": field_dist,
+                "field_LSE": field_LSE,
+                "field_LIE": field_LIE
+            }
+
+            permitidos = CONFIG_ANALISES.get(ferramenta.strip(), ["df"])
+            args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
+            resultado_texto, imagem_analise_base64 = funcao(**args_to_pass)
+            ultimo_resultado_texto = resultado_texto
+
+        if grafico:
+            funcao_grafico = GRAFICOS.get(grafico.strip())
+            if not funcao_grafico:
+                return JSONResponse({"erro": f"Gráfico {grafico} não encontrado.", "analise": ""}, status_code=400)
+
+            disponiveis = {
+                "df": df,
+                "coluna_y": coluna_y.strip() if coluna_y else None,
+                "coluna_x": coluna_x.strip() if coluna_x else None,
+                "coluna_z": coluna_z.strip() if coluna_z else None,
+                "Data": Data,
+                "lista_y": lista_y_processada,
+                "lista_x": lista_x_processada,
+                "lista_z": lista_z,
+                "subgrupo": subgrupo_val,
+                "field": field,
+                "field_conf": field_conf,
+                "field_dist": field_dist,
+                "field_LSE": field_LSE,
+                "field_LIE": field_LIE
+            }
+
+            permitidos = CONFIG_ANALISES.get(grafico.strip(), ["df", "coluna_y"])
+            args_to_pass = {k: disponiveis[k] for k in permitidos if k in disponiveis}
+
+            import inspect
+            params_aceitos = inspect.signature(funcao_grafico).parameters
+            args_filtrados = {k: v for k, v in args_to_pass.items() if k in params_aceitos}
+
+            # 🔧 Recebe mensagem, imagem e info_grafico
+            mensagem, imagem_grafico_isolado_base64, info_grafico = funcao_grafico(**args_filtrados)
+            ultimo_resultado_texto = f"Gráfico gerado: {grafico}"
+
+        return JSONResponse({
+            "analise": resultado_texto,
+            "grafico_base64": imagem_analise_base64,
+            "grafico_isolado_base64": imagem_grafico_isolado_base64,
+            "info_grafico": info_grafico,
+            "resposta_ia": resposta_ia
+        })
+
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao processar a análise.",
+            "analise": "",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
+
+@app.post("/v2/personalizar-grafico")
+async def personalizar_grafico_v2(
+    request: Request,
+    arquivo: UploadFile = File(None),
+    aba: str = Form(None),
+    grafico: str = Form(None),
+    coluna_y: str = Form(None),
+    coluna_x: str = Form(None),
+    coluna_z: str = Form(None),
+    subgrupo: str = Form(None),
+    field: str = Form(None),
+    field_conf: str = Form(None),
+    field_dist: str = Form(None),
+    field_LSE: str = Form(None),
+    field_LIE: str = Form(None),
+    Data: str = Form(None),
+    lista_y: str = Form(None),
+    lista_x: str = Form(None),
+    cor: str = Form(""),
+    titulo_x: str = Form(""),
+    titulo_y: str = Form(""),
+    titulo_grafico: str = Form(""),
+    tamanho_fonte: str = Form(""),
+    inclinacao_x: str = Form(""),
+    inclinacao_y: str = Form(""),
+    espessura: str = Form("")
+):
+    try:
+        global df_global
+        from graficos import GRAFICOS
+        import inspect
+
+        print("\n====================== INÍCIO DEBUG /V2/PERSONALIZAR-GRAFICO ======================")
+        print("🎨 Gráfico solicitado:", grafico)
+        print("➡ coluna_y:", coluna_y)
+        print("➡ cor:", cor)
+        print("➡ titulo_x:", titulo_x)
+        print("➡ titulo_y:", titulo_y)
+        print("➡ titulo_grafico:", titulo_grafico)
+        print("➡ tamanho_fonte:", tamanho_fonte)
+        print("➡ inclinacao_x:", inclinacao_x)
+        print("➡ inclinacao_y:", inclinacao_y)
+        print("➡ espessura:", espessura)
+        print("======================= FIM DEBUG /V2/PERSONALIZAR-GRAFICO ==========================\n")
+
+        df = df_global
+        if df is None or df.empty:
+            return JSONResponse({"erro": "Nenhum DataFrame carregado. Gere o gráfico primeiro."}, status_code=400)
+
+        lista_y_processada = [x.strip() for x in lista_y.split(",")] if lista_y else []
+        lista_x_processada = [x.strip() for x in lista_x.split(",")] if lista_x else []
+
+        funcao_grafico = GRAFICOS.get(grafico.strip())
+        if not funcao_grafico:
+            return JSONResponse({"erro": f"Gráfico {grafico} não encontrado."}, status_code=400)
+
+        params_aceitos = inspect.signature(funcao_grafico).parameters
+
+        args_to_pass = {k: v for k, v in {
+            "df": df,
+            "coluna_y": coluna_y,
+            "coluna_x": coluna_x,
+            "coluna_z": coluna_z,
+            "subgrupo": subgrupo,
+            "field": field,
+            "field_conf": field_conf,
+            "field_dist": field_dist,
+            "field_LSE": field_LSE,
+            "field_LIE": field_LIE,
+            "Data": Data,
+            "lista_y": lista_y_processada,
+            "lista_x": lista_x_processada,
+            "cor": cor or "",
+            "titulo_x": titulo_x or "",
+            "titulo_y": titulo_y or "",
+            "titulo_grafico": titulo_grafico or "",
+            "tamanho_fonte": tamanho_fonte or "",
+            "inclinacao_x": inclinacao_x or "",
+            "inclinacao_y": inclinacao_y or "",
+            "espessura": espessura or ""
+        }.items() if k in params_aceitos}
+
+        imagem_grafico_isolado_base64, info_grafico = funcao_grafico(**args_to_pass)
+
+        return {
+            "grafico_isolado_base64": imagem_grafico_isolado_base64,
+            "info_grafico": info_grafico  # ✅ Retorna info_grafico com os dados salvos
+        }
+
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao personalizar gráfico.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
+
+@app.post("/v2/pergunta")
+async def pergunta_v2(request: Request, pergunta: str = Form(...), tipo: str = Form(...)):
+    try:
+        from agente import perguntar_ia
+        global ultimo_resultado_texto
+
+        if tipo == "analise":
+            texto_base = ultimo_resultado_texto or "Nenhuma análise encontrada."
+        elif tipo == "grafico":
+            texto_base = "Último gráfico gerado no sistema."
+        else:
+            return JSONResponse({"erro": "Tipo de pergunta inválido."}, status_code=400)
+
+        # 🔧 Novo: cria prompt completo unindo análise + pergunta
+        prompt_completo = f"""
+        Esta é a última análise ou gráfico gerado pelo sistema:
+
+        {texto_base}
+
+        Agora responda a seguinte pergunta do aluno, considerando as informações acima:
+
+        {pergunta}
+        """
+
+        resposta = perguntar_ia(pergunta, prompt_completo)
+
+        return {"resposta": resposta}
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao processar a pergunta.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
+
