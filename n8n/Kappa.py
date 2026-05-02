@@ -409,95 +409,112 @@ def concordancia_atributos(df, coluna_y, coluna_x, subgrupo, field=None, ordinal
         resultado += f"O Kappa entre avaliadores foi **{br(kappa_between)}** → **{classificar_kappa(kappa_between)}**."
  
     # ====================================================================
-    # GRÁFICOS (estilo Minitab)
+    # GRÁFICOS (estilo Minitab — Attribute Agreement Analysis)
     # ====================================================================
     aplicar_estilo_minitab()
  
-    # Determina layout: até 2 gráficos lado a lado se tem ambos within + vs_padrao
+    # IC 95% Wilson — função auxiliar
+    def ic_wilson(n_total, n_match):
+        if n_total == 0:
+            return 0.0, 0.0
+        p = n_match / n_total
+        z = 1.96
+        denom = 1 + z**2 / n_total
+        centro = (p + z**2 / (2 * n_total)) / denom
+        margem = z * np.sqrt((p * (1 - p) + z**2 / (4 * n_total)) / n_total) / denom
+        return max(0, (centro - margem) * 100), min(100, (centro + margem) * 100)
+ 
+    # Função única que desenha um quadro padronizado
+    def plotar_quadro(ax, avs, pcts, ic_lows, ic_ups, titulo):
+        x_pos = np.arange(len(avs))
+ 
+        # Linha de referência AIAG (90% — alvo de excelência)
+        ax.axhline(90, color='#10b981', linestyle='--', linewidth=1.2, alpha=0.7, zorder=1)
+        ax.text(len(avs) - 0.5, 91.5, "Alvo AIAG (90%)", fontsize=8,
+                color='#10b981', ha='right', va='bottom', alpha=0.8)
+ 
+        # Linha vertical do IC (vermelha)
+        for i, (lo, up) in enumerate(zip(ic_lows, ic_ups)):
+            ax.plot([x_pos[i], x_pos[i]], [lo, up], color='#dc2626', linewidth=1.5, zorder=2)
+            # Xs nas extremidades (estilo Minitab)
+            ax.plot(x_pos[i], lo, marker='x', color='#1f4e8f', markersize=8, mew=1.8, zorder=3)
+            ax.plot(x_pos[i], up, marker='x', color='#1f4e8f', markersize=8, mew=1.8, zorder=3)
+ 
+        # Círculos azuis sólidos (estilo Minitab)
+        ax.scatter(x_pos, pcts, s=110, color='#1f4e8f', zorder=4,
+                   edgecolors='white', linewidths=1.5)
+ 
+        # Anotação do valor exato acima de cada ponto
+        for i, p in enumerate(pcts):
+            ax.annotate(f"{p:.0f}%", xy=(x_pos[i], p), xytext=(0, 12),
+                        textcoords="offset points", ha='center', fontsize=9,
+                        fontweight='bold', color='#1f2937')
+ 
+        # Eixos
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(avs, fontsize=10)
+        ax.set_ylabel("% Concordância", fontsize=10)
+        ax.set_title(titulo, fontsize=11, fontweight='bold', pad=10)
+        ax.set_ylim(0, 108)
+        ax.set_yticks([0, 20, 40, 60, 80, 100])
+ 
+        # Grade horizontal sutil
+        ax.grid(axis='y', linestyle=':', alpha=0.4, zorder=0)
+        ax.set_axisbelow(True)
+ 
+        # Margens nas laterais
+        ax.set_xlim(-0.5, len(avs) - 0.5)
+ 
+    # ====================================================================
+    # Layout dos quadros conforme dados disponíveis
+    # ====================================================================
     if tem_replicas and tem_padrao:
-        fig, axes = plt.subplots(1, 2, figsize=(11, 5))
+        fig, axes = plt.subplots(1, 2, figsize=(13, 6))
     elif tem_replicas or tem_padrao:
-        fig, axes = plt.subplots(1, 1, figsize=(7, 5))
+        fig, axes = plt.subplots(1, 1, figsize=(8, 6))
         axes = [axes]
     else:
-        # Sem réplicas e sem padrão: gráfico simples de % match overall
-        fig, axes = plt.subplots(1, 1, figsize=(7, 5))
+        fig, axes = plt.subplots(1, 1, figsize=(8, 6))
         axes = [axes]
  
-    fig.suptitle(f"Concordância de Atributos — {coluna_y}", fontsize=12, fontweight='bold')
+    fig.suptitle(f"Concordância de Atributos — {coluna_y}",
+                 fontsize=14, fontweight='bold', color='#1f2937')
  
     idx_ax = 0
  
-    # Gráfico 1: Within Appraisers
+    # Quadro 1: Within Appraisers
     if tem_replicas:
-        ax = axes[idx_ax]
         avs = [r["avaliador"] for r in within_results]
         pcts = [r["pct_match"] for r in within_results]
-        # IC 95% binomial Wilson aproximado
-        ic_low = []
-        ic_up = []
+        ic_lows, ic_ups = [], []
         for r in within_results:
-            n = r["n_inspecionados"]
-            x = r["n_match"]
-            if n == 0:
-                ic_low.append(0); ic_up.append(0); continue
-            p = x / n
-            z = 1.96
-            denom = 1 + z**2/n
-            centro = (p + z**2/(2*n)) / denom
-            margem = z * np.sqrt((p*(1-p) + z**2/(4*n))/n) / denom
-            ic_low.append(max(0, (centro - margem)*100))
-            ic_up.append(min(100, (centro + margem)*100))
- 
-        x_pos = np.arange(len(avs))
-        ax.errorbar(x_pos, pcts,
-                    yerr=[np.array(pcts) - np.array(ic_low), np.array(ic_up) - np.array(pcts)],
-                    fmt='o', color='steelblue', ecolor='red', capsize=5, markersize=8)
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(avs, fontsize=9)
-        ax.set_ylabel("% Match", fontsize=9)
-        ax.set_title("Within Appraisers", fontsize=10)
-        ax.set_ylim(0, 105)
-        ax.grid(linestyle=':', alpha=0.5)
+            lo, up = ic_wilson(r["n_inspecionados"], r["n_match"])
+            ic_lows.append(lo); ic_ups.append(up)
+        plotar_quadro(axes[idx_ax], avs, pcts, ic_lows, ic_ups,
+                      "Within Appraisers (consistência intra)")
         idx_ax += 1
  
-    # Gráfico 2: Appraiser vs Standard
+    # Quadro 2: Appraiser vs Standard
     if tem_padrao:
-        ax = axes[idx_ax]
         avs = [r["avaliador"] for r in avaliador_vs_padrao]
         pcts = [r["pct_match"] for r in avaliador_vs_padrao]
-        ic_low = []
-        ic_up = []
+        ic_lows, ic_ups = [], []
         for r in avaliador_vs_padrao:
-            n = r["n_inspecionados"]
-            x = r["n_match"]
-            if n == 0:
-                ic_low.append(0); ic_up.append(0); continue
-            p = x / n
-            z = 1.96
-            denom = 1 + z**2/n
-            centro = (p + z**2/(2*n)) / denom
-            margem = z * np.sqrt((p*(1-p) + z**2/(4*n))/n) / denom
-            ic_low.append(max(0, (centro - margem)*100))
-            ic_up.append(min(100, (centro + margem)*100))
- 
-        x_pos = np.arange(len(avs))
-        ax.errorbar(x_pos, pcts,
-                    yerr=[np.array(pcts) - np.array(ic_low), np.array(ic_up) - np.array(pcts)],
-                    fmt='o', color='steelblue', ecolor='red', capsize=5, markersize=8)
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(avs, fontsize=9)
-        ax.set_ylabel("% Match", fontsize=9)
-        ax.set_title("Appraiser vs Standard", fontsize=10)
-        ax.set_ylim(0, 105)
-        ax.grid(linestyle=':', alpha=0.5)
+            lo, up = ic_wilson(r["n_inspecionados"], r["n_match"])
+            ic_lows.append(lo); ic_ups.append(up)
+        plotar_quadro(axes[idx_ax], avs, pcts, ic_lows, ic_ups,
+                      "Appraiser vs Standard (vs gabarito)")
         idx_ax += 1
  
-    # Caso sem nada (só between): mostra gráfico simples
+    # Caso sem nada: mostra % match overall
     if not tem_replicas and not tem_padrao:
         ax = axes[0]
-        ax.bar(["% Match Overall"], [pct_match_overall], color='steelblue')
-        ax.set_ylim(0, 105)
+        ax.bar(["% Concordância Overall"], [pct_match_overall],
+               color='#1f4e8f', edgecolor='white', linewidth=1.5, width=0.5)
+        ax.axhline(90, color='#10b981', linestyle='--', linewidth=1.2, alpha=0.7)
+        ax.text(0, pct_match_overall + 2, f"{pct_match_overall:.0f}%",
+                ha='center', fontsize=11, fontweight='bold')
+        ax.set_ylim(0, 108)
         ax.set_ylabel("%", fontsize=9)
         ax.set_title("Concordância Overall", fontsize=10)
         ax.grid(linestyle=':', alpha=0.5)
@@ -506,7 +523,7 @@ def concordancia_atributos(df, coluna_y, coluna_x, subgrupo, field=None, ordinal
     plt.subplots_adjust(top=0.90)
  
     buf = BytesIO()
-    plt.savefig(buf, format="png", dpi=100)
+    plt.savefig(buf, format="png", dpi=150)
     plt.close(fig)
     buf.seek(0)
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
@@ -520,3 +537,4 @@ def concordancia_atributos(df, coluna_y, coluna_x, subgrupo, field=None, ordinal
 ANALISES = {
     "Concordância de Atributos": concordancia_atributos,
 }
+
