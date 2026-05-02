@@ -1,22 +1,33 @@
 # MSA.py — Análises do Sistema de Medição (Measurement System Analysis)
 # Segue o padrão dos demais módulos do projeto (Inferencial.py, Capabilidade.py, etc.)
 # Referência metodológica: AIAG MSA 4ª edição (com layout visual estilo Minitab)
+#
+# Mapeamento dos campos para o usuário:
+#   coluna_y  → Medição
+#   coluna_x  → Peça
+#   subgrupo  → Operador
+#   field_LIE → Limite Inferior de Especificação (opcional)
+#   field_LSE → Limite Superior de Especificação (opcional)
  
 from suporte import *
  
  
-def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=None, field_LSE=None):
+def gage_rr(df, coluna_y, coluna_x, subgrupo, field_LIE=None, field_LSE=None):
     """
     Gage R&R Cruzado pelo método ANOVA (AIAG MSA 4ª ed.).
+ 
+    Parâmetros (nomes técnicos do projeto):
+      - coluna_y  : nome da coluna com as medições
+      - coluna_x  : nome da coluna com as peças
+      - subgrupo  : nome da coluna com os operadores
+      - field_LIE : Limite Inferior de Especificação (string, opcional)
+      - field_LSE : Limite Superior de Especificação (string, opcional)
  
     Modelo: Yijk = μ + Pi + Oj + (PO)ij + εijk
       - Pi: efeito da peça (aleatório)
       - Oj: efeito do operador (aleatório)
       - (PO)ij: interação peça × operador (aleatório)
       - εijk: erro/repetibilidade
- 
-    Componentes de variância obtidos pelo método EMS (Expected Mean Squares),
-    igual ao Minitab.
     """
     import matplotlib.pyplot as plt
     import numpy as np
@@ -28,32 +39,32 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
     from suporte import aplicar_estilo_minitab
  
     # ================== VALIDAÇÕES DE ENTRADA ==================
-    if not coluna_peca or not coluna_operador or not coluna_medicao:
-        return "⚠ É obrigatório informar Peça, Operador e Medição.", None
+    if not coluna_y or not coluna_x or not subgrupo:
+        return "⚠ É obrigatório informar Medição, Peça e Operador.", None
  
-    for col in [coluna_peca, coluna_operador, coluna_medicao]:
+    for col in [coluna_y, coluna_x, subgrupo]:
         if col not in df.columns:
             return f"⚠ Coluna '{col}' não encontrada no arquivo.", None
  
-    dados = df[[coluna_peca, coluna_operador, coluna_medicao]].dropna().copy()
+    dados = df[[coluna_x, subgrupo, coluna_y]].dropna().copy()
     if dados.empty:
         return "⚠ Não há dados válidos nas colunas informadas.", None
  
     # Garante numérico na medição
     try:
-        dados[coluna_medicao] = pd.to_numeric(dados[coluna_medicao], errors='coerce')
-        dados = dados.dropna(subset=[coluna_medicao])
+        dados[coluna_y] = pd.to_numeric(dados[coluna_y], errors='coerce')
+        dados = dados.dropna(subset=[coluna_y])
     except Exception:
         return "⚠ A coluna de Medição deve conter valores numéricos.", None
  
     # Garante string nos identificadores
-    dados[coluna_peca] = dados[coluna_peca].astype(str)
-    dados[coluna_operador] = dados[coluna_operador].astype(str)
+    dados[coluna_x] = dados[coluna_x].astype(str)
+    dados[subgrupo] = dados[subgrupo].astype(str)
  
     # ================== TAMANHOS DO ESTUDO ==================
-    n_pecas = dados[coluna_peca].nunique()
-    n_operadores = dados[coluna_operador].nunique()
-    contagem = dados.groupby([coluna_peca, coluna_operador]).size()
+    n_pecas = dados[coluna_x].nunique()
+    n_operadores = dados[subgrupo].nunique()
+    contagem = dados.groupby([coluna_x, subgrupo]).size()
  
     if contagem.empty:
         return "⚠ Não foi possível agrupar peças por operador.", None
@@ -67,10 +78,11 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
         return "⚠ É preciso pelo menos 2 operadores para o estudo Gage R&R Cruzado.", None
  
     # ================== ANOVA DE DOIS FATORES ==================
+    # Renomeia para nomes simples na fórmula (evita problemas com acentos/espaços)
     dados_anova = dados.rename(columns={
-        coluna_peca: "Peca",
-        coluna_operador: "Operador",
-        coluna_medicao: "Y"
+        coluna_x: "Peca",
+        subgrupo: "Operador",
+        coluna_y: "Y"
     })
  
     try:
@@ -79,7 +91,7 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
     except Exception as e:
         return f"⚠ Não foi possível ajustar o modelo ANOVA: {str(e)}", None
  
-    # Extrai MS (mean squares) e DF (degrees of freedom) — método EMS do AIAG
+    # Extrai MS (mean squares) — método EMS do AIAG
     ms_peca = anova_completa.loc['C(Peca)', 'sum_sq'] / anova_completa.loc['C(Peca)', 'df']
     ms_op = anova_completa.loc['C(Operador)', 'sum_sq'] / anova_completa.loc['C(Operador)', 'df']
     ms_int = anova_completa.loc['C(Peca):C(Operador)', 'sum_sq'] / anova_completa.loc['C(Peca):C(Operador)', 'df']
@@ -92,14 +104,12 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
  
     # ================== COMPONENTES DE VARIÂNCIA ==================
     if incluir_interacao:
-        # COM interação
         var_repetibilidade = ms_erro
         var_interacao = max(0.0, (ms_int - ms_erro) / n_replicas)
         var_operador = max(0.0, (ms_op - ms_int) / (n_pecas * n_replicas))
         var_peca = max(0.0, (ms_peca - ms_int) / (n_operadores * n_replicas))
         var_reprodutibilidade = var_operador + var_interacao
     else:
-        # SEM interação — recombina interação com erro
         df_int = anova_completa.loc['C(Peca):C(Operador)', 'df']
         df_erro = anova_completa.loc['Residual', 'df']
         ss_int = anova_completa.loc['C(Peca):C(Operador)', 'sum_sq']
@@ -115,7 +125,6 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
     var_total = var_gage + var_peca
  
     # ================== MÉTRICAS DE VARIAÇÃO ==================
-    # %Contribution (% da variância total)
     if var_total > 0:
         pct_contrib_gage = 100 * var_gage / var_total
         pct_contrib_repet = 100 * var_repetibilidade / var_total
@@ -124,7 +133,6 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
     else:
         pct_contrib_gage = pct_contrib_repet = pct_contrib_reprod = pct_contrib_peca = 0.0
  
-    # %Study Variation (usando 6 desvios-padrão — convenção AIAG MSA 4ª ed.)
     sd_gage = np.sqrt(var_gage)
     sd_repet = np.sqrt(var_repetibilidade)
     sd_reprod = np.sqrt(var_reprodutibilidade)
@@ -171,7 +179,6 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
     veredito_tol = classificar_aiag(pct_tol_gage) if pct_tol_gage is not None else "—"
     veredito_ndc = "✅ Aceitável" if ndc >= 5 else ("⚠️ Marginal" if ndc >= 2 else "❌ Inaceitável")
  
-    # Helper para formato BR
     def br(v, casas=4):
         try:
             return f"{round(v, casas)}".replace(".", ",")
@@ -238,7 +245,7 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
     # ================== GRÁFICO SIX-PACK (estilo Minitab) ==================
     aplicar_estilo_minitab()
     fig, axes = plt.subplots(3, 2, figsize=(11, 10))
-    fig.suptitle(f"Gage R&R – {coluna_medicao}", fontsize=13, fontweight='bold')
+    fig.suptitle(f"Gage R&R – {coluna_y}", fontsize=13, fontweight='bold')
  
     # 1. Componentes de Variação
     ax1 = axes[0, 0]
@@ -256,17 +263,16 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
     ax1.legend(fontsize=7)
     ax1.grid(axis='y', linestyle=':', alpha=0.5)
  
-    # 2. Carta R por Operador (range das réplicas por peça-operador)
+    # 2. Carta R por Operador
     ax2 = axes[0, 1]
-    ranges_por_op = dados.groupby([coluna_operador, coluna_peca])[coluna_medicao].agg(lambda x: x.max() - x.min())
-    operadores_unicos = sorted(dados[coluna_operador].unique())
-    pecas_unicas = sorted(dados[coluna_peca].unique())
+    ranges_por_op = dados.groupby([subgrupo, coluna_x])[coluna_y].agg(lambda x: x.max() - x.min())
+    operadores_unicos = sorted(dados[subgrupo].unique())
+    pecas_unicas = sorted(dados[coluna_x].unique())
  
     for op in operadores_unicos:
         valores = [ranges_por_op.get((op, p), np.nan) for p in pecas_unicas]
         ax2.plot(range(len(pecas_unicas)), valores, marker='o', label=str(op), markersize=4)
  
-    # Limite de controle para R-chart (UCL = D4 * R-bar)
     R_bar = ranges_por_op.mean()
     d4_table = {2: 3.267, 3: 2.574, 4: 2.282, 5: 2.114, 6: 2.004, 7: 1.924, 8: 1.864, 9: 1.816, 10: 1.777}
     D4 = d4_table.get(n_replicas, 2.0)
@@ -281,13 +287,12 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
  
     # 3. Carta X-barra por Operador
     ax3 = axes[1, 0]
-    medias_por_op = dados.groupby([coluna_operador, coluna_peca])[coluna_medicao].mean()
+    medias_por_op = dados.groupby([subgrupo, coluna_x])[coluna_y].mean()
  
     for op in operadores_unicos:
         valores = [medias_por_op.get((op, p), np.nan) for p in pecas_unicas]
         ax3.plot(range(len(pecas_unicas)), valores, marker='o', label=str(op), markersize=4)
  
-    # Limites para X-bar chart usando R-bar
     X_bar_bar = medias_por_op.mean()
     a2_table = {2: 1.880, 3: 1.023, 4: 0.729, 5: 0.577, 6: 0.483, 7: 0.419, 8: 0.373, 9: 0.337, 10: 0.308}
     A2 = a2_table.get(n_replicas, 0.5)
@@ -304,36 +309,36 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
  
     # 4. Medições por Peça (boxplot)
     ax4 = axes[1, 1]
-    dados_por_peca = [dados[dados[coluna_peca] == p][coluna_medicao].values for p in pecas_unicas]
+    dados_por_peca = [dados[dados[coluna_x] == p][coluna_y].values for p in pecas_unicas]
     ax4.boxplot(dados_por_peca, labels=pecas_unicas, patch_artist=True,
                 boxprops=dict(facecolor='lightgrey', color='black'),
                 medianprops=dict(color='red'))
     ax4.set_title("Medições por Peça", fontsize=10)
     ax4.set_xlabel("Peça", fontsize=8)
-    ax4.set_ylabel(coluna_medicao, fontsize=8)
+    ax4.set_ylabel(coluna_y, fontsize=8)
     ax4.tick_params(axis='x', labelsize=6, rotation=45)
     ax4.grid(linestyle=':', alpha=0.5)
  
     # 5. Medições por Operador (boxplot)
     ax5 = axes[2, 0]
-    dados_por_op = [dados[dados[coluna_operador] == op][coluna_medicao].values for op in operadores_unicos]
+    dados_por_op = [dados[dados[subgrupo] == op][coluna_y].values for op in operadores_unicos]
     ax5.boxplot(dados_por_op, labels=operadores_unicos, patch_artist=True,
                 boxprops=dict(facecolor='lightblue', color='black'),
                 medianprops=dict(color='red'))
     ax5.set_title("Medições por Operador", fontsize=10)
     ax5.set_xlabel("Operador", fontsize=8)
-    ax5.set_ylabel(coluna_medicao, fontsize=8)
+    ax5.set_ylabel(coluna_y, fontsize=8)
     ax5.grid(linestyle=':', alpha=0.5)
  
     # 6. Interação Peça × Operador
     ax6 = axes[2, 1]
-    medias_int = dados.groupby([coluna_peca, coluna_operador])[coluna_medicao].mean().unstack()
+    medias_int = dados.groupby([coluna_x, subgrupo])[coluna_y].mean().unstack()
     for op in operadores_unicos:
         if op in medias_int.columns:
             ax6.plot(range(len(medias_int.index)), medias_int[op].values, marker='o', label=str(op), markersize=4)
     ax6.set_title("Interação Peça × Operador", fontsize=10)
     ax6.set_xlabel("Peça (índice)", fontsize=8)
-    ax6.set_ylabel(f"Média de {coluna_medicao}", fontsize=8)
+    ax6.set_ylabel(f"Média de {coluna_y}", fontsize=8)
     ax6.legend(fontsize=6)
     ax6.grid(linestyle=':', alpha=0.5)
  
@@ -354,6 +359,6 @@ def gage_rr_cruzado(df, coluna_peca, coluna_operador, coluna_medicao, field_LIE=
 # as análises deste módulo no roteamento global de ferramentas.
 # ====================================================================
 ANALISES = {
-    "Gage R&R": gage_rr_cruzado,
+    "Gage R&R": gage_rr,
 }
- 
+
