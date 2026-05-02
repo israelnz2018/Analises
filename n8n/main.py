@@ -26,6 +26,7 @@ try:
     from leitura import ler_arquivo
     from Capabilidade import ANALISES as ANALISES_CAP
     from Exploratoria import ANALISES as ANALISES_EXP 
+    from MSA import ANALISES as ANALISES_MSA
     from Inferencial import ANALISES as ANALISES_INF
     from Preditiva import ANALISES as ANALISES_PRED
     from Controledeprocesso import ANALISES as ANALISES_PROC
@@ -71,6 +72,7 @@ ANALISES = {}
 ANALISES.update(ANALISES_CAP if 'ANALISES_CAP' in locals() else {})
 ANALISES.update(ANALISES_EXP if 'ANALISES_EXP' in locals() else {})
 ANALISES.update(ANALISES_INF if 'ANALISES_INF' in locals() else {})
+ANALISES.update(ANALISES_MSA if 'ANALISES_MSA' in locals() else {})
 ANALISES.update(ANALISES_PRED if 'ANALISES_PRED' in locals() else {})
 ANALISES.update(ANALISES_PROC if 'ANALISES_PROC' in locals() else {})
 ANALISES.update(ANALISES_DIVERSAS if 'ANALISES_DIVERSAS' in locals() else {})
@@ -94,6 +96,7 @@ CONFIG_ANALISES = {
     "Superfície - 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
     "Dispersão 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
     "Intervalo": ["df", "lista_y", "subgrupo", "field_conf"],
+    "Gage R&R": ["df", "coluna_peca", "coluna_operador", "coluna_medicao", "field_LIE", "field_LSE"],
     "1 Sample T": ["df", "coluna_y", "field", "field_conf"],
     "2 Sample T": ["df", "lista_y", "field_conf"],
     "2 Paired Test": ["df", "lista_y", "field_conf"],
