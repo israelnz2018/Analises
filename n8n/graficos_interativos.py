@@ -120,7 +120,9 @@ def _payload(tipo, series, labels, estat_global=None, estat_grupo=None, config=N
         "avisos": avisos or [],
     }
 
-
+# ============================================================
+# HISTOGRAMA
+# ============================================================
 def histograma_interativo(df, coluna_y, subgrupo=None):
     erro = _validar_coluna(df, coluna_y, "Variavel Y")
     if erro:
@@ -162,6 +164,10 @@ def histograma_interativo(df, coluna_y, subgrupo=None):
         },
         avisos=avisos,
     )
+
+# ============================================================
+# PARETO
+# ============================================================
 
 def pareto_interativo(df, coluna_x, coluna_y=None, subgrupo=None):
     # 1) validar X
@@ -259,12 +265,68 @@ def pareto_interativo(df, coluna_x, coluna_y=None, subgrupo=None):
     )
 
 
+# ============================================================
+# SETORES (PIZZA)
+# ============================================================
+
+def pizza_interativo(df, coluna_x, coluna_y=None, subgrupo=None):
+    erro = _validar_coluna(df, coluna_x, "Categoria X")
+    if erro:
+        return {"erro": erro}
+
+    avisos = []
+    sg, niveis, av_sg = _normalizar_subgrupo(df, coluna_x, subgrupo)
+    avisos.extend(av_sg)
+
+    df_work = df.copy()
+    df_work = df_work.dropna(subset=[coluna_x])
+
+    if sg:
+        df_work['_chave'] = df_work[coluna_x].astype(str) + ' | ' + df_work[sg].astype(str)
+        chave = '_chave'
+        avisos.append("Subgrupo combinado com X como rotulo de cada fatia.")
+    else:
+        df_work['_chave'] = df_work[coluna_x].astype(str)
+        chave = '_chave'
+
+    if coluna_y and coluna_y in df.columns:
+        df_work[coluna_y] = pd.to_numeric(df_work[coluna_y], errors='coerce')
+        df_work = df_work.dropna(subset=[coluna_y])
+        if len(df_work) == 0:
+            return {"erro": f"Coluna Y '{coluna_y}' nao tem valores numericos validos."}
+        agregado = df_work.groupby(chave)[coluna_y].sum().sort_values(ascending=False)
+        rotulo_y = f"Soma de {coluna_y}"
+    else:
+        agregado = df_work[chave].value_counts()
+        rotulo_y = "Frequencia"
+
+    if len(agregado) == 0:
+        return {"erro": "Sem dados validos para o grafico de Pizza."}
+
+    labels = [str(l) for l in agregado.index.tolist()]
+    valores = [float(v) for v in agregado.values.tolist()]
+
+    titulo = f"Setores de {coluna_x}" + (f" por {sg}" if sg else "")
+
+    return _payload(
+        tipo="pizza",
+        series=[{"labels": labels, "valores": valores, "nome": rotulo_y}],
+        labels={"titulo": titulo},
+        estat_global=None,
+        estat_grupo=None,
+        config={"n_fatias": len(labels)},
+        avisos=avisos,
+    )
+
+
 GRAFICOS_INTERATIVOS = {
-    "Histograma": histograma_interativo,
-    "Pareto":     pareto_interativo,
+    "Histograma":      histograma_interativo,
+    "Pareto":          pareto_interativo,
+    "Setores (Pizza)": pizza_interativo,
 }
 
 CONFIG_GRAFICOS_INTERATIVOS = {
-    "Histograma": ["df", "coluna_y", "subgrupo"],
-     "Pareto":     ["df", "coluna_x", "coluna_y", "subgrupo"],
+    "Histograma":      ["df", "coluna_y", "subgrupo"],
+    "Pareto":          ["df", "coluna_x", "coluna_y", "subgrupo"],
+    "Setores (Pizza)": ["df", "coluna_x", "coluna_y", "subgrupo"],
 }
