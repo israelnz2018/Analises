@@ -745,6 +745,135 @@ def bolhas_interativo(df, coluna_y, coluna_x, coluna_z=None):
     )
 
 
+# ============================================================
+# DISPERSAO 3D (scatter3d com 3 eixos cartesianos)
+# ============================================================
+
+def dispersao3d_interativo(df, coluna_y, coluna_x, coluna_z=None):
+    erro = _validar_coluna(df, coluna_y, "Variavel Y")
+    if erro:
+        return {"erro": erro}
+    erro = _validar_coluna(df, coluna_x, "Variavel X")
+    if erro:
+        return {"erro": erro}
+    erro = _validar_coluna(df, coluna_z, "Variavel Z")
+    if erro:
+        return {"erro": erro}
+
+    df_work = df[[coluna_x, coluna_y, coluna_z]].copy()
+    df_work[coluna_x] = pd.to_numeric(df_work[coluna_x], errors='coerce')
+    df_work[coluna_y] = pd.to_numeric(df_work[coluna_y], errors='coerce')
+    df_work[coluna_z] = pd.to_numeric(df_work[coluna_z], errors='coerce')
+    df_work = df_work.dropna(subset=[coluna_x, coluna_y, coluna_z])
+
+    if len(df_work) < 1:
+        return {"erro": "Sem dados validos para Dispersao 3D."}
+
+    titulo = f"Dispersao 3D: {coluna_y} vs {coluna_x} vs {coluna_z}"
+
+    return _payload(
+        tipo="dispersao3d",
+        series=[{
+            "nome": f"{coluna_y} vs {coluna_x} vs {coluna_z}",
+            "x": df_work[coluna_x].tolist(),
+            "y": df_work[coluna_y].tolist(),
+            "z": df_work[coluna_z].tolist(),
+        }],
+        labels={
+            "x": str(coluna_x),
+            "y": str(coluna_y),
+            "z": str(coluna_z),
+            "titulo": titulo,
+        },
+        estat_global=_estatisticas_basicas(df_work[coluna_y]),
+        estat_grupo=None,
+        config={},
+        avisos=[],
+    )
+
+
+# ============================================================
+# SUPERFICIE 3D (interpola X,Y,Z em uma malha tridimensional)
+# ============================================================
+
+def superficie3d_interativo(df, coluna_y, coluna_x, coluna_z=None):
+    erro = _validar_coluna(df, coluna_y, "Variavel Y")
+    if erro:
+        return {"erro": erro}
+    erro = _validar_coluna(df, coluna_x, "Variavel X")
+    if erro:
+        return {"erro": erro}
+    erro = _validar_coluna(df, coluna_z, "Variavel Z")
+    if erro:
+        return {"erro": erro}
+
+    avisos = []
+    df_work = df[[coluna_x, coluna_y, coluna_z]].copy()
+    df_work[coluna_x] = pd.to_numeric(df_work[coluna_x], errors='coerce')
+    df_work[coluna_y] = pd.to_numeric(df_work[coluna_y], errors='coerce')
+    df_work[coluna_z] = pd.to_numeric(df_work[coluna_z], errors='coerce')
+    df_work = df_work.dropna(subset=[coluna_x, coluna_y, coluna_z])
+
+    if len(df_work) < 4:
+        return {"erro": "Sem dados suficientes para Superficie 3D (minimo 4 pontos)."}
+
+    # construir malha regular interpolando Z em funcao de X e Y
+    try:
+        from scipy.interpolate import griddata
+        import numpy as np
+    except ImportError:
+        return {"erro": "Modulo scipy nao disponivel no servidor para interpolacao."}
+
+    x = df_work[coluna_x].values
+    y = df_work[coluna_y].values
+    z = df_work[coluna_z].values
+
+    n_grid = 40
+    xi = np.linspace(x.min(), x.max(), n_grid)
+    yi = np.linspace(y.min(), y.max(), n_grid)
+    xi_grid, yi_grid = np.meshgrid(xi, yi)
+
+    # tenta cubic; se faltar densidade, cai para linear; depois nearest
+    zi = griddata((x, y), z, (xi_grid, yi_grid), method='cubic')
+    if zi is None or np.isnan(zi).all():
+        zi = griddata((x, y), z, (xi_grid, yi_grid), method='linear')
+        avisos.append("Interpolacao cubica falhou; usando linear.")
+    if zi is None or np.isnan(zi).all():
+        zi = griddata((x, y), z, (xi_grid, yi_grid), method='nearest')
+        avisos.append("Interpolacao linear falhou; usando vizinho mais proximo.")
+
+    # converte NaN remanescentes em None para JSON
+    zi_list = []
+    for row in zi:
+        zi_list.append([None if (v is None or (isinstance(v, float) and np.isnan(v))) else float(v) for v in row])
+
+    titulo = f"Superficie 3D: {coluna_z} = f({coluna_x}, {coluna_y})"
+
+    return _payload(
+        tipo="superficie3d",
+        series=[{
+            "nome": f"{coluna_z} = f({coluna_x}, {coluna_y})",
+            "x": xi.tolist(),
+            "y": yi.tolist(),
+            "z": zi_list,
+            # pontos originais sobrepostos a superficie
+            "pontos_x": x.tolist(),
+            "pontos_y": y.tolist(),
+            "pontos_z": z.tolist(),
+        }],
+        labels={
+            "x": str(coluna_x),
+            "y": str(coluna_y),
+            "z": str(coluna_z),
+            "titulo": titulo,
+        },
+        estat_global=_estatisticas_basicas(df_work[coluna_z]),
+        estat_grupo=None,
+        config={"n_pontos": int(len(df_work))},
+        avisos=avisos,
+    )
+
+
 # Atualize os dois dicionários assim:
 
 GRAFICOS_INTERATIVOS = {
@@ -756,6 +885,8 @@ GRAFICOS_INTERATIVOS = {
     "Dispersão":       dispersao_interativo,
     "Tendência":       tendencia_interativo,
     "Bolhas - 3D":     bolhas_interativo,
+    "Superfície - 3D": superficie3d_interativo,
+    "Dispersão 3D":    dispersao3d_interativo,
 }
 
 CONFIG_GRAFICOS_INTERATIVOS = {
@@ -767,4 +898,6 @@ CONFIG_GRAFICOS_INTERATIVOS = {
     "Dispersão":       ["df", "coluna_y", "coluna_x", "subgrupo"],
     "Tendência":       ["df", "coluna_y", "Data", "subgrupo"],
     "Bolhas - 3D":     ["df", "coluna_y", "coluna_x", "coluna_z"],
+    "Superfície - 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
+    "Dispersão 3D":    ["df", "coluna_y", "coluna_x", "coluna_z"],
 }
