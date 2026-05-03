@@ -463,6 +463,105 @@ def boxplot_interativo(df, lista_y, subgrupo=None):
     )
 
 
+# ============================================================
+# DISPERSAO
+# ============================================================
+
+def dispersao_interativo(df, coluna_y, coluna_x, subgrupo=None):
+    erro = _validar_coluna(df, coluna_y, "Variavel Y")
+    if erro:
+        return {"erro": erro}
+    erro = _validar_coluna(df, coluna_x, "Variavel X")
+    if erro:
+        return {"erro": erro}
+
+    cols = [coluna_x, coluna_y]
+    if subgrupo and subgrupo in df.columns and subgrupo not in cols:
+        cols.append(subgrupo)
+    df_work = df[cols].copy()
+    df_work[coluna_x] = pd.to_numeric(df_work[coluna_x], errors='coerce')
+    df_work[coluna_y] = pd.to_numeric(df_work[coluna_y], errors='coerce')
+    df_work = df_work.dropna(subset=[coluna_x, coluna_y])
+
+    if len(df_work) < 2:
+        return {"erro": "Dados insuficientes (precisa de ao menos 2 pontos numericos)."}
+
+    avisos = []
+    sg, niveis, av_sg = _normalizar_subgrupo(df, coluna_x, subgrupo)
+    avisos.extend(av_sg)
+
+    def _tendencia(xv, yv):
+        n = len(xv)
+        if n < 2:
+            return None
+        x = pd.Series(xv).astype(float)
+        y = pd.Series(yv).astype(float)
+        if x.std() == 0 or y.std() == 0:
+            return None
+        denom_x = ((x - x.mean()) ** 2).sum()
+        if denom_x == 0:
+            return None
+        slope = float(((x - x.mean()) * (y - y.mean())).sum() / denom_x)
+        intercept = float(y.mean() - slope * x.mean())
+        denom_r = (((x - x.mean()) ** 2).sum() ** 0.5) * (((y - y.mean()) ** 2).sum() ** 0.5)
+        r = float(((x - x.mean()) * (y - y.mean())).sum() / denom_r) if denom_r > 0 else 0.0
+        x_min, x_max = float(x.min()), float(x.max())
+        return {
+            "x": [x_min, x_max],
+            "y": [slope * x_min + intercept, slope * x_max + intercept],
+            "slope": slope,
+            "intercept": intercept,
+            "r": r,
+            "r2": r * r,
+            "n": int(n),
+        }
+
+    series = []
+    if sg is None:
+        x_vals = df_work[coluna_x].tolist()
+        y_vals = df_work[coluna_y].tolist()
+        series.append({
+            "nome": f"{coluna_y} vs {coluna_x}",
+            "x": x_vals,
+            "y": y_vals,
+            "tendencia": _tendencia(x_vals, y_vals),
+        })
+    else:
+        niveis_explicitos = [n for n in niveis if n != "__OUTROS__"]
+        for nivel in niveis:
+            if nivel == "__OUTROS__":
+                mask = ~df_work[sg].astype(str).isin(niveis_explicitos)
+            else:
+                mask = df_work[sg].astype(str) == str(nivel)
+            sub = df_work[mask]
+            if len(sub) == 0:
+                continue
+            rotulo = "Outros" if nivel == "__OUTROS__" else str(nivel)
+            x_vals = sub[coluna_x].tolist()
+            y_vals = sub[coluna_y].tolist()
+            series.append({
+                "nome": rotulo,
+                "x": x_vals,
+                "y": y_vals,
+                "tendencia": _tendencia(x_vals, y_vals),
+            })
+        if not series:
+            return {"erro": "Sem dados validos por subgrupo."}
+
+    tend_global = _tendencia(df_work[coluna_x].tolist(), df_work[coluna_y].tolist())
+    titulo = f"Dispersao de {coluna_y} vs {coluna_x}" + (f" por {sg}" if sg else "")
+
+    return _payload(
+        tipo="dispersao",
+        series=series,
+        labels={"x": str(coluna_x), "y": str(coluna_y), "titulo": titulo},
+        estat_global=None,
+        estat_grupo=None,
+        config={"tendencia_global": tend_global},
+        avisos=avisos,
+    )
+
+
 # Atualize os dois dicionários assim:
 
 GRAFICOS_INTERATIVOS = {
@@ -471,6 +570,7 @@ GRAFICOS_INTERATIVOS = {
     "Setores (Pizza)": pizza_interativo,
     "Barras":          barras_interativo,
     "BoxPlot":         boxplot_interativo,
+    "Dispersão":       dispersao_interativo,
 }
 
 CONFIG_GRAFICOS_INTERATIVOS = {
@@ -479,4 +579,5 @@ CONFIG_GRAFICOS_INTERATIVOS = {
     "Setores (Pizza)": ["df", "coluna_x", "coluna_y", "subgrupo"],
     "Barras":          ["df", "coluna_x", "coluna_y", "subgrupo"],
     "BoxPlot":         ["df", "lista_y", "subgrupo"],
+    "Dispersão":       ["df", "coluna_y", "coluna_x", "subgrupo"],
 }
