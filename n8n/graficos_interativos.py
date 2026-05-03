@@ -391,6 +391,78 @@ def barras_interativo(df, coluna_x, coluna_y=None, subgrupo=None):
     )
 
 
+# ============================================================
+# BOXPLOT
+# ============================================================
+
+def boxplot_interativo(df, lista_y, subgrupo=None):
+    if not lista_y:
+        return {"erro": "Informe ao menos uma variavel Y."}
+
+    avisos = []
+    series = []
+
+    colunas_validas = []
+    for col in lista_y:
+        erro = _validar_coluna(df, col, f"Y ({col})")
+        if erro:
+            avisos.append(erro)
+            continue
+        dados, erro = _converter_numerico(df[col], col)
+        if erro:
+            avisos.append(erro)
+            continue
+        colunas_validas.append((col, dados))
+
+    if not colunas_validas:
+        return {"erro": "Nenhuma variavel Y valida."}
+
+    sg, niveis, av_sg = _normalizar_subgrupo(df, lista_y[0], subgrupo)
+    avisos.extend(av_sg)
+
+    if sg is None:
+        for nome, dados in colunas_validas:
+            series.append({
+                "nome": nome,
+                "valores": dados.tolist(),
+            })
+    else:
+        niveis_explicitos = [n for n in niveis if n != "__OUTROS__"]
+        for nome, _ in colunas_validas:
+            for nivel in niveis:
+                valores = _serie_filtrada_por_grupo(
+                    df, nome, sg, nivel, niveis_explicitos
+                )
+                if len(valores) > 0:
+                    rotulo = "Outros" if nivel == "__OUTROS__" else str(nivel)
+                    label = f"{nome} | {rotulo}" if len(colunas_validas) > 1 else rotulo
+                    series.append({"nome": label, "valores": valores.tolist()})
+
+    if not series:
+        return {"erro": "Sem dados validos para o BoxPlot."}
+
+    titulo = "BoxPlot de " + ", ".join([c for c, _ in colunas_validas])
+    if sg:
+        titulo += f" por {sg}"
+
+    # estatisticas globais usando a primeira coluna valida
+    estat_global = _estatisticas_basicas(colunas_validas[0][1])
+
+    return _payload(
+        tipo="boxplot",
+        series=series,
+        labels={
+            "x": sg or "Variavel",
+            "y": colunas_validas[0][0],
+            "titulo": titulo,
+        },
+        estat_global=estat_global,
+        estat_grupo=None,
+        config={"n_series": len(series)},
+        avisos=avisos,
+    )
+
+
 # Atualize os dois dicionários assim:
 
 GRAFICOS_INTERATIVOS = {
@@ -398,6 +470,7 @@ GRAFICOS_INTERATIVOS = {
     "Pareto":          pareto_interativo,
     "Setores (Pizza)": pizza_interativo,
     "Barras":          barras_interativo,
+    "BoxPlot":         boxplot_interativo,
 }
 
 CONFIG_GRAFICOS_INTERATIVOS = {
@@ -405,4 +478,5 @@ CONFIG_GRAFICOS_INTERATIVOS = {
     "Pareto":          ["df", "coluna_x", "coluna_y", "subgrupo"],
     "Setores (Pizza)": ["df", "coluna_x", "coluna_y", "subgrupo"],
     "Barras":          ["df", "coluna_x", "coluna_y", "subgrupo"],
+    "BoxPlot":         ["df", "lista_y", "subgrupo"],
 }
