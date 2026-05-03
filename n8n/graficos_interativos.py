@@ -874,6 +874,135 @@ def superficie3d_interativo(df, coluna_y, coluna_x, coluna_z=None):
     )
 
 
+# ============================================================
+# INTERVALO (intervalos de confianca da media estilo Minitab)
+# ============================================================
+
+def intervalo_interativo(df, lista_y, subgrupo=None, field_conf=None):
+    if not lista_y:
+        return {"erro": "Informe ao menos uma variavel Y."}
+
+    # nivel de confianca (default 95)
+    try:
+        nivel = float(field_conf) if field_conf else 95.0
+        if nivel <= 0 or nivel >= 100:
+            nivel = 95.0
+    except (ValueError, TypeError):
+        nivel = 95.0
+    alpha = 1.0 - nivel / 100.0
+
+    avisos = []
+
+    # valida cada Y
+    colunas_validas = []
+    for col in lista_y:
+        erro = _validar_coluna(df, col, f"Y ({col})")
+        if erro:
+            avisos.append(erro)
+            continue
+        dados, erro = _converter_numerico(df[col], col)
+        if erro:
+            avisos.append(erro)
+            continue
+        colunas_validas.append((col, dados))
+
+    if not colunas_validas:
+        return {"erro": "Nenhuma variavel Y valida."}
+
+    sg, niveis, av_sg = _normalizar_subgrupo(df, lista_y[0], subgrupo)
+    avisos.extend(av_sg)
+
+    try:
+        from scipy import stats as scipy_stats
+    except ImportError:
+        return {"erro": "Modulo scipy nao disponivel para calcular intervalos de confianca."}
+
+    def _ic(valores):
+        v = pd.Series(valores).dropna()
+        n = len(v)
+        if n < 2:
+            return None
+        media = float(v.mean())
+        dp = float(v.std(ddof=1))
+        se = dp / (n ** 0.5) if n > 0 else 0.0
+        t_crit = float(scipy_stats.t.ppf(1 - alpha / 2, n - 1)) if n > 1 else 0.0
+        margem = t_crit * se
+        return {
+            "n": int(n),
+            "media": media,
+            "dp": dp,
+            "se": float(se),
+            "margem": float(margem),
+            "ic_inferior": float(media - margem),
+            "ic_superior": float(media + margem),
+        }
+
+    categorias = []
+    medias, ic_inf, ic_sup = [], [], []
+    ns, dps, ses, margens = [], [], [], []
+
+    if sg is None:
+        for nome, dados in colunas_validas:
+            ic = _ic(dados)
+            if not ic:
+                avisos.append(f"'{nome}' tem n<2 e foi ignorado.")
+                continue
+            categorias.append(nome)
+            medias.append(ic["media"]);     ic_inf.append(ic["ic_inferior"]); ic_sup.append(ic["ic_superior"])
+            ns.append(ic["n"]);              dps.append(ic["dp"]);              ses.append(ic["se"])
+            margens.append(ic["margem"])
+    else:
+        niveis_explicitos = [n for n in niveis if n != "__OUTROS__"]
+        for nome, _ in colunas_validas:
+            for nivel_sg in niveis:
+                valores = _serie_filtrada_por_grupo(df, nome, sg, nivel_sg, niveis_explicitos)
+                if len(valores) < 2:
+                    continue
+                ic = _ic(valores)
+                if not ic:
+                    continue
+                rotulo = "Outros" if nivel_sg == "__OUTROS__" else str(nivel_sg)
+                cat = f"{nome} | {rotulo}" if len(colunas_validas) > 1 else rotulo
+                categorias.append(cat)
+                medias.append(ic["media"]);     ic_inf.append(ic["ic_inferior"]); ic_sup.append(ic["ic_superior"])
+                ns.append(ic["n"]);              dps.append(ic["dp"]);              ses.append(ic["se"])
+                margens.append(ic["margem"])
+
+    if not categorias:
+        return {"erro": "Sem dados validos para calcular intervalos (cada grupo precisa de n>=2)."}
+
+    titulo = f"Intervalos de Confianca {nivel:.0f}% - " + ", ".join([c for c, _ in colunas_validas])
+    if sg:
+        titulo += f" por {sg}"
+
+    return _payload(
+        tipo="intervalo",
+        series=[{
+            "nome": f"IC {nivel:.0f}%",
+            "categorias": categorias,
+            "medias": medias,
+            "ic_inferior": ic_inf,
+            "ic_superior": ic_sup,
+            "ns": ns,
+            "dps": dps,
+            "ses": ses,
+            "margens": margens,
+        }],
+        labels={
+            "x": str(sg) if sg else "Variavel",
+            "y": colunas_validas[0][0],
+            "titulo": titulo,
+        },
+        estat_global=None,
+        estat_grupo=None,
+        config={
+            "nivel_confianca": nivel,
+            "n_grupos": len(categorias),
+        },
+        avisos=avisos,
+    )
+
+
 # Atualize os dois dicionários assim:
 
 GRAFICOS_INTERATIVOS = {
@@ -887,6 +1016,7 @@ GRAFICOS_INTERATIVOS = {
     "Bolhas - 3D":     bolhas_interativo,
     "Superfície - 3D": superficie3d_interativo,
     "Dispersão 3D":    dispersao3d_interativo,
+    "Intervalo":       intervalo_interativo,
 }
 
 CONFIG_GRAFICOS_INTERATIVOS = {
@@ -900,4 +1030,5 @@ CONFIG_GRAFICOS_INTERATIVOS = {
     "Bolhas - 3D":     ["df", "coluna_y", "coluna_x", "coluna_z"],
     "Superfície - 3D": ["df", "coluna_y", "coluna_x", "coluna_z"],
     "Dispersão 3D":    ["df", "coluna_y", "coluna_x", "coluna_z"],
+    "Intervalo":       ["df", "lista_y", "subgrupo", "field_conf"],
 }
