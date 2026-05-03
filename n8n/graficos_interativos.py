@@ -562,6 +562,116 @@ def dispersao_interativo(df, coluna_y, coluna_x, subgrupo=None):
     )
 
 
+# ============================================================
+# TENDENCIA
+# ============================================================
+
+def tendencia_interativo(df, coluna_y, Data=None, subgrupo=None):
+    erro = _validar_coluna(df, coluna_y, "Variavel Y")
+    if erro:
+        return {"erro": erro}
+
+    avisos = []
+
+    cols = [coluna_y]
+    if Data and Data in df.columns:
+        cols.insert(0, Data)
+    if subgrupo and subgrupo in df.columns and subgrupo not in cols:
+        cols.append(subgrupo)
+    df_work = df[cols].copy()
+
+    # tratar a coluna de Data
+    usa_data = bool(Data and Data in df.columns)
+    if usa_data:
+        try:
+            convertida = pd.to_datetime(df_work[Data], errors='coerce', dayfirst=False)
+            if convertida.isna().sum() > len(convertida) / 2:
+                convertida = pd.to_datetime(df_work[Data], errors='coerce', dayfirst=True)
+            if convertida.isna().sum() > len(convertida) / 2:
+                avisos.append(f"Coluna '{Data}' nao reconhecida como data; usando como sequencia.")
+                df_work['_eixo_x'] = df_work[Data].astype(str)
+                tipo_x = "categoria"
+            else:
+                df_work['_eixo_x'] = convertida
+                tipo_x = "data"
+        except Exception:
+            df_work['_eixo_x'] = df_work[Data].astype(str)
+            tipo_x = "categoria"
+    else:
+        # sem coluna de data: usa indice da linha como eixo X
+        df_work['_eixo_x'] = range(len(df_work))
+        tipo_x = "indice"
+        avisos.append("Sem coluna de Data informada; usando indice da linha como eixo X.")
+
+    df_work[coluna_y] = pd.to_numeric(df_work[coluna_y], errors='coerce')
+    df_work = df_work.dropna(subset=['_eixo_x', coluna_y])
+
+    if len(df_work) < 1:
+        return {"erro": "Sem dados validos para tendencia."}
+
+    df_work = df_work.sort_values(by='_eixo_x')
+
+    sg, niveis, av_sg = _normalizar_subgrupo(df, coluna_y, subgrupo)
+    avisos.extend(av_sg)
+
+    def _x_para_lista(serie_x):
+        if tipo_x == "data":
+            return [pd.Timestamp(d).isoformat() for d in serie_x]
+        return [str(v) for v in serie_x.tolist()]
+
+    series = []
+    if sg is None:
+        x_vals = _x_para_lista(df_work['_eixo_x'])
+        y_vals = df_work[coluna_y].tolist()
+        media = float(df_work[coluna_y].mean()) if len(y_vals) > 0 else 0.0
+        series.append({
+            "nome": str(coluna_y),
+            "x": x_vals,
+            "valores": y_vals,
+            "media": media,
+        })
+    else:
+        niveis_explicitos = [n for n in niveis if n != "__OUTROS__"]
+        for nivel in niveis:
+            if nivel == "__OUTROS__":
+                mask = ~df_work[sg].astype(str).isin(niveis_explicitos)
+            else:
+                mask = df_work[sg].astype(str) == str(nivel)
+            sub = df_work[mask].sort_values(by='_eixo_x')
+            if len(sub) == 0:
+                continue
+            rotulo = "Outros" if nivel == "__OUTROS__" else str(nivel)
+            x_vals = _x_para_lista(sub['_eixo_x'])
+            y_vals = sub[coluna_y].tolist()
+            media = float(sub[coluna_y].mean()) if len(y_vals) > 0 else 0.0
+            series.append({
+                "nome": rotulo,
+                "x": x_vals,
+                "valores": y_vals,
+                "media": media,
+            })
+        if not series:
+            return {"erro": "Sem dados validos por subgrupo."}
+
+    estat_global = _estatisticas_basicas(df_work[coluna_y])
+    rotulo_x = str(Data) if usa_data else "Sequencia"
+    titulo = f"Tendencia de {coluna_y}"
+    if usa_data:
+        titulo += f" ao longo de {Data}"
+    if sg:
+        titulo += f" por {sg}"
+
+    return _payload(
+        tipo="tendencia",
+        series=series,
+        labels={"x": rotulo_x, "y": str(coluna_y), "titulo": titulo},
+        estat_global=estat_global,
+        estat_grupo=None,
+        config={"tipo_x": tipo_x},
+        avisos=avisos,
+    )
+
+
 # Atualize os dois dicionários assim:
 
 GRAFICOS_INTERATIVOS = {
@@ -571,6 +681,7 @@ GRAFICOS_INTERATIVOS = {
     "Barras":          barras_interativo,
     "BoxPlot":         boxplot_interativo,
     "Dispersão":       dispersao_interativo,
+    "Tendência":       tendencia_interativo,
 }
 
 CONFIG_GRAFICOS_INTERATIVOS = {
@@ -580,4 +691,5 @@ CONFIG_GRAFICOS_INTERATIVOS = {
     "Barras":          ["df", "coluna_x", "coluna_y", "subgrupo"],
     "BoxPlot":         ["df", "lista_y", "subgrupo"],
     "Dispersão":       ["df", "coluna_y", "coluna_x", "subgrupo"],
+    "Tendência":       ["df", "coluna_y", "Data", "subgrupo"],
 }
