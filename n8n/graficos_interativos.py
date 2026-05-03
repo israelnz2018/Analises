@@ -163,11 +163,108 @@ def histograma_interativo(df, coluna_y, subgrupo=None):
         avisos=avisos,
     )
 
+def pareto_interativo(df, coluna_x, coluna_y=None, subgrupo=None):
+    # 1) validar X
+    erro = _validar_coluna(df, coluna_x, "Categoria X")
+    if erro:
+        return {"erro": erro}
+
+    # 2) decide se usa contagem (sem Y) ou soma (com Y)
+    if coluna_y and coluna_y in df.columns:
+        df_calc = df[[coluna_x, coluna_y]].copy()
+        df_calc[coluna_y] = pd.to_numeric(df_calc[coluna_y], errors='coerce')
+        df_calc = df_calc.dropna(subset=[coluna_y, coluna_x])
+        if len(df_calc) == 0:
+            return {"erro": f"Coluna Y '{coluna_y}' nao tem valores numericos validos."}
+        agregado = df_calc.groupby(df_calc[coluna_x].astype(str))[coluna_y].sum()
+        rotulo_y = f"Soma de {coluna_y}"
+    else:
+        agregado = df[coluna_x].dropna().astype(str).value_counts()
+        rotulo_y = "Frequencia"
+
+    if len(agregado) == 0:
+        return {"erro": "Sem dados validos para o Pareto."}
+
+    # 3) ordena decrescente
+    agregado = agregado.sort_values(ascending=False)
+    categorias = [str(c) for c in agregado.index.tolist()]
+    valores_total = [float(v) for v in agregado.values.tolist()]
+
+    # 4) cumulativa percentual
+    total = sum(valores_total)
+    cumulativa_pct = []
+    acumulado = 0.0
+    for v in valores_total:
+        acumulado += v
+        cumulativa_pct.append(round((acumulado / total) * 100, 2) if total > 0 else 0)
+
+    # 5) subgrupo (opcional) -> empilhamento por nivel
+    series = []
+    sg, niveis, avisos = _normalizar_subgrupo(df, coluna_x, subgrupo)
+
+    if sg is None:
+        series.append({
+            "nome": rotulo_y,
+            "categorias": categorias,
+            "valores": valores_total,
+        })
+    else:
+        niveis_explicitos = [n for n in niveis if n != "__OUTROS__"]
+        for nivel in niveis:
+            if nivel == "__OUTROS__":
+                mask = ~df[sg].astype(str).isin(niveis_explicitos)
+            else:
+                mask = df[sg].astype(str) == str(nivel)
+            sub_df = df[mask]
+            if coluna_y and coluna_y in df.columns:
+                sub_df = sub_df[[coluna_x, coluna_y]].copy()
+                sub_df[coluna_y] = pd.to_numeric(sub_df[coluna_y], errors='coerce')
+                sub_df = sub_df.dropna(subset=[coluna_y, coluna_x])
+                agg = sub_df.groupby(sub_df[coluna_x].astype(str))[coluna_y].sum()
+            else:
+                agg = sub_df[coluna_x].dropna().astype(str).value_counts()
+            valores_nivel = [float(agg.get(c, 0)) for c in categorias]
+            if sum(valores_nivel) > 0:
+                rotulo = "Outros" if nivel == "__OUTROS__" else str(nivel)
+                series.append({
+                    "nome": rotulo,
+                    "categorias": categorias,
+                    "valores": valores_nivel,
+                })
+        if not series:
+            return {"erro": "Sem dados validos por subgrupo."}
+
+    # 6) serie da linha cumulativa (sempre por ultimo)
+    series.append({
+        "nome": "% Cumulativa",
+        "categorias": categorias,
+        "valores": cumulativa_pct,
+        "tipo_serie": "cumulativa",
+    })
+
+    titulo = f"Pareto de {coluna_x}" + (f" por {sg}" if sg else "")
+
+    return _payload(
+        tipo="pareto",
+        series=series,
+        labels={"x": str(coluna_x), "y": rotulo_y, "titulo": titulo},
+        estat_global=None,
+        estat_grupo=None,
+        config={
+            "categorias": categorias,
+            "total": total,
+            "barmode": "stack" if len(series) > 2 else "group",
+        },
+        avisos=avisos,
+    )
+
 
 GRAFICOS_INTERATIVOS = {
     "Histograma": histograma_interativo,
+    "Pareto":     pareto_interativo,
 }
 
 CONFIG_GRAFICOS_INTERATIVOS = {
     "Histograma": ["df", "coluna_y", "subgrupo"],
+     "Pareto":     ["df", "coluna_x", "coluna_y", "subgrupo"],
 }
