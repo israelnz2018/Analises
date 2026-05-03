@@ -672,6 +672,79 @@ def tendencia_interativo(df, coluna_y, Data=None, subgrupo=None):
     )
 
 
+# ============================================================
+# BOLHAS - 3D (bubble chart: X, Y posicao, Z = tamanho da bolha)
+# ============================================================
+
+def bolhas_interativo(df, coluna_y, coluna_x, coluna_z=None):
+    erro = _validar_coluna(df, coluna_y, "Variavel Y")
+    if erro:
+        return {"erro": erro}
+    erro = _validar_coluna(df, coluna_x, "Variavel X")
+    if erro:
+        return {"erro": erro}
+
+    avisos = []
+
+    cols = [coluna_x, coluna_y]
+    tem_z = bool(coluna_z and coluna_z in df.columns)
+    if tem_z:
+        cols.append(coluna_z)
+
+    df_work = df[cols].copy()
+    df_work[coluna_x] = pd.to_numeric(df_work[coluna_x], errors='coerce')
+    df_work[coluna_y] = pd.to_numeric(df_work[coluna_y], errors='coerce')
+
+    if tem_z:
+        df_work[coluna_z] = pd.to_numeric(df_work[coluna_z], errors='coerce')
+        df_work = df_work.dropna(subset=[coluna_x, coluna_y, coluna_z])
+    else:
+        df_work = df_work.dropna(subset=[coluna_x, coluna_y])
+        avisos.append("Coluna Z nao informada. Usando tamanho fixo para as bolhas.")
+
+    if len(df_work) < 1:
+        return {"erro": "Sem dados validos para o grafico de Bolhas."}
+
+    x_vals = df_work[coluna_x].tolist()
+    y_vals = df_work[coluna_y].tolist()
+
+    if tem_z:
+        z_vals = df_work[coluna_z].tolist()
+        z_min = float(df_work[coluna_z].min())
+        z_max = float(df_work[coluna_z].max())
+        # normaliza Z para range de tamanho [10, 55]
+        z_range = z_max - z_min if z_max != z_min else 1.0
+        tamanhos = [10 + 45 * ((v - z_min) / z_range) for v in z_vals]
+    else:
+        z_vals = []
+        tamanhos = [20] * len(x_vals)
+
+    titulo = f"Bolhas: {coluna_y} vs {coluna_x}"
+    if tem_z:
+        titulo += f" (tamanho = {coluna_z})"
+
+    return _payload(
+        tipo="bolhas",
+        series=[{
+            "nome": f"{coluna_y} vs {coluna_x}",
+            "x": x_vals,
+            "y": y_vals,
+            "z": z_vals,
+            "tamanhos": tamanhos,
+        }],
+        labels={
+            "x": str(coluna_x),
+            "y": str(coluna_y),
+            "z": str(coluna_z) if tem_z else "",
+            "titulo": titulo,
+        },
+        estat_global=_estatisticas_basicas(df_work[coluna_y]),
+        estat_grupo=None,
+        config={"tem_z": tem_z, "coluna_z": str(coluna_z) if tem_z else ""},
+        avisos=avisos,
+    )
+
+
 # Atualize os dois dicionários assim:
 
 GRAFICOS_INTERATIVOS = {
@@ -682,6 +755,7 @@ GRAFICOS_INTERATIVOS = {
     "BoxPlot":         boxplot_interativo,
     "Dispersão":       dispersao_interativo,
     "Tendência":       tendencia_interativo,
+    "Bolhas - 3D":     bolhas_interativo,
 }
 
 CONFIG_GRAFICOS_INTERATIVOS = {
@@ -692,4 +766,5 @@ CONFIG_GRAFICOS_INTERATIVOS = {
     "BoxPlot":         ["df", "lista_y", "subgrupo"],
     "Dispersão":       ["df", "coluna_y", "coluna_x", "subgrupo"],
     "Tendência":       ["df", "coluna_y", "Data", "subgrupo"],
+    "Bolhas - 3D":     ["df", "coluna_y", "coluna_x", "coluna_z"],
 }
