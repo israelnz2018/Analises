@@ -33,6 +33,7 @@ try:
     from Controledeprocesso import ANALISES as ANALISES_PROC
     from Analisesdiversas import ANALISES as ANALISES_DIVERSAS
     from graficos import GRAFICOS
+    from graficos_interativos import GRAFICOS_INTERATIVOS, CONFIG_GRAFICOS_INTERATIVOS
 except ImportError as e:
     print(f"⚠ Erro de importação: {str(e)}")
 
@@ -904,6 +905,82 @@ async def gerar_planilha_gage_rr(
         tb = traceback.format_exc()
         return JSONResponse({
             "erro": "Erro interno ao gerar a planilha.",
+            "detalhe": str(e),
+            "traceback": tb
+        }, status_code=500)
+
+
+@app.post("/v2/grafico-interativo")
+async def grafico_interativo(
+    request: Request,
+    arquivo: UploadFile = File(None),
+    aba: str = Form(None),
+    grafico: str = Form(None),
+    coluna_y: str = Form(None),
+    coluna_x: str = Form(None),
+    coluna_z: str = Form(None),
+    lista_y: str = Form(None),
+    lista_x: str = Form(None),
+    subgrupo: str = Form(None),
+    field: str = Form(None),
+    Data: str = Form(None),
+):
+    """
+    Endpoint enxuto que delega a renderização para o módulo graficos_interativos.
+    Retorna JSON estruturado para o Plotly.js renderizar no front.
+    """
+    try:
+        if arquivo is None:
+            return JSONResponse({"erro": "Envie um arquivo Excel."}, status_code=400)
+
+        if not grafico:
+            return JSONResponse({"erro": "Informe o tipo de gráfico."}, status_code=400)
+
+        if grafico not in GRAFICOS_INTERATIVOS:
+            disponiveis = ", ".join(GRAFICOS_INTERATIVOS.keys())
+            return JSONResponse(
+                {"erro": f"Gráfico '{grafico}' não suportado em modo interativo. Disponíveis: {disponiveis}"},
+                status_code=400
+            )
+
+        import pandas as pd
+        import io
+        file_bytes = await arquivo.read()
+        if arquivo.filename.endswith(".xlsx") or arquivo.filename.endswith(".xlsm"):
+            df = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl", sheet_name=aba)
+        elif arquivo.filename.endswith(".csv"):
+            df = pd.read_csv(io.BytesIO(file_bytes))
+        else:
+            return JSONResponse({"erro": "Formato não suportado. Use .xlsx, .xlsm ou .csv."}, status_code=400)
+
+        lista_y_proc = [v.strip() for v in lista_y.split(",")] if lista_y else None
+        lista_x_proc = [v.strip() for v in lista_x.split(",")] if lista_x else None
+
+        disponiveis = {
+            "df": df,
+            "coluna_y": coluna_y.strip() if coluna_y else None,
+            "coluna_x": coluna_x.strip() if coluna_x else None,
+            "coluna_z": coluna_z.strip() if coluna_z else None,
+            "subgrupo": subgrupo.strip() if subgrupo else None,
+            "lista_y": lista_y_proc,
+            "lista_x": lista_x_proc,
+            "field": field,
+            "Data": Data,
+        }
+
+        parametros_necessarios = CONFIG_GRAFICOS_INTERATIVOS.get(grafico, ["df"])
+        argumentos = {p: disponiveis.get(p) for p in parametros_necessarios}
+
+        funcao = GRAFICOS_INTERATIVOS[grafico]
+        resultado = funcao(**argumentos)
+
+        return JSONResponse(resultado)
+
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        return JSONResponse({
+            "erro": "Erro interno ao gerar gráfico interativo.",
             "detalhe": str(e),
             "traceback": tb
         }, status_code=500)
