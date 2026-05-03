@@ -319,14 +319,90 @@ def pizza_interativo(df, coluna_x, coluna_y=None, subgrupo=None):
     )
 
 
+# ============================================================
+# BARRAS
+# ============================================================
+
+def barras_interativo(df, coluna_x, coluna_y=None, subgrupo=None):
+    erro = _validar_coluna(df, coluna_x, "Categoria X")
+    if erro:
+        return {"erro": erro}
+
+    avisos = []
+    sg, niveis, av_sg = _normalizar_subgrupo(df, coluna_x, subgrupo)
+    avisos.extend(av_sg)
+
+    df_work = df.copy()
+    df_work = df_work.dropna(subset=[coluna_x])
+    df_work['_chave'] = df_work[coluna_x].astype(str)
+
+    # ordenacao das categorias globais
+    if coluna_y and coluna_y in df.columns:
+        df_work[coluna_y] = pd.to_numeric(df_work[coluna_y], errors='coerce')
+        df_work = df_work.dropna(subset=[coluna_y])
+        if len(df_work) == 0:
+            return {"erro": f"Coluna Y '{coluna_y}' nao tem valores numericos validos."}
+        ordem = df_work.groupby('_chave')[coluna_y].sum().sort_values(ascending=False).index.tolist()
+        rotulo_y = f"Soma de {coluna_y}"
+    else:
+        ordem = df_work['_chave'].value_counts().index.tolist()
+        rotulo_y = "Frequencia"
+
+    categorias = [str(c) for c in ordem]
+
+    series = []
+
+    if sg is None:
+        if coluna_y and coluna_y in df.columns:
+            agg = df_work.groupby('_chave')[coluna_y].sum()
+        else:
+            agg = df_work['_chave'].value_counts()
+        valores = [float(agg.get(c, 0)) for c in categorias]
+        series.append({"nome": rotulo_y, "categorias": categorias, "valores": valores})
+    else:
+        niveis_explicitos = [n for n in niveis if n != "__OUTROS__"]
+        for nivel in niveis:
+            if nivel == "__OUTROS__":
+                mask = ~df_work[sg].astype(str).isin(niveis_explicitos)
+            else:
+                mask = df_work[sg].astype(str) == str(nivel)
+            sub_df = df_work[mask]
+            if coluna_y and coluna_y in df.columns:
+                agg = sub_df.groupby('_chave')[coluna_y].sum()
+            else:
+                agg = sub_df['_chave'].value_counts()
+            valores = [float(agg.get(c, 0)) for c in categorias]
+            if sum(valores) > 0:
+                rotulo = "Outros" if nivel == "__OUTROS__" else str(nivel)
+                series.append({"nome": rotulo, "categorias": categorias, "valores": valores})
+        if not series:
+            return {"erro": "Sem dados validos por subgrupo."}
+
+    titulo = f"Barras de {coluna_x}" + (f" por {sg}" if sg else "")
+
+    return _payload(
+        tipo="barras",
+        series=series,
+        labels={"x": str(coluna_x), "y": rotulo_y, "titulo": titulo},
+        estat_global=None,
+        estat_grupo=None,
+        config={"barmode": "group" if len(series) > 1 else "group"},
+        avisos=avisos,
+    )
+
+
+# Atualize os dois dicionários assim:
+
 GRAFICOS_INTERATIVOS = {
     "Histograma":      histograma_interativo,
     "Pareto":          pareto_interativo,
     "Setores (Pizza)": pizza_interativo,
+    "Barras":          barras_interativo,
 }
 
 CONFIG_GRAFICOS_INTERATIVOS = {
     "Histograma":      ["df", "coluna_y", "subgrupo"],
     "Pareto":          ["df", "coluna_x", "coluna_y", "subgrupo"],
     "Setores (Pizza)": ["df", "coluna_x", "coluna_y", "subgrupo"],
+    "Barras":          ["df", "coluna_x", "coluna_y", "subgrupo"],
 }
