@@ -925,7 +925,7 @@ def metodo_analitico_analise(df, coluna_y, coluna_x, field=None, field_LSE=None,
     dados = dados.dropna()
 
     if len(dados) < 8:
-        return "❌ Minimo de 8 pecas necessarias para o estudo (AIAG).", None
+        return f"❌ Minimo de 8 pecas necessarias. Backend recebeu {len(df)} linhas brutas, {len(dados)} validas apos limpeza. Coluna X='{coluna_x}', Y='{coluna_y}'.", None
 
     dados = dados.sort_values(coluna_x).reset_index(drop=True)
     refs = dados[coluna_x].values.astype(float)
