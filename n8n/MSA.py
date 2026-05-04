@@ -471,11 +471,202 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
 
     return msg, imagem_base64
 
+def linearidade_analise(df, coluna_y, coluna_x, field_LSE=None, field_LIE=None):
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    import numpy as np
+    import io
+    import base64
+    try:
+        from scipy import stats as scipy_stats
+    except ImportError:
+        return "❌ Modulo scipy nao disponivel.", None
+
+    if not coluna_y or coluna_y not in df.columns:
+        return "❌ Coluna de medicoes (Y) nao encontrada.", None
+    if not coluna_x or coluna_x not in df.columns:
+        return "❌ Coluna de valor de referencia (X) nao encontrada.", None
+
+    dados = df[[coluna_x, coluna_y]].copy()
+    dados[coluna_x] = pd.to_numeric(dados[coluna_x], errors='coerce')
+    dados[coluna_y] = pd.to_numeric(dados[coluna_y], errors='coerce')
+    dados = dados.dropna()
+
+    if len(dados) < 6:
+        return "❌ Minimo de 6 medicoes necessarias para o estudo de linearidade.", None
+
+    refs_unicos = sorted(dados[coluna_x].unique())
+    if len(refs_unicos) < 2:
+        return "❌ E necessario pelo menos 2 valores de referencia diferentes.", None
+
+    # Bias individual de cada medicao
+    dados['Bias'] = dados[coluna_y] - dados[coluna_x]
+
+    # Estatisticas por peca (referencia)
+    stats_por_peca = []
+    for ref in refs_unicos:
+        grupo = dados[dados[coluna_x] == ref]
+        n_g = len(grupo)
+        media_med = float(grupo[coluna_y].mean())
+        media_bias = float(grupo['Bias'].mean())
+        dp_bias = float(grupo['Bias'].std(ddof=1)) if n_g > 1 else 0.0
+        stats_por_peca.append({
+            'ref': ref,
+            'n': n_g,
+            'media_medicao': media_med,
+            'media_bias': media_bias,
+            'dp_bias': dp_bias,
+        })
+
+    # Regressao linear: Bias = a + b * Referencia (usa TODAS as medicoes)
+    x_vals = dados[coluna_x].values.astype(float)
+    y_vals = dados['Bias'].values.astype(float)
+    n_total = len(x_vals)
+
+    slope, intercept, r_value, p_slope, se_slope = scipy_stats.linregress(x_vals, y_vals)
+    r_squared = r_value ** 2
+
+    # Erro padrao do intercept e p-valor
+    x_mean = float(np.mean(x_vals))
+    sxx = float(np.sum((x_vals - x_mean) ** 2))
+    y_pred_all = intercept + slope * x_vals
+    residuos = y_vals - y_pred_all
+    sse = float(np.sum(residuos ** 2))
+    s_res = (sse / (n_total - 2)) ** 0.5 if n_total > 2 else 0.0
+    se_intercept = s_res * ((1.0 / n_total + (x_mean ** 2) / sxx) ** 0.5) if sxx > 0 else 0.0
+    if se_intercept > 0:
+        t_intercept = intercept / se_intercept
+        p_intercept = float(2 * (1 - scipy_stats.t.cdf(abs(t_intercept), n_total - 2)))
+    else:
+        t_intercept = 0.0
+        p_intercept = 1.0
+
+    if se_slope > 0:
+        t_slope = slope / se_slope
+    else:
+        t_slope = 0.0
+
+    # Tolerancia e %Linearidade
+    tolerancia = None
+    pct_linearidade = None
+    lse_val = lie_val = None
+    if field_LSE not in (None, "") and field_LIE not in (None, ""):
+        try:
+            lse_val = float(field_LSE)
+            lie_val = float(field_LIE)
+            tolerancia = lse_val - lie_val
+            if tolerancia > 0:
+                # %Linearidade = |slope| * 100 (estilo Minitab simplificado: bias/processo)
+                pct_linearidade = abs(slope) * 100.0
+        except (ValueError, TypeError):
+            tolerancia = None
+
+    # Bias medio global
+    bias_medio_global = float(dados['Bias'].mean())
+
+    # ========== GRAFICO ==========
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # Pontos individuais (bias de cada medicao)
+    ax.scatter(x_vals, y_vals, color='#3b82f6', alpha=0.5, s=40, label='Bias individual', zorder=2)
+
+    # Media de bias por peca (destacada)
+    refs_arr = np.array([s['ref'] for s in stats_por_peca])
+    medias_bias_arr = np.array([s['media_bias'] for s in stats_por_peca])
+    ax.scatter(refs_arr, medias_bias_arr, color='#dc2626', s=110, marker='D',
+               edgecolor='black', linewidth=1.2, label='Bias medio por peca', zorder=4)
+
+    # Linha de regressao
+    x_line = np.linspace(min(x_vals), max(x_vals), 100)
+    y_line = intercept + slope * x_line
+    sinal = '+' if intercept >= 0 else '-'
+    eq_label = f'Regressao: Bias = {slope:.4f}*Ref {sinal} {abs(intercept):.4f}'
+    ax.plot(x_line, y_line, color='#1d4ed8', linewidth=2.0, label=eq_label, zorder=3)
+
+    # Faixa IC 95% da regressao
+    if n_total > 2 and sxx > 0:
+        t_crit_ic = float(scipy_stats.t.ppf(0.975, n_total - 2))
+        se_pred = s_res * np.sqrt(1.0 / n_total + ((x_line - x_mean) ** 2) / sxx)
+        ic_sup = y_line + t_crit_ic * se_pred
+        ic_inf = y_line - t_crit_ic * se_pred
+        ax.fill_between(x_line, ic_inf, ic_sup, color='#1d4ed8', alpha=0.15, label='IC 95%', zorder=1)
+
+    # Linha do Bias = 0 (referencia ideal)
+    ax.axhline(0, color='#10b981', linewidth=2.0, linestyle='-', label='Bias = 0 (ideal)', zorder=2)
+
+    # Ajusta ylim com margem
+    y_min_dados = float(min(y_vals.min(), 0))
+    y_max_dados = float(max(y_vals.max(), 0))
+    y_range = y_max_dados - y_min_dados
+    y_margin = y_range * 0.3 if y_range > 0 else 0.01
+    ax.set_ylim(y_min_dados - y_margin, y_max_dados + y_margin)
+
+    ax.set_xlabel(f'Valor de Referencia ({coluna_x})')
+    ax.set_ylabel('Bias (Medicao - Referencia)')
+    ax.set_title(f'Estudo de Linearidade - {coluna_y}', fontsize=13, fontweight='bold')
+    ax.legend(loc='best', fontsize=9)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    plt.close()
+    imagem_base64 = base64.b64encode(buf.getvalue()).decode()
+
+    # ========== TEXTO ==========
+    conclusao_slope = "❌ Slope significativo - linearidade comprometida (p<0.05)" if p_slope < 0.05 else "✅ Slope nao significativo - boa linearidade (p>=0.05)"
+    conclusao_intercept = "❌ Intercept significativo - bias constante presente (p<0.05)" if p_intercept < 0.05 else "✅ Intercept nao significativo (p>=0.05)"
+
+    msg = f"""## Estudo de Linearidade - {coluna_y}
+
+**Dados do estudo:**
+- Total de medicoes = {n_total}
+- Numero de pecas (referencias) = {len(refs_unicos)}
+- Faixa de referencia: {min(refs_unicos):.4f} a {max(refs_unicos):.4f}
+- Bias medio global = {bias_medio_global:.6f}
+
+**Estatisticas por peca:**
+"""
+    for s in stats_por_peca:
+        msg += f"- Ref={s['ref']:.4f}: n={s['n']}, Bias medio={s['media_bias']:.6f}, DP={s['dp_bias']:.6f}\n"
+
+    msg += f"""
+**Regressao Linear (Bias vs Referencia):**
+- Slope (inclinacao) = {slope:.6f}
+- Intercept (intercepto) = {intercept:.6f}
+- R = {r_value:.4f}
+- R-quadrado = {r_squared:.4f}
+- S (erro padrao residual) = {s_res:.6f}
+
+**Teste t do Slope (H0: slope = 0):**
+- Estatistica t = {t_slope:.4f}
+- p-valor = {p_slope:.6f}
+- Conclusao: {conclusao_slope}
+
+**Teste t do Intercept (H0: intercept = 0):**
+- Estatistica t = {t_intercept:.4f}
+- p-valor = {p_intercept:.6f}
+- Conclusao: {conclusao_intercept}
+"""
+    if pct_linearidade is not None:
+        crit_lin = "✅ Adequada" if pct_linearidade < 5 else ("⚠️ Marginal" if pct_linearidade < 10 else "❌ Inadequada")
+        msg += f"""
+**Capabilidade (Tolerancia = {tolerancia:.4f}):**
+- LSE = {lse_val:.4f}, LIE = {lie_val:.4f}
+- %Linearidade = {pct_linearidade:.2f}% -> {crit_lin}
+  (criterio: <5% adequada, <10% marginal)
+"""
+    else:
+        msg += "\n**%Linearidade nao calculada** (LSE e LIE nao informados)."
+
+    return msg, imagem_base64
+
 # ====================================================================
 # DICIONÁRIO DE EXPORTAÇÃO
 # ====================================================================
 ANALISES = {
     "Gage R&R": gage_rr,
     "Vício (Bias)": vicio_bias_analise,
+    "Linearidade": linearidade_analise,
 }
 
