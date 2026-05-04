@@ -878,6 +878,193 @@ def estabilidade_analise(df, coluna_y, subgrupo, field=None, field_LSE=None, fie
 
     return msg, imagem_base64
 
+def metodo_analitico_analise(df, coluna_y, coluna_x, field=None, field_LSE=None, field_LIE=None):
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    import numpy as np
+    import io
+    import base64
+    try:
+        from scipy import stats as scipy_stats
+    except ImportError:
+        return "❌ Modulo scipy nao disponivel.", None
+
+    if not coluna_y or coluna_y not in df.columns:
+        return "❌ Coluna de aceitacoes (Y) nao encontrada.", None
+    if not coluna_x or coluna_x not in df.columns:
+        return "❌ Coluna de valor de referencia (X) nao encontrada.", None
+    if field is None or field == "":
+        return "❌ Numero de trials (Field) e obrigatorio.", None
+
+    try:
+        n_trials = int(float(field))
+    except (ValueError, TypeError):
+        return "❌ Numero de trials invalido.", None
+
+    if n_trials < 15:
+        return "❌ Numero de trials minimo e 15 (recomendado 20 - AIAG).", None
+
+    lse_val = lie_val = None
+    try:
+        if field_LSE not in (None, "") and str(field_LSE).strip() != "":
+            lse_val = float(field_LSE)
+    except (ValueError, TypeError):
+        lse_val = None
+    try:
+        if field_LIE not in (None, "") and str(field_LIE).strip() != "":
+            lie_val = float(field_LIE)
+    except (ValueError, TypeError):
+        lie_val = None
+
+    if lse_val is None and lie_val is None:
+        return "❌ E obrigatorio informar pelo menos um limite de tolerancia (LSE ou LIE).", None
+
+    dados = df[[coluna_x, coluna_y]].copy()
+    dados[coluna_x] = pd.to_numeric(dados[coluna_x], errors='coerce')
+    dados[coluna_y] = pd.to_numeric(dados[coluna_y], errors='coerce')
+    dados = dados.dropna()
+
+    if len(dados) < 8:
+        return "❌ Minimo de 8 pecas necessarias para o estudo (AIAG).", None
+
+    dados = dados.sort_values(coluna_x).reset_index(drop=True)
+    refs = dados[coluna_x].values.astype(float)
+    aceitacoes = dados[coluna_y].values.astype(int)
+
+    if (aceitacoes < 0).any() or (aceitacoes > n_trials).any():
+        return f"❌ Aceitacoes devem estar entre 0 e {n_trials}.", None
+
+    # Probabilidade de aceitacao (com correcao para 0 e 100%)
+    probs = aceitacoes / n_trials
+    probs_ajust = probs.copy()
+    for i in range(len(probs_ajust)):
+        if probs_ajust[i] == 0.0:
+            probs_ajust[i] = 1.0 / (2.0 * n_trials)
+        elif probs_ajust[i] == 1.0:
+            probs_ajust[i] = 1.0 - 1.0 / (2.0 * n_trials)
+
+    # Z-score (transformacao probit) - regressao Z = a + b * Ref
+    z_scores = scipy_stats.norm.ppf(probs_ajust)
+
+    if len(refs) < 2:
+        return "❌ Dados insuficientes para regressao.", None
+
+    slope, intercept, r_value, p_slope, se_slope = scipy_stats.linregress(refs, z_scores)
+    if slope == 0:
+        return "❌ Slope nulo - nao e possivel calcular bias e repetibilidade.", None
+
+    # Bias e Repetibilidade (estilo AIAG)
+    # Limite de tolerancia usado: prefere LIE (lower) se ambos informados
+    limite_calc = lie_val if lie_val is not None else lse_val
+    nome_limite = "LIE" if lie_val is not None else "LSE"
+
+    # Ponto de 50% aceitacao (Z = 0): X_50 = -intercept / slope
+    x_50 = -intercept / slope
+    bias = x_50 - limite_calc
+    repetibilidade = 1.0 / abs(slope) * 6.0  # faixa 6-sigma
+
+    # Teste t do bias (DF = n_trials - 1, metodo AIAG)
+    if se_slope > 0:
+        se_x50 = abs(se_slope / (slope ** 2))
+        t_bias = bias / se_x50 if se_x50 > 0 else 0.0
+        df_aiag = n_trials - 1
+        p_bias = float(2 * (1 - scipy_stats.t.cdf(abs(t_bias), df_aiag)))
+    else:
+        t_bias = 0.0
+        p_bias = 1.0
+
+    # %Bias e %Repetibilidade (em relacao a tolerancia, se ambos limites informados)
+    pct_bias = pct_repet = None
+    tolerancia = None
+    if lse_val is not None and lie_val is not None:
+        tolerancia = lse_val - lie_val
+        if tolerancia > 0:
+            pct_bias = (abs(bias) / tolerancia) * 100.0
+            pct_repet = (repetibilidade / tolerancia) * 100.0
+
+    # ========== GRAFICO: Gage Performance Curve ==========
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.5))
+
+    # Grafico 1: Probability plot (Z vs Reference) com linha ajustada
+    x_line = np.linspace(refs.min(), refs.max(), 100)
+    z_line = intercept + slope * x_line
+    ax1.scatter(refs, z_scores, color='#3b82f6', s=60, zorder=3, label='Z observado')
+    ax1.plot(x_line, z_line, color='#1d4ed8', linewidth=2.0, label=f'Z = {slope:.4f}*Ref + {intercept:.4f}', zorder=2)
+    ax1.axhline(0, color='#10b981', linewidth=1.5, linestyle='--', alpha=0.7, label='Z = 0 (P=50%)')
+    ax1.axvline(limite_calc, color='#ef4444', linewidth=1.5, linestyle=':', label=f'{nome_limite} = {limite_calc:.4f}')
+    ax1.set_xlabel(f'Valor de Referencia ({coluna_x})')
+    ax1.set_ylabel('Z-score (probit)')
+    ax1.set_title('Probability Plot (Probit)', fontsize=11, fontweight='bold')
+    ax1.legend(loc='best', fontsize=8)
+    ax1.grid(True, alpha=0.3)
+
+    # Grafico 2: Gage Performance Curve (% aceitacao vs referencia)
+    p_line = scipy_stats.norm.cdf(z_line)
+    ax2.scatter(refs, probs * 100, color='#3b82f6', s=70, zorder=3, label='% aceitacao observada')
+    ax2.plot(x_line, p_line * 100, color='#1d4ed8', linewidth=2.0, label='Curva ajustada', zorder=2)
+    ax2.axhline(50, color='#10b981', linewidth=1.2, linestyle='--', alpha=0.6, label='50%')
+    ax2.axvline(limite_calc, color='#ef4444', linewidth=1.5, linestyle=':', label=f'{nome_limite} = {limite_calc:.4f}')
+    ax2.axvline(x_50, color='#f59e0b', linewidth=1.5, linestyle='--', label=f'Ponto 50% = {x_50:.4f}')
+    ax2.set_xlabel(f'Valor de Referencia ({coluna_x})')
+    ax2.set_ylabel('% Aceitacao')
+    ax2.set_title('Gage Performance Curve', fontsize=11, fontweight='bold')
+    ax2.set_ylim(-5, 105)
+    ax2.legend(loc='best', fontsize=8)
+    ax2.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    plt.close()
+    imagem_base64 = base64.b64encode(buf.getvalue()).decode()
+
+    # ========== TEXTO ==========
+    conclusao_bias = "❌ Bias significativo (p<0.05)" if p_bias < 0.05 else "✅ Bias nao significativo (p>=0.05)"
+
+    msg = f"""## Estudo de Atributos - Metodo Analitico (AIAG)
+
+**Dados do estudo:**
+- Numero de pecas = {len(refs)}
+- Numero de trials por peca = {n_trials}
+- Faixa de referencia: {refs.min():.4f} a {refs.max():.4f}
+- Limite usado para calculo: {nome_limite} = {limite_calc:.4f}
+
+**Pontos observados:**
+"""
+    for i in range(len(refs)):
+        msg += f"- Ref={refs[i]:.4f}: {aceitacoes[i]}/{n_trials} = {probs[i]*100:.1f}% aceitacao\n"
+
+    msg += f"""
+**Regressao Probit (Z = a + b*Ref):**
+- Slope (b) = {slope:.6f}
+- Intercept (a) = {intercept:.6f}
+- R = {r_value:.4f}
+- R-quadrado = {r_value**2:.4f}
+
+**Bias do Sistema de Medicao:**
+- Ponto de 50% aceitacao = {x_50:.6f}
+- Bias = {bias:.6f}  (Ponto 50% - {nome_limite})
+- Estatistica t = {t_bias:.4f}
+- p-valor = {p_bias:.6f}
+- Conclusao: {conclusao_bias}
+
+**Repetibilidade do Sistema de Medicao:**
+- Repetibilidade = {repetibilidade:.6f}  (faixa 6-sigma = 6/|slope|)
+"""
+    if pct_bias is not None:
+        crit_bias = "✅ Adequado" if pct_bias < 5 else ("⚠️ Marginal" if pct_bias < 10 else "❌ Inadequado")
+        crit_repet = "✅ Adequado" if pct_repet < 10 else ("⚠️ Marginal" if pct_repet < 30 else "❌ Inadequado")
+        msg += f"""
+**Capabilidade (Tolerancia = {tolerancia:.4f}):**
+- LSE = {lse_val:.4f}, LIE = {lie_val:.4f}
+- %Bias = {pct_bias:.2f}% -> {crit_bias} (criterio: <5% adequado)
+- %Repetibilidade = {pct_repet:.2f}% -> {crit_repet} (criterio: <10% adequado)
+"""
+    else:
+        msg += "\n**%Bias e %Repetibilidade nao calculados** (necessario LSE e LIE para tolerancia)."
+
+    return msg, imagem_base64
+
 # ====================================================================
 # DICIONÁRIO DE EXPORTAÇÃO
 # ====================================================================
@@ -886,6 +1073,8 @@ ANALISES = {
     "Vício (Bias)": vicio_bias_analise,
     "Linearidade": linearidade_analise,
     "Estabilidade": estabilidade_analise,
+    "Método Analítico": metodo_analitico_analise,
+
 
 }
 
