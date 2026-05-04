@@ -661,6 +661,223 @@ def linearidade_analise(df, coluna_y, coluna_x, field_LSE=None, field_LIE=None):
 
     return msg, imagem_base64
 
+def estabilidade_analise(df, coluna_y, subgrupo, field=None, field_LSE=None, field_LIE=None):
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    import numpy as np
+    import io
+    import base64
+
+    if not coluna_y or coluna_y not in df.columns:
+        return "❌ Coluna de medicoes (Y) nao encontrada.", None
+    if not subgrupo or subgrupo not in df.columns:
+        return "❌ Coluna de subgrupo nao encontrada.", None
+    if field is None or field == "":
+        return "❌ Valor de referencia (Field) e obrigatorio.", None
+
+    try:
+        valor_ref = float(field)
+    except (ValueError, TypeError):
+        return "❌ Valor de referencia invalido.", None
+
+    dados = df[[subgrupo, coluna_y]].copy()
+    dados[coluna_y] = pd.to_numeric(dados[coluna_y], errors='coerce')
+    dados = dados.dropna()
+
+    if len(dados) < 10:
+        return "❌ Minimo de 10 medicoes necessarias para o estudo.", None
+
+    dados['Bias'] = dados[coluna_y] - valor_ref
+    dados[subgrupo] = dados[subgrupo].astype(str)
+
+    subgrupos_unicos = sorted(dados[subgrupo].unique(),
+                              key=lambda x: (len(x), x))
+    n_subgrupos = len(subgrupos_unicos)
+    if n_subgrupos < 3:
+        return "❌ Minimo de 3 subgrupos necessarios para o estudo.", None
+
+    medias = []
+    amplitudes = []
+    tamanhos = []
+    for sg in subgrupos_unicos:
+        grupo = dados[dados[subgrupo] == sg]['Bias'].values
+        if len(grupo) < 1:
+            continue
+        medias.append(float(np.mean(grupo)))
+        amplitudes.append(float(np.max(grupo) - np.min(grupo)) if len(grupo) > 1 else 0.0)
+        tamanhos.append(len(grupo))
+
+    n_medio = int(round(np.mean(tamanhos)))
+    if n_medio < 2:
+        return "❌ Cada subgrupo precisa ter pelo menos 2 medicoes.", None
+
+    a2_table = {2: 1.880, 3: 1.023, 4: 0.729, 5: 0.577, 6: 0.483,
+                7: 0.419, 8: 0.373, 9: 0.337, 10: 0.308}
+    d3_table = {2: 0.000, 3: 0.000, 4: 0.000, 5: 0.000, 6: 0.000,
+                7: 0.076, 8: 0.136, 9: 0.184, 10: 0.223}
+    d4_table = {2: 3.267, 3: 2.574, 4: 2.282, 5: 2.114, 6: 2.004,
+                7: 1.924, 8: 1.864, 9: 1.816, 10: 1.777}
+
+    A2 = a2_table.get(n_medio, 0.577)
+    D3 = d3_table.get(n_medio, 0.0)
+    D4 = d4_table.get(n_medio, 2.114)
+
+    media_geral = float(np.mean(medias))
+    R_bar = float(np.mean(amplitudes))
+
+    LSC_X = media_geral + A2 * R_bar
+    LIC_X = media_geral - A2 * R_bar
+    LSC_R = D4 * R_bar
+    LIC_R = D3 * R_bar
+
+    pontos_fora_X = []
+    for i, m in enumerate(medias):
+        if m > LSC_X or m < LIC_X:
+            pontos_fora_X.append((i + 1, subgrupos_unicos[i], m))
+
+    pontos_fora_R = []
+    for i, r in enumerate(amplitudes):
+        if r > LSC_R or r < LIC_R:
+            pontos_fora_R.append((i + 1, subgrupos_unicos[i], r))
+
+    sequencia_X = []
+    seq_atual = 0
+    lado_atual = None
+    for m in medias:
+        lado = 'acima' if m > media_geral else ('abaixo' if m < media_geral else None)
+        if lado is None:
+            seq_atual = 0
+            lado_atual = None
+            continue
+        if lado == lado_atual:
+            seq_atual += 1
+        else:
+            seq_atual = 1
+            lado_atual = lado
+        if seq_atual >= 8:
+            sequencia_X.append((lado, seq_atual))
+
+    causas_especiais = len(pontos_fora_X) > 0 or len(pontos_fora_R) > 0 or len(sequencia_X) > 0
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 8), sharex=True)
+    indices = list(range(1, n_subgrupos + 1))
+
+    ax1.plot(indices, medias, 'o-', color='#3b82f6', markersize=7, linewidth=1.4, label='Bias medio')
+    ax1.axhline(media_geral, color='#10b981', linewidth=1.8, linestyle='-',
+                label=f'X̄̄ = {media_geral:.4f}')
+    ax1.axhline(LSC_X, color='#ef4444', linewidth=1.5, linestyle='--',
+                label=f'LSC = {LSC_X:.4f}')
+    ax1.axhline(LIC_X, color='#ef4444', linewidth=1.5, linestyle='--',
+                label=f'LIC = {LIC_X:.4f}')
+    for idx, sg, m in pontos_fora_X:
+        ax1.plot(idx, m, 'o', color='red', markersize=12, markerfacecolor='none',
+                 markeredgewidth=2, zorder=5)
+    ax1.set_ylabel('Bias medio (X̄)')
+    ax1.set_title(f'Carta X̄ do Bias - {coluna_y}', fontsize=12, fontweight='bold')
+    ax1.legend(loc='best', fontsize=8)
+    ax1.grid(True, alpha=0.3)
+
+    ax2.plot(indices, amplitudes, 's-', color='#f59e0b', markersize=7, linewidth=1.4, label='Amplitude')
+    ax2.axhline(R_bar, color='#10b981', linewidth=1.8, linestyle='-',
+                label=f'R̄ = {R_bar:.4f}')
+    ax2.axhline(LSC_R, color='#ef4444', linewidth=1.5, linestyle='--',
+                label=f'LSC = {LSC_R:.4f}')
+    if D3 > 0:
+        ax2.axhline(LIC_R, color='#ef4444', linewidth=1.5, linestyle='--',
+                    label=f'LIC = {LIC_R:.4f}')
+    for idx, sg, r in pontos_fora_R:
+        ax2.plot(idx, r, 's', color='red', markersize=12, markerfacecolor='none',
+                 markeredgewidth=2, zorder=5)
+    ax2.set_xlabel('Subgrupo')
+    ax2.set_ylabel('Amplitude (R)')
+    ax2.set_title(f'Carta R do Bias - {coluna_y}', fontsize=12, fontweight='bold')
+    ax2.legend(loc='best', fontsize=8)
+    ax2.grid(True, alpha=0.3)
+    ax2.set_xticks(indices)
+    ax2.set_xticklabels(subgrupos_unicos, rotation=45, ha='right', fontsize=8)
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    plt.close()
+    imagem_base64 = base64.b64encode(buf.getvalue()).decode()
+
+    tolerancia = None
+    pct_estab = None
+    lse_val = lie_val = None
+    dp_global = float(dados['Bias'].std(ddof=1))
+    if field_LSE not in (None, "") and field_LIE not in (None, ""):
+        try:
+            lse_val = float(field_LSE)
+            lie_val = float(field_LIE)
+            tolerancia = lse_val - lie_val
+            if tolerancia > 0 and dp_global > 0:
+                pct_estab = (6.0 * dp_global / tolerancia) * 100.0
+        except (ValueError, TypeError):
+            tolerancia = None
+
+    if causas_especiais:
+        conclusao = "❌ Sistema NAO estavel - causas especiais detectadas"
+    else:
+        conclusao = "✅ Sistema estavel - apenas causas comuns presentes"
+
+    msg = f"""## Estudo de Estabilidade - {coluna_y}
+
+**Dados do estudo:**
+- Total de medicoes = {len(dados)}
+- Numero de subgrupos = {n_subgrupos}
+- Tamanho medio do subgrupo = {n_medio}
+- Valor de referencia = {valor_ref:.6f}
+- Bias medio global (X̄̄) = {media_geral:.6f}
+- Amplitude media (R̄) = {R_bar:.6f}
+
+**Limites de Controle - Carta X̄:**
+- LSC = {LSC_X:.6f}
+- Linha central = {media_geral:.6f}
+- LIC = {LIC_X:.6f}
+
+**Limites de Controle - Carta R:**
+- LSC = {LSC_R:.6f}
+- Linha central = {R_bar:.6f}
+- LIC = {LIC_R:.6f}
+
+**Analise de Causas Especiais (regras AIAG/Western Electric):**
+"""
+    if pontos_fora_X:
+        msg += f"- ❌ {len(pontos_fora_X)} ponto(s) fora dos limites na Carta X̄:\n"
+        for idx, sg, m in pontos_fora_X:
+            msg += f"   - Subgrupo {sg} (posicao {idx}): {m:.6f}\n"
+    else:
+        msg += "- ✅ Nenhum ponto fora dos limites na Carta X̄\n"
+
+    if pontos_fora_R:
+        msg += f"- ❌ {len(pontos_fora_R)} ponto(s) fora dos limites na Carta R:\n"
+        for idx, sg, r in pontos_fora_R:
+            msg += f"   - Subgrupo {sg} (posicao {idx}): {r:.6f}\n"
+    else:
+        msg += "- ✅ Nenhum ponto fora dos limites na Carta R\n"
+
+    if sequencia_X:
+        msg += f"- ❌ Sequencia de 8+ pontos consecutivos do mesmo lado da media detectada\n"
+    else:
+        msg += "- ✅ Sem sequencias suspeitas de pontos consecutivos\n"
+
+    msg += f"\n**Conclusao:** {conclusao}\n"
+
+    if pct_estab is not None:
+        crit = "✅ Adequada" if pct_estab < 10 else ("⚠️ Marginal" if pct_estab < 30 else "❌ Inadequada")
+        msg += f"""
+**Capabilidade (Tolerancia = {tolerancia:.4f}):**
+- LSE = {lse_val:.4f}, LIE = {lie_val:.4f}
+- DP global do Bias = {dp_global:.6f}
+- %Estabilidade (6σ/Tol) = {pct_estab:.2f}% -> {crit}
+  (criterio AIAG: <10% adequada, <30% marginal)
+"""
+    else:
+        msg += "\n**%Estabilidade nao calculada** (LSE e LIE nao informados)."
+
+    return msg, imagem_base64
+
 # ====================================================================
 # DICIONÁRIO DE EXPORTAÇÃO
 # ====================================================================
@@ -668,5 +885,7 @@ ANALISES = {
     "Gage R&R": gage_rr,
     "Vício (Bias)": vicio_bias_analise,
     "Linearidade": linearidade_analise,
+    "Estabilidade": estabilidade_analise,
+
 }
 
