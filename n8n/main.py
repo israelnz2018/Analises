@@ -43,30 +43,45 @@ app.include_router(claude_router)
 app.include_router(metavise_router)
 
 # Middleware de CORS atualizado para incluir seu novo domínio
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://app.educacaopelotrabalho.com",
-        "https://educacaopelotrabalho-production.up.railway.app",
-        "https://aistudio.google.com",  # ← adicionar esta linha
-        "*"  # ← adicionar esta linha para desenvolvimento
-    
-    ],
-    allow_credentials=True,
+    allow_origin_regex=(
+        r"^https://("
+        r".*\.run\.app"                            # Google AI Studio (qualquer subdominio)
+        r"|.*\.up\.railway\.app"                   # Railway (qualquer deploy)
+        r"|app\.educacaopelotrabalho\.com"         # producao
+        r"|aistudio\.google\.com"                  # Google AI Studio principal
+        r")$"
+        r"|^http://localhost(:\d+)?$"              # localhost para desenvolvimento
+    ),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
 # Responde preflight OPTIONS universalmente
+import re as _re_cors
+_CORS_REGEX = _re_cors.compile(
+    r"^https://("
+    r".*\.run\.app"
+    r"|.*\.up\.railway\.app"
+    r"|app\.educacaopelotrabalho\.com"
+    r"|aistudio\.google\.com"
+    r")$"
+    r"|^http://localhost(:\d+)?$"
+)
+
 @app.options("/{path:path}")
-async def preflight_handler(path: str):
+async def preflight_handler(request: Request, path: str):
+    origin = request.headers.get("origin", "")
     response = Response()
-    response.headers["Access-Control-Allow-Origin"] = "https://app.educacaopelotrabalho.com, https://educacaopelotrabalho-production.up.railway.app"
-
-
-    response.headers["Access-Control-Allow-Methods"] = "*"
-    response.headers["Access-Control-Allow-Headers"] = "*"
+    if origin and _CORS_REGEX.match(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Max-Age"] = "86400"
     return response
 
 # Construção do dicionário de análises
