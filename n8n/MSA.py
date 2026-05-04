@@ -353,22 +353,9 @@ def gage_rr(df, coluna_y, coluna_x, subgrupo, field_LIE=None, field_LSE=None):
  
     return resultado, imagem_base64
 
-Entendido! Vou refazer sem a parte de gerar planilha. O Vício (Bias) vai ter só o modo "Analisar Planilha" (mais simples, igual aos outros gráficos).
-Esquece os comandos anteriores. Aqui vão os novos:
-
-BLOCO 1 — Backend (GitHub/Railway)
-São 2 alterações: 1 no MSA.py e 1 no main.py
-
-
-========================================
-1.1) MSA.py — Adicionar função vicio_bias_analise e registrar em ANALISES
-========================================
-
-COLE A FUNÇÃO ABAIXO no arquivo MSA.py (no fim do arquivo, antes do dicionário ANALISES):
-
 def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None):
-    import pandas as pd
     import matplotlib.pyplot as plt
+    import pandas as pd
     import io
     import base64
     try:
@@ -442,7 +429,7 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
     plt.close()
     imagem_base64 = base64.b64encode(buf.getvalue()).decode()
 
-    conclusao_t = "❌ Vicio significativo (p<0.05) - sistema com tendencia" if p_valor < 0.05 else "✅ Vicio nao significativo (p>=0.05)"
+    conclusao_t = "❌ Vicio significativo (p<0.05)" if p_valor < 0.05 else "✅ Vicio nao significativo (p>=0.05)"
     msg = f"""## Estudo de Vicio (Tipo 1) - {coluna_y}
 
 **Estatisticas das medicoes:**
@@ -465,7 +452,7 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
         crit_cg = "✅ Adequado" if cg >= 1.33 else "❌ Inadequado"
         crit_cgk = "✅ Adequado" if cgk >= 1.33 else "❌ Inadequado"
         msg += f"""
-**Capabilidade do Instrumento (Tolerancia = LSE - LIE = {tolerancia:.4f}):**
+**Capabilidade do Instrumento (Tolerancia = {tolerancia:.4f}):**
 - LSE = {lse_val:.4f}, LIE = {lie_val:.4f}
 - Cg = {cg:.4f} -> {crit_cg} (criterio: Cg >= 1.33)
 - Cgk = {cgk:.4f} -> {crit_cgk} (criterio: Cgk >= 1.33)
@@ -477,21 +464,11 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
     return msg, imagem_base64
 
 
-E NO DICIONARIO ANALISES (no fim do MSA.py), adicione a linha:
-
-ANALISES = {
-    # ...mantenha as analises existentes...
-    "Vício (Bias)": vicio_bias_analise,
-}
-
-
- 
 # ====================================================================
-# DICIONÁRIO DE EXPORTAÇÃO — usado pelo main.py para registrar
-# as análises deste módulo no roteamento global de ferramentas.
+# DICIONÁRIO DE EXPORTAÇÃO
 # ====================================================================
 ANALISES = {
     "Gage R&R": gage_rr,
-    "Vício (Bias)": ["df", "coluna_y", "field", "field_LSE", "field_LIE"],
+    "Vício (Bias)": vicio_bias_analise,
 }
 
