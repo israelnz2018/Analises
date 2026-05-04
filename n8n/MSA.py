@@ -352,7 +352,123 @@ def gage_rr(df, coluna_y, coluna_x, subgrupo, field_LIE=None, field_LSE=None):
     imagem_base64 = base64.b64encode(buf.read()).decode("utf-8")
  
     return resultado, imagem_base64
- 
+
+def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None):
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import io
+    import base64
+    try:
+        from scipy import stats as scipy_stats
+    except ImportError:
+        return "❌ Modulo scipy nao disponivel.", None
+
+    if not coluna_y or coluna_y not in df.columns:
+        return "❌ Coluna de medicoes nao encontrada.", None
+    if field is None or field == "":
+        return "❌ Valor de referencia (Field) e obrigatorio.", None
+
+    try:
+        valor_ref = float(field)
+    except (ValueError, TypeError):
+        return "❌ Valor de referencia invalido.", None
+
+    medicoes = pd.to_numeric(df[coluna_y], errors='coerce').dropna()
+    n = len(medicoes)
+    if n < 5:
+        return "❌ Minimo de 5 medicoes necessarias para o estudo.", None
+
+    media = float(medicoes.mean())
+    dp = float(medicoes.std(ddof=1))
+    se = dp / (n ** 0.5) if dp > 0 else 0.0
+    bias = media - valor_ref
+
+    # Teste t para H0: bias = 0
+    if se > 0:
+        t_stat = bias / se
+        p_valor = float(2 * (1 - scipy_stats.t.cdf(abs(t_stat), n - 1)))
+    else:
+        t_stat = 0.0
+        p_valor = 1.0
+    t_crit = float(scipy_stats.t.ppf(0.975, n - 1)) if n > 1 else 0.0
+    ic_inferior = bias - t_crit * se
+    ic_superior = bias + t_crit * se
+
+    # Cg / Cgk se houver LSE e LIE
+    cg = cgk = pct_var_estudo = tolerancia = None
+    lse_val = lie_val = None
+    if field_LSE not in (None, "") and field_LIE not in (None, ""):
+        try:
+            lse_val = float(field_LSE)
+            lie_val = float(field_LIE)
+            tolerancia = lse_val - lie_val
+            if tolerancia > 0 and dp > 0:
+                cg = (0.20 * tolerancia) / (6.0 * dp)
+                cgk = (0.10 * tolerancia - abs(bias)) / (3.0 * dp)
+                pct_var_estudo = (6.0 * dp / (0.20 * tolerancia)) * 100.0
+        except (ValueError, TypeError):
+            pass
+
+    # Run chart
+    fig, ax = plt.subplots(figsize=(10, 6))
+    indices = list(range(1, n + 1))
+    ax.plot(indices, medicoes.values, 'o-', color='#3b82f6', markersize=6, linewidth=1.2, label='Medicoes')
+    ax.axhline(valor_ref, color='#10b981', linewidth=2.0, label=f'Referencia = {valor_ref:.4f}')
+    ax.axhline(media, color='#1d4ed8', linestyle='--', linewidth=1.5, label=f'Media = {media:.4f}')
+    if tolerancia and tolerancia > 0:
+        ax.axhline(valor_ref + 0.10 * tolerancia, color='#ef4444', linestyle=':', linewidth=1.5,
+                   label=f'Ref + 10% Tol ({valor_ref + 0.10 * tolerancia:.4f})')
+        ax.axhline(valor_ref - 0.10 * tolerancia, color='#ef4444', linestyle=':', linewidth=1.5,
+                   label=f'Ref - 10% Tol ({valor_ref - 0.10 * tolerancia:.4f})')
+    ax.set_xlabel('Observacao')
+    ax.set_ylabel(f'Medicao ({coluna_y})')
+    ax.set_title(f'Estudo de Vicio (Tipo 1) - {coluna_y}', fontsize=13, fontweight='bold')
+    ax.legend(loc='best', fontsize=9)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+    plt.close()
+    imagem_base64 = base64.b64encode(buf.getvalue()).decode()
+
+    # Texto-relatorio (estilo Minitab)
+    conclusao_t = "❌ Vicio significativo (p<0.05) - sistema com tendencia" if p_valor < 0.05 else "✅ Vicio nao significativo (p>=0.05)"
+    msg = f"""## Estudo de Vicio (Tipo 1) - {coluna_y}
+
+**Estatisticas das medicoes:**
+- n = {n}
+- Media = {media:.6f}
+- Desvio padrao (DP) = {dp:.6f}
+- Erro padrao (SE) = {se:.6f}
+
+**Analise do Vicio:**
+- Valor de referencia = {valor_ref:.6f}
+- Vicio (Bias) = {bias:.6f}
+- IC 95% do Bias = [{ic_inferior:.6f}, {ic_superior:.6f}]
+
+**Teste t (H0: Bias = 0):**
+- Estatistica t = {t_stat:.4f}
+- p-valor = {p_valor:.6f}
+- Conclusao: {conclusao_t}
+"""
+    if cg is not None:
+        crit_cg = "✅ Adequado" if cg >= 1.33 else "❌ Inadequado"
+        crit_cgk = "✅ Adequado" if cgk >= 1.33 else "❌ Inadequado"
+        msg += f"""
+**Capabilidade do Instrumento (Tolerancia = LSE - LIE = {tolerancia:.4f}):**
+- LSE = {lse_val:.4f}, LIE = {lie_val:.4f}
+- Cg = {cg:.4f} -> {crit_cg} (criterio: Cg >= 1.33)
+- Cgk = {cgk:.4f} -> {crit_cgk} (criterio: Cgk >= 1.33)
+- %Var(estudo) = {pct_var_estudo:.2f}%
+"""
+    else:
+        msg += "\n**Cg/Cgk nao calculados** (LSE e LIE nao informados)."
+
+    return msg, imagem_base64
+
+
+
  
 # ====================================================================
 # DICIONÁRIO DE EXPORTAÇÃO — usado pelo main.py para registrar
@@ -360,5 +476,6 @@ def gage_rr(df, coluna_y, coluna_x, subgrupo, field_LIE=None, field_LSE=None):
 # ====================================================================
 ANALISES = {
     "Gage R&R": gage_rr,
+    "Vício (Bias)": ["df", "coluna_y", "field", "field_LSE", "field_LIE"],
 }
 
