@@ -417,6 +417,14 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
                    label=f'Ref + 10% Tol ({valor_ref + 0.10 * tolerancia:.4f})')
         ax.axhline(valor_ref - 0.10 * tolerancia, color='#ef4444', linestyle=':', linewidth=1.5,
                    label=f'Ref - 10% Tol ({valor_ref - 0.10 * tolerancia:.4f})')
+
+    # Ajusta ylim com base nos dados reais + margem de 40%
+    y_min_dados = float(medicoes.values.min())
+    y_max_dados = float(medicoes.values.max())
+    y_range = y_max_dados - y_min_dados
+    y_margin = y_range * 0.4 if y_range > 0 else abs(media) * 0.01
+    ax.set_ylim(y_min_dados - y_margin, y_max_dados + y_margin)
+
     ax.set_xlabel('Observacao')
     ax.set_ylabel(f'Medicao ({coluna_y})')
     ax.set_title(f'Estudo de Vicio (Tipo 1) - {coluna_y}', fontsize=13, fontweight='bold')
@@ -462,7 +470,6 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
         msg += "\n**Cg/Cgk nao calculados** (LSE e LIE nao informados)."
 
     return msg, imagem_base64
-
 
 # ====================================================================
 # DICIONÁRIO DE EXPORTAÇÃO
