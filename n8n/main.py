@@ -118,6 +118,7 @@ CONFIG_ANALISES = {
     "Concordância de Atributos": ["df", "coluna_y", "coluna_x", "subgrupo", "field", "ordinal"],
     "Vício (Bias)": ["df", "coluna_y", "field", "field_LSE", "field_LIE"],
     "Linearidade": ["df", "coluna_y", "coluna_x", "field_LSE", "field_LIE"],
+    "Estabilidade": ["df", "coluna_y", "subgrupo", "field", "field_LSE", "field_LIE"],
     "1 Sample T": ["df", "coluna_y", "field", "field_conf"],
     "2 Sample T": ["df", "lista_y", "field_conf"],
     "2 Paired Test": ["df", "lista_y", "field_conf"],
