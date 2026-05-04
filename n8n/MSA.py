@@ -353,6 +353,19 @@ def gage_rr(df, coluna_y, coluna_x, subgrupo, field_LIE=None, field_LSE=None):
  
     return resultado, imagem_base64
 
+Entendido! Vou refazer sem a parte de gerar planilha. O Vício (Bias) vai ter só o modo "Analisar Planilha" (mais simples, igual aos outros gráficos).
+Esquece os comandos anteriores. Aqui vão os novos:
+
+BLOCO 1 — Backend (GitHub/Railway)
+São 2 alterações: 1 no MSA.py e 1 no main.py
+
+
+========================================
+1.1) MSA.py — Adicionar função vicio_bias_analise e registrar em ANALISES
+========================================
+
+COLE A FUNÇÃO ABAIXO no arquivo MSA.py (no fim do arquivo, antes do dicionário ANALISES):
+
 def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None):
     import pandas as pd
     import matplotlib.pyplot as plt
@@ -383,7 +396,6 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
     se = dp / (n ** 0.5) if dp > 0 else 0.0
     bias = media - valor_ref
 
-    # Teste t para H0: bias = 0
     if se > 0:
         t_stat = bias / se
         p_valor = float(2 * (1 - scipy_stats.t.cdf(abs(t_stat), n - 1)))
@@ -394,7 +406,6 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
     ic_inferior = bias - t_crit * se
     ic_superior = bias + t_crit * se
 
-    # Cg / Cgk se houver LSE e LIE
     cg = cgk = pct_var_estudo = tolerancia = None
     lse_val = lie_val = None
     if field_LSE not in (None, "") and field_LIE not in (None, ""):
@@ -409,7 +420,6 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
         except (ValueError, TypeError):
             pass
 
-    # Run chart
     fig, ax = plt.subplots(figsize=(10, 6))
     indices = list(range(1, n + 1))
     ax.plot(indices, medicoes.values, 'o-', color='#3b82f6', markersize=6, linewidth=1.2, label='Medicoes')
@@ -432,7 +442,6 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
     plt.close()
     imagem_base64 = base64.b64encode(buf.getvalue()).decode()
 
-    # Texto-relatorio (estilo Minitab)
     conclusao_t = "❌ Vicio significativo (p<0.05) - sistema com tendencia" if p_valor < 0.05 else "✅ Vicio nao significativo (p>=0.05)"
     msg = f"""## Estudo de Vicio (Tipo 1) - {coluna_y}
 
@@ -467,6 +476,13 @@ def vicio_bias_analise(df, coluna_y, field=None, field_LSE=None, field_LIE=None)
 
     return msg, imagem_base64
 
+
+E NO DICIONARIO ANALISES (no fim do MSA.py), adicione a linha:
+
+ANALISES = {
+    # ...mantenha as analises existentes...
+    "Vício (Bias)": vicio_bias_analise,
+}
 
 
  
