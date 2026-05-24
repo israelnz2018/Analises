@@ -294,8 +294,26 @@ async def analisar(
             params_aceitos = inspect.signature(funcao_grafico).parameters
             args_filtrados = {k: v for k, v in args_to_pass.items() if k in params_aceitos}
 
-            # 🔧 Recebe mensagem, imagem e info_grafico
+            
             mensagem, imagem_grafico_isolado_base64, info_grafico = funcao_grafico(**args_filtrados)
+
+            # 🆕 Salva contexto rico do gráfico pra responder perguntas depois
+            global ultimo_grafico_nome, ultimo_grafico_info, ultimo_grafico_resumo
+            ultimo_grafico_nome = grafico
+            ultimo_grafico_info = info_grafico
+            try:
+                cols_usadas = []
+                if coluna_y: cols_usadas.append(coluna_y.strip())
+                if coluna_x: cols_usadas.append(coluna_x.strip())
+                cols_usadas += [c.strip() for c in lista_y_processada if c]
+                cols_usadas = [c for c in cols_usadas if c and c in df.columns]
+                ultimo_grafico_resumo = (
+                    df[cols_usadas].describe(include='all').to_dict()
+                    if cols_usadas else None
+                )
+            except Exception:
+                ultimo_grafico_resumo = None
+
             ultimo_resultado_texto = f"Gráfico gerado: {grafico}"
 
         return JSONResponse({
@@ -501,9 +519,17 @@ async def pergunta(request: Request, pergunta: str = Form(...), tipo: str = Form
         if tipo == "analise":
             texto_base = ultimo_resultado_texto or "Nenhuma análise encontrada."
         elif tipo == "grafico":
-            texto_base = "Último gráfico gerado no sistema."
-        else:
-            return JSONResponse({"erro": "Tipo de pergunta inválido."}, status_code=400)
+            global ultimo_grafico_nome, ultimo_grafico_info, ultimo_grafico_resumo
+            if ultimo_grafico_nome:
+                texto_base = (
+                    f"Tipo de gráfico gerado: {ultimo_grafico_nome}\n\n"
+                    f"Informações visuais (títulos, eixos, cores, séries):\n"
+                    f"{ultimo_grafico_info}\n\n"
+                    f"Resumo estatístico das colunas usadas no gráfico (count, mean, std, min, max, quartis):\n"
+                    f"{ultimo_grafico_resumo}"
+                )
+            else:
+                texto_base = "Nenhum gráfico encontrado."
 
         # 🔧 Novo: cria prompt completo unindo análise + pergunta
         prompt_completo = f"""
@@ -993,6 +1019,35 @@ async def grafico_interativo(
 
         funcao = GRAFICOS_INTERATIVOS[grafico]
         resultado = funcao(**argumentos)
+
+        # 🆕 Salva contexto rico do gráfico interativo pra responder perguntas depois.
+        # Espelha a Mudança 2 (que faz o mesmo dentro de /v2/analise quando grafico != "").
+        global ultimo_grafico_nome, ultimo_grafico_info, ultimo_grafico_resumo
+        ultimo_grafico_nome = grafico
+        try:
+            # resultado é JSON Plotly — extrai só campos descritivos (não os arrays de dados grandes)
+            if isinstance(resultado, dict):
+                ultimo_grafico_info = {
+                    k: v for k, v in resultado.items()
+                    if k in ('tipo', 'titulo', 'titulo_x', 'titulo_y',
+                             'titulo_grafico', 'lista_y', 'lista_x', 'labels')
+                }
+            else:
+                ultimo_grafico_info = None
+        except Exception:
+            ultimo_grafico_info = None
+        try:
+            cols_usadas = []
+            if coluna_y: cols_usadas.append(coluna_y.strip())
+            if coluna_x: cols_usadas.append(coluna_x.strip())
+            if lista_y_proc: cols_usadas += [c for c in lista_y_proc if c]
+            cols_usadas = [c for c in cols_usadas if c and c in df.columns]
+            ultimo_grafico_resumo = (
+                df[cols_usadas].describe(include='all').to_dict()
+                if cols_usadas else None
+            )
+        except Exception:
+            ultimo_grafico_resumo = None
 
         return JSONResponse(resultado)
 
