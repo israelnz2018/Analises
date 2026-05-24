@@ -14,11 +14,12 @@ from metavise_routes import router as metavise_router
 
 
 
-# ✅ Variável global para armazenar df atual 
 df_global = None
-
-# ✅ Variável global para armazenar última análise ou gráfico
 ultimo_resultado_texto = ""
+# 🆕 contexto rico do último gráfico — preenchido em /v2/analise e /v2/grafico-interativo
+ultimo_grafico_nome = ""
+ultimo_grafico_info = None
+ultimo_grafico_resumo = None
 
 
 # Tentativa segura de importação dos módulos 
