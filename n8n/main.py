@@ -667,6 +667,24 @@ async def analisar_v2(
 
             # 🔧 Recebe mensagem, imagem e info_grafico
             mensagem, imagem_grafico_isolado_base64, info_grafico = funcao_grafico(**args_filtrados)
+
+            # 🆕 Salva contexto rico do gráfico pra responder perguntas depois (Mudança 2)
+            global ultimo_grafico_nome, ultimo_grafico_info, ultimo_grafico_resumo
+            ultimo_grafico_nome = grafico
+            ultimo_grafico_info = info_grafico
+            try:
+                cols_usadas = []
+                if coluna_y: cols_usadas.append(coluna_y.strip())
+                if coluna_x: cols_usadas.append(coluna_x.strip())
+                cols_usadas += [c.strip() for c in lista_y_processada if c]
+                cols_usadas = [c for c in cols_usadas if c and c in df.columns]
+                ultimo_grafico_resumo = (
+                    df[cols_usadas].describe(include='all').to_dict()
+                    if cols_usadas else None
+                )
+            except Exception:
+                ultimo_grafico_resumo = None
+
             ultimo_resultado_texto = f"Gráfico gerado: {grafico}"
 
         return JSONResponse({
@@ -796,7 +814,18 @@ async def pergunta_v2(request: Request, pergunta: str = Form(...), tipo: str = F
         if tipo == "analise":
             texto_base = ultimo_resultado_texto or "Nenhuma análise encontrada."
         elif tipo == "grafico":
-            texto_base = "Último gráfico gerado no sistema."
+            # 🆕 Mudança 3: usa contexto rico salvo em /v2/analise e /v2/grafico-interativo
+            global ultimo_grafico_nome, ultimo_grafico_info, ultimo_grafico_resumo
+            if ultimo_grafico_nome:
+                texto_base = (
+                    f"Tipo de gráfico gerado: {ultimo_grafico_nome}\n\n"
+                    f"Informações visuais (títulos, eixos, cores, séries):\n"
+                    f"{ultimo_grafico_info}\n\n"
+                    f"Resumo estatístico das colunas usadas no gráfico (count, mean, std, min, max, quartis):\n"
+                    f"{ultimo_grafico_resumo}"
+                )
+            else:
+                texto_base = "Nenhum gráfico encontrado."
         else:
             return JSONResponse({"erro": "Tipo de pergunta inválido."}, status_code=400)
 
