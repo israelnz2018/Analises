@@ -1,10 +1,19 @@
-# agente.py - atualizado para uso direto com OpenAI + memória SQLite
+# agente.py - migrado de OpenAI para Claude (REST) + memória SQLite
 
+import os
 import sqlite3
-from openai import OpenAI
+import requests
 
-# Inicializa cliente OpenAI
-client = OpenAI()
+# Configuração do Claude (via REST, mesmo padrão do claude_routes.py).
+# Modelo Sonnet (leve/rápido) — NÃO usar Opus/4.8 aqui por ser potente demais para Q&A.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+CLAUDE_MODEL = os.environ.get("AGENTE_CLAUDE_MODEL", "claude-sonnet-4-6")
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_HEADERS = {
+    "Content-Type": "application/json",
+    "x-api-key": ANTHROPIC_API_KEY,
+    "anthropic-version": "2023-06-01",
+}
 
 # ✅ Função para inicializar banco SQLite
 def init_db():
@@ -53,18 +62,18 @@ def perguntar_ia(pergunta: str, texto_analise: str) -> str:
         f"Pergunta do aluno: {pergunta}"
     )
 
-    # Chama OpenAI
-    resposta = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": "Você é um analista estatístico especialista em análises de processos."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.2,
-        max_tokens=500
-    )
-
-    resposta_final = resposta.choices[0].message.content
+    # Chama o Claude (REST)
+    payload = {
+        "model": CLAUDE_MODEL,
+        "max_tokens": 500,
+        "temperature": 0.2,
+        "system": "Você é um analista estatístico especialista em análises de processos.",
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    r = requests.post(ANTHROPIC_URL, headers=ANTHROPIC_HEADERS, json=payload, timeout=60)
+    r.raise_for_status()
+    data = r.json()
+    resposta_final = data["content"][0]["text"]
 
     # 🔧 Opcional: salvar pergunta e resposta no histórico (ajuste se quiser manter histórico separado)
     salvar_conversa("analise", f"Pergunta: {pergunta}\nResposta: {resposta_final}")
