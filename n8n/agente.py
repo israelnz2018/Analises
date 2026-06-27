@@ -5,9 +5,9 @@ import sqlite3
 import requests
 
 # Configuração do Claude (via REST, mesmo padrão do claude_routes.py).
-# Modelo Sonnet (leve/rápido) — NÃO usar Opus/4.8 aqui por ser potente demais para Q&A.
+# Modelo Haiku (o mais leve/barato) — abaixo do Sonnet 4.6, suficiente para Q&A.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-CLAUDE_MODEL = os.environ.get("AGENTE_CLAUDE_MODEL", "claude-sonnet-4-6")
+CLAUDE_MODEL = os.environ.get("AGENTE_CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 ANTHROPIC_HEADERS = {
     "Content-Type": "application/json",
