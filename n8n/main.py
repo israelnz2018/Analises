@@ -294,8 +294,20 @@ async def analisar(
             params_aceitos = inspect.signature(funcao_grafico).parameters
             args_filtrados = {k: v for k, v in args_to_pass.items() if k in params_aceitos}
 
-            
+
             mensagem, imagem_grafico_isolado_base64, info_grafico = funcao_grafico(**args_filtrados)
+            # Antes a mensagem de erro do grafico era descartada e o front recebia tudo vazio.
+            if not imagem_grafico_isolado_base64 and mensagem:
+                return JSONResponse({"erro": mensagem, "analise": ""}, status_code=400)
+
+
+            # Antes a mensagem de erro do grafico era descartada e o front recebia tudo vazio.
+
+            
+            if not imagem_grafico_isolado_base64 and mensagem:
+
+            
+                return JSONResponse({"erro": mensagem, "analise": ""}, status_code=400)
 
             # 🆕 Salva contexto rico do gráfico pra responder perguntas depois
             global ultimo_grafico_nome, ultimo_grafico_info, ultimo_grafico_resumo
@@ -667,6 +679,9 @@ async def analisar_v2(
 
             # 🔧 Recebe mensagem, imagem e info_grafico
             mensagem, imagem_grafico_isolado_base64, info_grafico = funcao_grafico(**args_filtrados)
+            # Antes a mensagem de erro do grafico era descartada e o front recebia tudo vazio.
+            if not imagem_grafico_isolado_base64 and mensagem:
+                return JSONResponse({"erro": mensagem, "analise": ""}, status_code=400)
 
             # 🆕 Salva contexto rico do gráfico pra responder perguntas depois (Mudança 2)
             global ultimo_grafico_nome, ultimo_grafico_info, ultimo_grafico_resumo

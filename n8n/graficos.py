@@ -20,6 +20,25 @@ def salvar_grafico():
     return img_base64 
 
 
+def _grade_subgrupos(qtd, altura=5, largura=6, sharey=True):
+    """
+    Uma área de plotagem por subgrupo, em grade (até 3 por linha).
+    Antes cada gráfico exigia exatamente 2 subgrupos e devolvia erro com 3+
+    (ex.: Estágio A/B/C); agora aceita qualquer quantidade.
+    Retorna (fig, lista_de_axes) com os axes sobrando já escondidos.
+    """
+    import math
+    import matplotlib.pyplot as plt
+    qtd = max(int(qtd), 1)
+    ncols = min(qtd, 3)
+    nrows = math.ceil(qtd / ncols)
+    fig, axs = plt.subplots(nrows, ncols, figsize=(largura * ncols, altura * nrows), sharey=sharey, squeeze=False)
+    lista = [ax for linha in axs for ax in linha]
+    for ax in lista[qtd:]:
+        ax.set_visible(False)
+    return fig, lista[:qtd]
+
+
 def gerar_histograma(df, coluna_y, subgrupo=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
@@ -55,10 +74,10 @@ def gerar_histograma(df, coluna_y, subgrupo=None):
                 return "❌ Dados insuficientes para gerar o gráfico.", None, None
 
             subgrupos = dados[subgrupo].unique()
-            if len(subgrupos) != 2:
-                return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None, None
+            if len(subgrupos) < 1:
+                return "❌ A coluna Subgrupo não tem valores.", None, None
 
-            fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
+            fig, axs = _grade_subgrupos(len(subgrupos), altura=5, largura=8)
             for ax, sub in zip(axs, subgrupos):
                 sns.histplot(
                     dados[dados[subgrupo] == sub][coluna_y],
@@ -257,10 +276,10 @@ def gerar_pareto(df, coluna_x, coluna_y=None, subgrupo=None):
 
             if dados.empty:
                 return "❌ Dados insuficientes para gerar o gráfico.", None, None
-            if len(subgrupos) != 2:
-                return f"❌ O gráfico espera exatamente 2 categorias no subgrupo e encontrou {len(subgrupos)}.", None, None
+            if len(subgrupos) < 1:
+                return "❌ A coluna Subgrupo não tem valores.", None, None
 
-            fig, axs = plt.subplots(1, 2, figsize=(16, 5), sharey=True)
+            fig, axs = _grade_subgrupos(len(subgrupos), altura=5, largura=8)
 
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
@@ -422,10 +441,10 @@ def gerar_pizza(df, coluna_x, coluna_y=None, subgrupo=None):
             dados = df[[coluna_x, subgrupo] + ([coluna_y] if coluna_y else [])].dropna()
             subgrupos = dados[subgrupo].dropna().unique()
 
-            if len(subgrupos) != 2:
-                return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None, None
+            if len(subgrupos) < 1:
+                return "❌ A coluna Subgrupo não tem valores.", None, None
 
-            fig, axs = plt.subplots(1, 2, figsize=(16, 6))
+            fig, axs = _grade_subgrupos(len(subgrupos), altura=6, largura=8, sharey=False)
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
                 if coluna_y:
@@ -608,12 +627,12 @@ def gerar_barras(df, coluna_x, coluna_y=None, subgrupo=None):
             dados = df[[coluna_x, coluna_y, subgrupo]].dropna() if coluna_y else df[[coluna_x, subgrupo]].dropna()
             subgrupos = dados[subgrupo].unique()
 
-            if len(subgrupos) != 2:
-                return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None, None
+            if len(subgrupos) < 1:
+                return "❌ A coluna Subgrupo não tem valores.", None, None
 
             categorias = sorted(dados[coluna_x].dropna().unique())
 
-            fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+            fig, axs = _grade_subgrupos(len(subgrupos), altura=6, largura=8)
 
             for ax, sub in zip(axs, subgrupos):
                 dados_sub = dados[dados[subgrupo] == sub]
@@ -799,10 +818,10 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
         dados = df[lista_y + [subgrupo]].dropna()
         subgrupos = dados[subgrupo].unique()
 
-        if len(subgrupos) != 2:
-            return f"❌ O gráfico espera exatamente 2 subgrupos e encontrou {len(subgrupos)}.", None, None
+        if len(subgrupos) < 1:
+            return "❌ A coluna Subgrupo não tem valores.", None, None
 
-        fig, axs = plt.subplots(1, 2, figsize=(16, 6), sharey=True)
+        fig, axs = _grade_subgrupos(len(subgrupos), altura=6, largura=8)
 
         for ax, sub in zip(axs, subgrupos):
             dados_sub = dados[dados[subgrupo] == sub]
@@ -811,7 +830,7 @@ def gerar_boxplot(df, lista_y, subgrupo=None):
 
         plt.tight_layout()
 
-        info_grafico["titulo_grafico"] = f"Boxplot por {subgrupos[0]} e {subgrupos[1]}"
+        info_grafico["titulo_grafico"] = "Boxplot por " + ", ".join(str(s) for s in subgrupos)
         info_grafico["titulo_x"] = ", ".join(lista_y)
         info_grafico["titulo_y"] = ""
     else:
